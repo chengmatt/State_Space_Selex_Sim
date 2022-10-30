@@ -1,0 +1,973 @@
+```{r setup}
+library(tidyverse)
+library(sf)
+library(units)
+
+source(here::here('scripts', 'GAM_utils.R'))
+source(here::here('scripts', 'sf_util.R'))
+source(here::here('scripts', 'util.R'))
+
+sim_d = here::here("data", "GOA PCod Simulation")
+
+safe2021_model19.1_p = 
+  readxl::read_xlsx(
+    here::here('data', 'GOA PCod Simulation', 'Appendix 2.3 GOA Pacific cod 2021 Model 19.1 selected data and model results.xlsx'),
+    sheet = "Parameters"
+  )
+
+#' Retrieve parameter from SAFE 2021 model 19.1 appendix
+#'
+#' @param l parameter label
+#' 
+#' @return parameter value
+#' @export
+#'
+#' @examples
+get_safe_param = function(l) {
+  safe2021_model19.1_p %>% 
+  dplyr::filter(Label == l) %>% 
+  pull(Value) %>% 
+  as.numeric
+}
+
+#' Retrieve parameter SD from SAFE 2021 model 19.1 appendix
+#'
+#' @param l parameter label
+#' 
+#' @return parameter value
+#' @export
+#'
+#' @examples
+get_safe_param_sd = function(l) {
+  safe2021_model19.1_p %>% 
+  dplyr::filter(Label == l) %>% 
+  pull(Parm_StDev) %>% 
+  as.numeric
+}
+
+pcod_goa =
+  readRDS(pcod_goa_fp) %>% 
+  dplyr::mutate(
+    f_year = factor(year),
+    f_source = factor(source)
+  )
+
+bts_pcod_comp = 
+  read.csv.akfin.rename(
+    here::here('data', 'NMFS-BTS', 'race_specimen.csv'),
+    ixs = 
+      list(
+        region = 1, 
+        year = 2, 
+        depth = 24,
+        common_name = 29,
+        sex = 32,
+        length = 31,
+        weight = 33,
+        age = 34
+      )
+  ) %>% 
+  # Units cause trouble with the MLE optimizer
+  dplyr::mutate(
+    f_sex = factor(sex),
+    common_name = tolower(common_name),
+    length = set_units(length, 'mm'),
+    weight = set_units(weight, 'g')
+  )
+```
+
+
+We'll be pulling a lot of our values from the most recent stock assessment:
+- Mortality
+- Survival
+- Fecundity
+- Maturity
+- Length-at-age
+- Survey specific catchability 
+- Survey specific age-selectivity
+```{r}
+# Catchability
+safe2021_model19.1_q = 
+  safe2021_model19.1_p %>% 
+  dplyr::filter(Label %in% c("LnQ_base_Srv(4)", "LnQ_base_LLSrv(5)")) %>% 
+  dplyr::select(survey=Label, est=Value, sd=Parm_StDev) %>%
+  dplyr::mutate(
+    survey = 
+      plyr::mapvalues(
+        survey,
+        from = c("LnQ_base_Srv(4)", "LnQ_base_LLSrv(5)"),
+        to = c("BTS", "LLS")
+      ),
+    sd = as.numeric(sd)
+  )
+
+# Size selectivity
+safe2021_model19.1_sizeselectivity =
+  readxl::read_xlsx(
+    here::here('data', 'GOA PCod Simulation', 'Appendix 2.3 GOA Pacific cod 2021 Model 19.1 selected data and model results.xlsx'),
+    sheet = "Size_Selectivities"
+  ) %>% 
+  dplyr::filter(Fleet %in% c("Srv", "LLSrv")) %>% 
+  pivot_longer(cols = -c(Fleet, Yr), names_to = 'Length', values_to = 'Selectivity') %>% 
+  dplyr::mutate(
+    Fleet = plyr::mapvalues(Fleet, from=c("Srv", "LLSrv"), to=c("BTS", "LLS")),
+    Length = set_units(as.integer(Length), 'cm')
+  ) %>% 
+  dplyr::rename(survey = Fleet, year = Yr, length = Length, selectivity = Selectivity) %>% 
+  dplyr::group_by(survey, length) %>% 
+  dplyr::summarise(selectivity = mean(selectivity))
+```
+We'll start with some population meta-dynamics: Length-at-age and Weight-at-length
+```{r}
+safe2021_model19.1_p
+
+laa_ = function(a, v=F) {
+  # In order to add some variation in the length-at-age estimation, each iteration of the function will use values drawn from the pdf estimated by the 2021 SAFE model for the appropriate parameter. It's not perfect, as it yields a laa relationship that's much tighter than the actual, but it's something. We can revisit this later.
+  if(v) {
+    L_1 = rnorm(length(a), get_safe_param("L_at_Amin_Fem_GP_1"), get_safe_param_sd("L_at_Amin_Fem_GP_1"))
+    L_2 = rnorm(length(a), get_safe_param("L_at_Amax_Fem_GP_1"), get_safe_param_sd("L_at_Amax_Fem_GP_1"))
+    K = rnorm(length(a), get_safe_param("VonBert_K_Fem_GP_1"), get_safe_param_sd("VonBert_K_Fem_GP_1"))
+  } 
+  else{
+    L_1 = get_safe_param("L_at_Amin_Fem_GP_1")
+    L_2 = get_safe_param("L_at_Amax_Fem_GP_1")
+    K = get_safe_param("VonBert_K_Fem_GP_1")
+  }
+  
+  return(set_units(L_2 - (L_2 - L_1)*exp(-a * K), 'cm'))
+}
+
+wal_ = function(l) {
+  # The SAFE weight-at-length function is fitted to data that relates length in cm to weight in kg
+  l = set_units(l, 'mm')
+  a = get_safe_param("Wtlen_1_Fem_GP_1")
+  b = get_safe_param("Wtlen_2_Fem_GP_1")
+  
+  return(
+    # We have to use this mess because units raised to a non-integer power are meaningless.
+    # However, a non-integer power is what we have because these coefficients have come out of a non-linear 
+    set_units(a*(as.numeric(l)^b), 'g')
+  )
+}
+```
+Define our simulation parameters
+```{r}
+# Natural Mortality Rate (Taken from 2021 SAFE report)
+M = get_safe_param("NatM_uniform_Fem_GP_1")
+M_sd = get_safe_param_sd("NatM_uniform_Fem_GP_1") %>% as.numeric()
+
+M_ = function(n) {
+  return(exp(rnorm(n, log(M), M_sd)))
+}
+
+# Fishing Mortality Rate (Taken from 2021 SAFE report)
+f_2021 = 
+  readxl::read_excel(
+    here::here('data', 'GOA PCod Simulation', 'Fishing Mortality Workbook.xlsx'), 
+    sheet = 1, range = 'C1:F46'
+  ) %>% 
+  # We assume that F is log-normally distributed, 
+  dplyr::summarize(
+    F_ln_mu = mean(log(F)),
+    F_ln_sigma = sd(log(F))
+  ) %>% 
+  c
+
+
+F_ = function(n) {
+  return(exp(rnorm(n, f_2021$F_ln_mu, f_2021$F_ln_sigma)))
+}
+
+
+# Recruitment (billions) (Taken from 2021 SAFE report)
+# Old function. Used the values printed in table 2.31 of 2021 SAFE report (page 73)
+R_ = function(n) {
+  R_ln_mu = log(0.493)
+  R_ln_sigma = 0.471
+  # Return the recruitment sampled from the lognormal distribution 
+  return(1e9 * exp(rnorm(n, R_ln_mu, R_ln_sigma)))
+}
+
+# New function. Uses the parameters estimated by model 19.1 of 2021 SAFE report. Pulled from appendix 2.3
+R_ = function(n) {
+  # We'll use the recruitment function from the 2021 preferred model (26)
+  r0 = get_safe_param('SR_LN(R0)') %>% exp
+  r_sigma = get_safe_param('SR_sigmaR')
+  
+  b_y = 
+    safe2021_model19.1_p %>% 
+    dplyr::filter(str_detect(Label, "RecrDev")) %>% 
+    pull(Value)
+  
+  return(
+    r0*
+    exp(
+      -0.5*
+        (sample(b_y, n, replace=T))*
+        r_sigma+rnorm(n, 0, r_sigma)
+    )*1e3
+  )
+}
+
+# ---------------------------------
+# SIMULATION PARAMETERS
+# ---------------------------------
+# The maximum age of individuals (after which they are assumed to have 100% mortality)
+n_A = max(bts_pcod_comp$age, na.rm=T) + 2 # We'll add a couple years to the end of the oldest fish ever caught, just to leave room for the possibility of pacific cod of an age that we've never seen. It's unlikely that we'll ever see any of these in the simulation anyways, since the probability of one of our simulated fish living this long will be negligible. However, by the same logic fish of this age would be exceedingly rare and therefore relatively unlikely to be caught.
+# Number of 'burn in' years. Will precede the years of data we have, and allow the simulation to stablize from its origin
+n_bi_y = n_A * 2
+# The number of years to run the simulation. We'll simulate every year for which we have data, plus the 'burn in' years
+n_y = pcod_goa$year %>% unique %>% range %>% diff + n_bi_y + 1
+
+# Abundance at the start of the simulation
+N_0 = 1e9
+# Absolute age0 recruitment each year
+R_v = 
+  rep(1e3 * exp(get_safe_param('SR_LN(R0)')), n_y)
+  # R_(n_y)
+
+# Age-structured natural mortality matrix. Age by column, year by row
+M_mtx =
+  rep(M, n_y * (n_A - 1)) %>% 
+  # exp(rnorm((n_y * (n_A-1)), log(M), M_sd)) %>% 
+  # M_(n_y * (n_A-1)) %>% matrix(ncol=n_A-1) %>% 
+  matrix(ncol=n_A-1)
+
+# Matrix for modifying the fishing rates
+F_mod_mtx =
+  # Build a Gompertz sigmoid to adjust the fishing mortality rate 
+  (sigmoid::Gompertz(seq(1, n_y, 1), a = 2, b = n_y * .3, c = .1) + 0.25) %>% 
+  matrix(nrow = n_y, ncol = n_A-1)
+
+# Age-structured fishing mortality matrix. Age by column, year by row
+F_mtx =
+  rep(exp(f_2021$F_ln_mu), n_y * (n_A-1)) %>% 
+  # exp(rnorm(n_y * (n_A-1), f_2021$F_ln_mu, f_2021$F_ln_sigma)) %>% 
+  # F_(n_y * (n_A-1)) %>% 
+  matrix(ncol=n_A-1) * 
+  F_mod_mtx
+
+# Total mortality matrix. Age by column, year by row
+Z_mtx = 
+  (M_mtx + F_mtx)
+```
+
+Run our operating model
+```{r}
+# ---------------------------------
+# OPERATING MODEL SIMULATION START
+# ---------------------------------
+
+# Build the starting population vector
+# --------------------
+# Evenly distribute our starting population among the age classes
+# N_0_v = rep(N_0 / n_A, n_A)
+# Put the entire starting population in the age 0 class
+N_0_v = c(N_0, rep(0, n_A - 1))
+N_ = matrix(N_0_v, nrow=1)
+
+# Initiate the simulation loop
+# --------------------
+for (i in seq(n_y - 1)) {
+  # Build survival matrix.
+  S = 
+    diag(
+      # Calculate S = exp(-Z)
+      exp(-Z_mtx[i,])
+    ) %>% 
+      # 0 survival after maximum age 
+      cbind(0)
+  # S is now an n_A-1 x n_A matrix. It is missing it's first row, which 
+  #  calculates recruitment. This will be completed separately
+  
+  N_ =
+    N_ %>% 
+    rbind(
+      c(
+        # Add recruits to age 1 slot
+        R_v[i],
+        # Calculate survival for all other slots
+        S %*% c(tail(N_, 1))
+      )
+    )
+}
+
+# Fortify the results:
+N =
+  N_ %>% 
+  data.frame() %>% 
+  rownames_to_column("year") %>% 
+  dplyr::mutate(year = as.integer(as.integer(year) + min(pcod_goa$year) - 1 - n_bi_y)) %>% 
+  pivot_longer(cols = tail(names(.), -1), names_to="age", values_to="n") %>% 
+  dplyr::mutate(age = as.integer(str_replace(age, 'X', '')))
+  # Filter out the 'burn in' years
+  # dplyr::filter(year > min(year) + n_bi_y - 1)
+
+# Visualize the results of the simulation
+N %>% 
+  ggplot(
+    aes(
+      year, 
+      n / 1e9, 
+      fill=
+        factor(
+          age, 
+          levels = unique(age) %>% sort(decreasing = T)
+        )
+    )
+  ) + 
+  geom_bar(stat = "identity", position = "stack") + 
+  theme_light() + 
+  labs(
+    title = "Pacific Cod in the GOA",
+    subtitle = "Simulated Age-Structured Population",
+    x = "Year",
+    y = "Abundance (Billions)"
+  ) + 
+  scale_fill_viridis_d(name="Age") + 
+  theme_light() +
+  labs(
+    title = "GOA Pacific Cod Stock Simulation",
+    subtitle = "Age-structured population across time",
+    x = "Year",
+    y = "Abundance (millions)"
+  )
+
+# Display mortality over time
+rbind(
+  F_mtx %>% 
+    data.frame() %>% 
+    magrittr::set_colnames(., as.character(seq(ncol(.)))) %>% 
+    cbind(year = N$year %>% unique %>% sort) %>% 
+    dplyr::mutate(form = "F"),
+  M_mtx %>% 
+    data.frame() %>% 
+    magrittr::set_colnames(., as.character(seq(ncol(.)))) %>% 
+    cbind(year = N$year %>% unique %>% sort) %>% 
+    dplyr::mutate(form = "M"),
+  Z_mtx %>% 
+    data.frame() %>% 
+    magrittr::set_colnames(., as.character(seq(ncol(.)))) %>% 
+    cbind(year = N$year %>% unique %>% sort) %>% 
+    dplyr::mutate(form = "Z")
+) %>% 
+  pivot_longer(., cols = names(.)[!names(.) %in% c('year', 'form')], names_to = "age") %>% 
+  ggplot(aes(year, value, color=age, linetype=form)) +
+  geom_line() + 
+  theme_light() +
+  theme(legend.position = "bottom") + 
+  labs(
+    title = "GOA Pacific Cod Stock Simulation",
+    subtitle = "Simulation mortality across time",
+    x = "Year",
+    y = "",
+    color = "Age Class",
+    linetype = "Value"
+  )
+
+```
+
+Now we need to distribute the population in space, and then sample that population. This is somewhat done simultaneously, as the spatial and depth components of the models are estimated as continuous functions, and we want to sample them at the locations of our simulated samples.
+
+Based on this, we can see that anything larger than a 13k cell grid is prohibitive. Even that size will require nearly 10 hours, and will need to be run overnight.
+```{r}
+# For the sake of practicality, we'll make the grid cells 20k on a side. This should keep the clip time below 15 minutes.
+goa_grid = 
+  sf::st_make_grid(
+    goa_shp,
+    # We'll create a grid of 20km cells
+    # since the shapefile is in AK albers, the units are in meters, which is preferred.
+    cellsize = 20000,
+    # n = 5,
+    what = "polygons"
+  ) %>% 
+  sf::st_sf() %>% 
+  # Add an OID 
+  dplyr::mutate(., OID = seq(1, nrow(.)))
+
+goa_grid %>% 
+  ggplot() +
+  geom_sf() + 
+  geom_sf(data = ak_shp) + 
+  clip_to_shp(goa_shp)
+  
+# THIS TAKES A LONG TIME FOR HIGH NUMBERS OF POLYGONS
+goa_grid_clip = 
+  # Clip to the goa regional shapefile
+  goa_grid %>% 
+  sf::st_intersection(goa_shp)
+
+# To do this, we'll use the marmap package
+# We'll need the goa_bathy_grid
+goa_bathy_mat = readRDS(here::here('data', 'GOA PCod Simulation', 'goa_bathy_mat.Rds'))
+# Query depth from the sheet using marmap::get.depth
+
+
+goa_grid_depth = 
+  goa_grid_clip %>% 
+  # Add the cell centroids into the dataframe
+  dplyr::mutate(
+    data.frame(.),
+    data.frame(sf::st_coordinates(sf::st_centroid(sf::st_transform(., crs = CRS_WGS_1984)))),
+    data.frame(sf::st_coordinates(sf::st_centroid(.))) %>% dplyr::rename(lon=X, lat=Y),
+    depth = marmap::get.depth(mat=goa_bathy_mat, X, Y, locator = F)$depth
+  )
+
+goa_grid_depth_area = 
+  goa_grid_depth %>% 
+  dplyr::mutate(
+    .,
+    area = sf::st_area(.) %>% units::set_units('km^2')
+  )
+  
+goa_grid_depth_area %>% 
+  ggplot() +
+  geom_sf(aes(fill = depth)) + 
+  add_map() + 
+  clip_to_shp(goa_shp)
+
+goa_grid_depth_area %>% 
+  saveRDS(file.path(sim_d, 'goa_sim_grid_w_depth_area.Rds'))
+
+goa_grid_depth_area =
+  readRDS(file.path(sim_d, 'goa_sim_grid_w_depth_area.Rds'))
+```
+
+```{r}
+# Read in the clipped grid. Bit of a timesaver if the grid definition hasn't changed since it was last built.
+goa_sim_grid = 
+  readRDS(
+    file.path(sim_d, 'goa_sim_grid_w_depth_area.Rds')
+  ) %>% 
+  dplyr::select(lon, lat, depth, area) %>% 
+  # Add in a unique grid id for each grid square. This will be important for later
+  dplyr::mutate(., grid_id = seq(1, nrow(.)))
+
+# Now let's fit a delta model to the observed data and use its predictions to calculate the distribution of proportional abundance across our grid.
+# First we need to fit our models
+# We want these evaluations to be only considerate of the spatial and depth component, since the year effect is being simulated, so we'll refit both the GAM and the VAST models to ignore year effect.
+gam.sim.enc = 
+  bam(
+    ifelse(abundance, 1, 0) ~ 
+      effort + log(effort) + f_source + s(depth) + s(lon, lat, bs = 'tp', k = 30),
+    data = 
+      pcod_goa %>% 
+      dplyr::rename(lon_wgs = lon, lat_wgs = lat, lon = lon_aa, lat = lat_aa),
+    family = binomial(),
+    drop.intercept = T,
+    discrete = T,
+    nthreads = 8,
+    method = "fREML"
+  )
+
+gam.sim.pos = 
+   bam(
+    abundance ~ 
+      offset(log(effort)) + f_source + s(depth) + s(lon, lat, bs = 'tp', k = 30),
+    data = 
+      pcod_goa %>% 
+      dplyr::rename(lon_wgs = lon, lat_wgs = lat, lon = lon_aa, lat = lat_aa) %>% 
+      dplyr::filter(abundance > 0),
+    family = nb(),
+    drop.intercept = T,
+    method = "fREML",
+    discrete = T,
+    nthreads = 12
+  )
+
+# Now we use our fitted model predictions to build a grid of proportional abundance 
+goa_sim_grid_pred =
+  # Start with our sampling grid
+  goa_sim_grid %>% 
+  data.frame() %>% 
+  # Now that all of the necessary fields are present, we can use our delta-model to predict across our grid
+  sf::st_sf(sf_column_name = 'geometry') %>% 
+  dplyr::mutate(
+    .,
+    response = 
+      dm_pred(
+        gam.sim.enc,
+        gam.sim.pos,
+        # When we extrapolate across the delta-model, we want to use the sample locations and depths, but we want to control the source survey and level of effort used.
+        newdata = 
+          # The model expects values for the source-survey, and expressed effort. 
+          dplyr::mutate(
+            .,
+            # We want the survey to be BTS, as its effort is conveniently expressed in km^2
+            f_source = 
+              factor(
+                "BTS", 
+                # Need to define the levels as the same from the pcod_goa dataset
+                levels = 
+                  pcod_goa %>% 
+                  pull(f_source) %>% 
+                  levels
+            ), 
+            # Effort is less arbitrary, since our model is not meant for extrapolation.
+            # As such, we don't want to use a value significantly divergent from the values the model was fit to.
+            # In this case, .1 km2 is both mathematically convenient value, common in the BTS data
+            effort = 0.1
+          ),
+        type = "response"
+      ),
+      abundance_per_unit_area =   
+        # The response is expected catch over 0.1 km^2
+        # We can use this to extrapolate over the area of the grid cell
+        # Our effort input for the model predictions was 0.1km^2, so first multiply by 10 to get expected catch over 1km^2
+        response * 10 %>% 
+        # Now set the units
+        set_units('count/km^2'),
+      # Now extrapolate over the area of the cell:
+      abundance_absolute = 
+        abundance_per_unit_area * area,
+      # Now for each sample event, we have a predicted absolute abundance for the occuring grid square. 
+      # We want the proportion of the annual population that each grid square contains
+      abundance_p = 
+        abundance_absolute / sum(abundance_absolute)
+  ) %>% 
+  dplyr::select(-c(response, abundance_per_unit_area, abundance_absolute))
+
+# Let's check our work. 
+# We know that within each year, all of the abundance proportions should sum to 1 (or very nearly 1)
+if(
+  any(
+    goa_sim_grid_pred %>%
+    # Converting to a data.frame dramatically improved runtime of comparisons like these
+    data.frame() %>% 
+    # Convert the proportional abundance value from units to unitless
+    dplyr::mutate(abundance_p = as.numeric(abundance_p)) %>% 
+    # Sum within 
+    dplyr::summarize(total_p = sum(abundance_p)) %>% 
+    pull(total_p) - 1 > 1e-6
+ )
+) stop ("Predicted abundance proportion incorrectly distributed across grid.")
+
+goa_sim_grid_pred %>% 
+  ggplot() +
+  geom_sf(aes(fill = as.numeric(abundance_p), size=NA)) + 
+  add_map() + 
+  clip_to_shp(goa_shp)
+```
+
+Now we'll join the simulation grid with the sampling events. We won't join in the population data just yet.
+We do it this way because the relationship between the sampling events and the simulation grid is constant across all possible simulations: regardless of how our operating model changes, the spatial grid and the historical sampling events which occur across it are fixed. 
+By joining the sampling events to the grid before we integrate the simulated population data, we can develop a dataframe of sampling events with their corresponding grid cells which can be used across all simulations, i.e. we can rerun our operating model, get a totally different simulated population, and the sampling grid dataframe can still be used. 
+This is important because the sampling grid takes awhile to construct. By doing this once and reusing the dataframe we can shorten the turnaround time for executing a simulation, which will aid in iterative exploration.
+##########
+NOTE: Probably inconsequential, but at the moment (using a 20km-sided grid), the following join drops 14 samples. Presumably they fall just outside of the clipped grid. 14 samples is almost certainly inconsequential, but probably a good idea to mention it.
+#########
+```{r}
+# Add in the sampling event data
+goa_sim_grid_pred_w_samp = 
+  sf::st_join(
+    # We need to join sampling events to grid squares in both space and time
+    # First we'll prepare our simulated samples as a dataframe
+    pcod_goa %>%
+      # Subset the fields we need for the simulation
+      dplyr::select(year, source, lon, lat, effort) %>% 
+      # Add in a unique sample id field
+      dplyr::mutate(
+        ., 
+        sample_id = seq(1, nrow(.))
+      ) %>% 
+      sf::st_as_sf(coords = c("lon", "lat"), crs=CRS_WGS_1984, remove=F) %>% 
+      sf::st_transform(crs=CRS_AK_ALBERS),
+    goa_sim_grid_pred %>% 
+      sf::st_as_sf(sf_column_name='geometry', crs=CRS_AK_ALBERS) %>% 
+      dplyr::select(grid_id, depth, area, abundance_p),
+    join=sf::st_intersects
+  ) %>% 
+  drop_na() %>% 
+  # We'll also convert to a dataframe and drop the geometry column that we no longer need. For cleanliness
+  data.frame() %>% 
+  dplyr::select(-geometry)
+```
+
+
+
+```{r}
+gear_effects =
+  gam.sim.pos %>% 
+  gammit::extract_fixed() %>% 
+  dplyr::mutate(
+    term = 
+      str_replace_all(term, 'f_source', ''),
+    value = gratia::inv_link(gam.sim.pos)(value)
+  ) %>% 
+  dplyr::select(term, value) %>% 
+  rbind(
+    list(
+      term = "BTS",
+      value = 1
+    )
+  ) %>% 
+  deframe
+```
+
+Now we have our proportional field, across which to distribute our simulated population.
+Here we perform said apportionment:
+```{r}
+goa_sim_grid_N = 
+  merge(
+    goa_sim_grid_pred_w_samp,
+    N,
+    by="year"
+  )
+
+# Again, we need to check our work
+# For every sampling event, we should have one record for each age-group
+if(
+  goa_sim_grid_N %>% 
+  dplyr::group_by(sample_id) %>% 
+  dplyr::summarise(n = length(sample_id)) %>% 
+  dplyr::filter(n != n_A) %>% nrow != 0
+) stop("Not all age-class records present within all sampling events")
+
+# For every year/age-group combo, the total abundance should be the same between all records
+if(
+  goa_sim_grid_N %>% 
+  ungroup() %>% 
+  dplyr::group_by(year, age) %>% 
+  summarize(n_d = max(n) - min(n)) %>% 
+  dplyr::filter(n_d != 0) %>% 
+  nrow != 0
+) stop("Discrepancies in age-class abundance between records in same year")
+
+
+if(
+  nrow(goa_sim_grid_N) != nrow(goa_sim_grid_pred_w_samp) * n_A
+) stop("Unexpected number of records in final simulation dataframe")
+```
+
+We'll also add in the length and age data to convert our abundance into biomass
+```{r}
+goa_sim_grid_N_bio = 
+  goa_sim_grid_N %>% 
+  dplyr::mutate(
+    # Calculate the proportional amount of the total abundance present in each cell
+    n = n * abundance_p,
+    length = 
+      # Old method, using fitted LVB model
+      # lvb(age, l_inf = lvb_m@coef[['l_inf']], k = lvb_m@coef[['k']], t_0 = lvb_m@coef[['t_0']]),
+      # New method, using SAFE report parameters:
+      laa_(age, v = T),
+    weight = 
+      # Old method, using fittied WaL model
+      # wal(length_avg, a = wal_m@coef[['a']], b = wal_m@coef[['b']])
+      # New method, using SAFE report parameters:
+      wal_(length),
+    biomass = n * weight
+  )
+
+goa_sim_grid_N_bio %>% 
+  saveRDS(file.path(sim_d, 'goa_sim_grid_N_bio.Rmd'))
+
+# Let's plot our simulated ages, lengths, and weights against observed data to make sure our simulation is within reason.
+rbind(
+  bts_pcod_comp %>% 
+    dplyr::select(length, age) %>% 
+    dplyr::mutate(source = "obs") %>% 
+    drop_na,
+  goa_sim_grid_N_bio %>% 
+    dplyr::select(length, age) %>% 
+    dplyr::mutate(source = "sim") %>% 
+    drop_na
+) %>% 
+  ggplot(aes(age, length, color=source)) + 
+  geom_point()
+
+rbind(
+  bts_pcod_comp %>% 
+    dplyr::select(length, weight) %>% 
+    dplyr::mutate(source = "obs") %>% 
+    drop_na,
+  goa_sim_grid_N_bio %>% 
+    dplyr::select(length, weight) %>% 
+    dplyr::mutate(source = "sim") %>% 
+    drop_na
+) %>% 
+  ggplot(aes(length, weight, color=source)) + 
+  geom_point()
+```
+
+Now we have our simulated sampling events and the state of the simulated stock in the areas they were sampling.
+Recall that, as per our proposal, we will be simulating catch using the following formula:
+
+C = N*q*s*E*G\A
+
+Where C is the observed catch, N is the total population in the surveyed location, A is the total area of the surveyed location, q and s are the catch efficiency and size selectivity respectively, and G is the conversion rate for converting effort from the surveys native units.
+We have N, E, and A from our simulation, and we'll pull q and s from the SAFE report:
+```{r}
+# Catchability
+safe2021_model19.1_q =
+  safe2021_model19.1_p %>% 
+  dplyr::filter(Label %in% c("LnQ_base_Srv(4)", "LnQ_base_LLSrv(5)")) %>% 
+  dplyr::select(source=Label, ln_est=Value, sd=Parm_StDev) %>%
+  dplyr::mutate(
+    source = 
+      plyr::mapvalues(
+        source,
+        from = c("LnQ_base_Srv(4)", "LnQ_base_LLSrv(5)"),
+        to = c("BTS", "LLS")
+      )
+  ) %>% 
+# Meaghan Bryan has informed me that within the model the IPHC catchability coefficient is fixed at 1
+  rbind(
+    c(
+      "source" = "IPHC",
+      "ln_est" = log(1),
+      "sd" = NA
+    )
+  ) %>% 
+  dplyr::mutate(
+    ln_est = as.numeric(ln_est),
+    sd = as.numeric(sd),
+    est = exp(ln_est)
+  )
+
+# Size selectivity
+safe2021_model19.1_sizeselectivity =
+  readxl::read_xlsx(
+    here::here('data', 'GOA PCod Simulation', 'Appendix 2.3 GOA Pacific cod 2021 Model 19.1 selected data and model results.xlsx'),
+    sheet = "Size_Selectivities"
+  ) %>% 
+  dplyr::filter(Fleet %in% c("Srv", "LLSrv")) %>% 
+  pivot_longer(cols = -c(Fleet, Yr), names_to = 'Length', values_to = 'Selectivity') %>% 
+  dplyr::mutate(
+    Fleet = plyr::mapvalues(Fleet, from=c("Srv", "LLSrv"), to=c("BTS", "LLS")),
+    Length = set_units(as.integer(Length), 'cm')
+  ) %>%
+  dplyr::rename(source = Fleet, year = Yr, length_class = Length, selectivity = Selectivity) %>% 
+  # We don't want the year-specific selectivity curves, so we'll average across years
+  dplyr::group_by(source, length_class) %>% 
+  dplyr::summarize(s = mean(selectivity)) %>% 
+  # The SAFE report implies that the IPHC is given the exact same selectivity curve as the BTS, so we'll just imitate that here
+  rbind(
+    .,
+    dplyr::mutate(dplyr::filter(., source == "BTS"), source = "IPHC")
+  )
+```
+
+This just leaves G. This is a tricky one, as I go into some detail about in the Notes doc Gear-Effect Math. In short, G is very difficult to calculate, but we can get a rough approximation of it by taking the gear-effect coefficients estimated by our models and dividing them by q, and average s, as estimated by the SAFE report. 
+```{r}
+# We may be able to estimate the values of G directly
+goa_sim_grid_N_bio %>% 
+  dplyr::mutate(
+    inv_G = (catch * area
+  )
+```
+
+
+```{r}
+# This is just a rough approximation, and may need to be adjusted in the future
+
+G = 
+  left_join(
+    safe2021_model19.1_q %>% 
+      dplyr::select(source, q = est),
+    safe2021_model19.1_sizeselectivity %>% 
+      dplyr::group_by(source) %>% 
+      dplyr::summarize(s = mean(s)),
+    by=c("source")
+  ) %>%
+  dplyr::mutate(
+    H = gear_effects[source],
+    G = 
+      # For the BTS, we fix G at 1
+      ifelse(
+        source == "BTS",
+        1, 
+        H/(q*s)
+      ),
+    # G + H,
+    # In truth, the units of G are km^2/(survey's native units of effort), but this means that the units change between the surveys, which confuses R. Additionally, since the effort field does not contain units, we'll simply leave the denominator blank, which yields a unit of 'km2' for G.
+    G = set_units(G, 'km2')
+  )
+```
+
+
+```{r}
+# This is the second iteration of G, where we manually adjust it to make the CPUE PDFs of the simulation line up better with the observed data.
+g2 = 
+  c(
+    "BTS"=1,
+    "LLS"=.0005e-2,
+    "IPHC"=4.5e-5
+  )
+G = 
+  G %>% 
+  dplyr::mutate(
+    G = set_units(g2[source], 'km2')
+  )
+  
+
+survey_params =
+  left_join(
+    safe2021_model19.1_q %>% 
+      dplyr::select(source, q=est),
+    safe2021_model19.1_sizeselectivity,
+    by=c("source")
+  ) %>% 
+  left_join(
+    G %>% 
+      dplyr::select(source, G),
+    by=c("source")
+  )
+```
+
+The VERY last element we need to decide upon before we simulate our samples is our observation error. This is something of a judgement call, so here's a quick exploration into the effect that different levels of observation error will have on observations
+```{r}
+data.frame(
+  obs_error_sigma = seq(.3, 1.9, .1)
+) %>% 
+  dplyr::group_by(obs_error_sigma) %>% 
+  dplyr::summarize(
+    obs_error_coef = 
+      exp(rnorm(10000, 0, obs_error_sigma^2))
+  ) %>% 
+  ggplot(aes(obs_error_coef, fill=factor(obs_error_sigma), group=factor(obs_error_sigma))) +
+  geom_density(alpha=.3, position = "identity") + 
+  # scale_y_sqrt() + 
+  scale_x_continuous(limits = c(0, 5)) + 
+  labs(
+    title = 
+      "PDF of error coefficient (e^epsilon) under varying levels of sigma",
+    subtitle = 
+      "Simulated expected catch * error coefficient = simulated observed catch",
+    y = "",
+    x = "Error Coefficient"
+  ) + 
+  scale_fill_discrete(name = "Sigma")
+```
+
+Now we have everything we need to calculate our simulated samples. 
+```{r}
+# First, we define the sigma of our observation errors
+# These should be survey specific, as each survey has their own level of observation error
+# One way to think about this parameter: increasing obs_error_sigma 'squashes' the CPUE PDFs flatter and wider
+# After some trial and error, these obs_error_sigma values seem to produce CPUE PDFs that closely resemble observed, survey-specific responses
+# This trend appears to hold across multiple iterations of our simulation, suggesting that these values are not overfitted to a single simulation
+# These values have been determined by hand, but this could be a good opportunity to use some kind of STAN model to determine better values
+surv_obs_error_sigma = 
+  c(
+    "BTS" = 1.65,
+    "IPHC" = 1.55,
+    "LLS" = 2.1
+  )
+
+# A visualization of the chosen observation error distribution
+surv_obs_error_sigma %>% 
+  data.frame() %>% 
+  rownames_to_column("source") %>% 
+  dplyr::rename(obs_error_sigma = '.') %>% 
+  dplyr::group_by(source, obs_error_sigma) %>%  
+  dplyr::summarize(
+    obs_error_coef = 
+      exp(rnorm(10000, 0, obs_error_sigma^2))
+  ) %>% 
+  ggplot(aes(obs_error_coef, fill=source)) +
+  geom_density(alpha=.3, position = "identity", show.legend = F) + 
+  scale_x_continuous(limits = c(0, 5)) + 
+  labs(
+    title = 
+      paste0("PDF of error coefficient (e^epsilon)"),
+    subtitle = 
+      "Simulated expected catch * error coefficient = simulated observed catch",
+    y = "",
+    x = "Error Coefficient"
+  ) + 
+  scale_fill_discrete(name = "Sigma")
+
+# Let's first join our survey-specific parameters to the main data table:
+pcod_goa_sim_samples_joined_srvparams = 
+  pcod_goa_sim_samples_joined %>% 
+  dplyr::mutate(length_class = set_units(as.integer(length), 'cm')) %>% 
+  data.frame() %>% 
+  left_join(
+    survey_params,
+    by = c("source", "length_class")
+  )
+
+# And now we simulate catch
+pcod_goa_sim_catch = 
+  pcod_goa_sim_samples_joined_srvparams %>% 
+  # Join in the survey-specific observation error sigmas
+  dplyr::mutate(obs_error_sigma = surv_obs_error_sigma[source]) %>% 
+  # Now that we have all of the pieces in place, we can simulate observed catch!
+  # C = N*q*s*E*G\A
+  dplyr::mutate(
+    .,
+    expected_catch_abundance = 
+      n * q * s * effort * G / area,
+    expected_catch_biomass = 
+      expected_catch_abundance * weight,
+    # Finally, we need to add error to these observations:
+    epsilon = 
+      rnorm(nrow(.), 0 - obs_error_sigma^2/2, obs_error_sigma^2),
+    observed_catch_abundance = 
+      expected_catch_abundance * exp(epsilon),
+    observed_catch_biomass = 
+      expected_catch_biomass * exp(epsilon)
+  )
+
+pcod_goa_sim_catch_aggr = 
+  pcod_goa_sim_catch %>% 
+  # At this point we want to lump together all catch, as is done in our observed data
+  dplyr::select(year, source, lon, lat, effort, depth, area_swept, observed_catch_abundance, observed_catch_biomass) %>% 
+  dplyr::group_by(year, source, lon, lat, effort, depth, area_swept) %>% 
+  dplyr::summarise(
+    observed_catch_abundance = mean(observed_catch_abundance),
+    observed_catch_biomass = mean(observed_catch_biomass)
+  ) %>% 
+  dplyr::ungroup()
+
+# Let's compare the CPUE distribution between our simulated data and our observed data. We would expect these to be reasonably comparable.
+rbind(
+   pcod_goa_sim_catch_aggr %>%
+    dplyr::select(source, effort, abundance=observed_catch_abundance) %>% 
+    dplyr::mutate(type="simulated"),
+  pcod_goa %>%
+    dplyr::mutate(abundance = set_units(abundance, 'count')) %>% 
+    dplyr::select(source, abundance, effort) %>% 
+    dplyr::mutate(type="observed")
+) %>% 
+  ggplot(aes(log(abundance/effort), group=source, fill=source)) + 
+  geom_density(alpha=.3) + 
+  facet_wrap(~type, ncol=1)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
