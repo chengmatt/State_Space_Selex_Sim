@@ -3,10 +3,11 @@
 # Creator: Matthew LH. Cheng
 
 #' @param path Path to output folder
+#' @param file_name Name of pdf output
 
-plot_OM <- function(path) {
+plot_OM <- function(path, file_name) {
   
-  pdf(here(path, "OM_output_figs.pdf"), height = 15, width = 10)
+  pdf(here(path, file_name), height = 15, width = 10)
   
   require(tidyverse)
 
@@ -18,7 +19,7 @@ plot_OM <- function(path) {
   
   # Total recruitment across time and simulations
 print(  ggplot(rec_df, aes(x = as.numeric(Year), y = Rec, color = Sim, group = 1)) +
-          geom_line() +
+          geom_line(size = 1.5) +
           facet_wrap(~Sim, ncol = 1) +
           theme_bw() +
           theme(legend.position = "none") +
@@ -64,8 +65,8 @@ print(
   
 print(
   # Biomass at age
-  ggplot(biom_df, aes(x = as.numeric(Year), y = Biomass, color = Age)) +
-    geom_line() +
+  ggplot(biom_df, aes(x = as.numeric(Year), y = Biomass, fill = Age)) +
+    geom_col(position = "stack") +
     facet_wrap(~Sim, ncol = 1, scales = "free") +
     theme_bw() +
     theme(legend.position = "none") +
@@ -91,11 +92,11 @@ print(
   
 print(
   # Numbers across ages
-  ggplot(natage, aes(x = as.numeric(Year), y = Numbers, color = Age)) +
-    geom_line() +
+  ggplot(natage, aes(x = as.numeric(Year), y = Numbers, fill = Age)) +
+    geom_col(position = "stack") +
     facet_wrap(~Sim, ncol = 1, scales = "free") +
     theme_bw() +
-    theme(legend.position = "none") +
+    theme(legend.position = "top") +
     labs(x = "Year",y = "Numbers at age")
 )
   
@@ -128,6 +129,7 @@ print(
     theme(legend.position = "none") +
     labs(x = "Age",y = "Average proportion at age")
 )
+
   
 
 # Catch at age ------------------------------------------------------------

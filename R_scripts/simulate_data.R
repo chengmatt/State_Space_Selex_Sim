@@ -18,6 +18,8 @@ source(here("R_scripts", "functions", "specify_data_scenarios.R")) # Specify dat
 source(here("R_scripts", "functions", "specify_selex.R")) # Specify selectivity scenarios
 source(here("R_scripts", "functions", "specify_nat_mort.R")) # Specify natural mortality scenarios
 source(here("R_scripts", "functions", "specify_q.R")) # Specify catchability scenarios
+source(here("R_scripts", "functions", "specify_F_pattern.R")) # Specify fishing mortality scenario
+source(here("R_scripts", "functions", "specify_rec_devs.R")) # Specify recruitment deviates here
 
 # Path to general input biological parameters
 spreadsheet_path <- here("input", "Sablefish_Inputs.xlsx")
@@ -29,7 +31,7 @@ read_params_create_OM_objects(spreadsheet_path = spreadsheet_path)
 
 # Specify data scenarios here
 fish_surv_data_scenarios(Fish_Start_yr = 125, Surv_Start_yr = 150, n_years = n_years,
-                         Fish_freq = 1, Surv_freq = 1, Scenario = "Low")
+                         Fish_freq = 1, Surv_freq = 1, Scenario = "High")
 
 # Specify selectivity parameterizations here
 specify_selex(Fish_Funct_Form = "Asymp", Surv_Funct_Form = "Asymp", ages = ages,
@@ -41,23 +43,13 @@ specify_nat_mort(Mort_Time = "Constant", Mean_M = 0.1)
 # Specify catchability for the fishery and survey
 specify_q(q_Fish_Time = "Constant", q_Surv_Time = "Constant", q_Mean_Fish = 0.2, q_Mean_Surv = 0.03)
 
-# Set 0 to fmort init
-fish_mort[1:(Fish_Start_yr-1),] <- 0
+# Specify fishing mortality pattern
+specify_F_pattern(Fish_Start_yr = Fish_Start_yr, F_type = "Contrast", Start_F = 0.001, F_sigma_dev = 0.0085)
 
-# Increase
-fish_mort[(Fish_Start_yr:(n_years-25)),] <- seq(0.005, 0.3, length.out = length(Fish_Start_yr:(n_years-25)))
+# Specify recruitment deviates here
+specify_rec_devs(Rec_Dev_Type = "iid", rho_rec = NA)
 
-# Ramp down
-fish_mort[(n_years-25):n_years,] <- seq(0.15, 0.1, length.out = length((n_years-25):n_years))
-
-fish_mort_df <- melt(fish_mort)
-ggplot(fish_mort_df, aes(x = as.numeric(Var1), y = value, color = Var2)) +
-  geom_line()
-
-# True F to C
-F_to_C <- TRUE
-
-check_equil <- TRUE
+check_equil <- FALSE
 
 
 # Start Simulation to get to equilibrium conditions --------------------------------------------------------
@@ -70,18 +62,17 @@ for(sim in 1:n_sims) {
   if(check_equil == TRUE) {
     
     # Turn recruitment variation off
-    sigma_rec <- 0
+    rec_devs[,] <- 0
     # Turn fishing off
     Fish_selex_at_age[,,] <- 0 # Selectivity
     fish_mort[,] <- 0
     Fish_yrs <- NA # no fishing occuring
     Fish_Start_yr <- NA # no fishing occuring
+    Surv_yrs <- NA # no survey occuring
+    Surv_Start_yr <- NA # no survey occuring
     
   } # checking equilibrium conditions
-  
-  # Generate new rec devs for every simulation
-  rec_devs[,] <- rnorm(n_years, 0, sigma_rec)
-  
+
   # Print simulation iteration
   print(paste("Simulation",sim,"out of", n_sims))
 
@@ -103,8 +94,8 @@ for(sim in 1:n_sims) {
       SSB[y,sim] <- sum(mat_at_age[y,,sim] * wt_at_age[y,,sim] * N_at_age[y,,sim], na.rm = TRUE)
       
       # Now, calculate the number of recruits we get - this returns abundance - N at age 2
-      rec_total[y,sim] <- beverton_holt_recruit_new(ssb = SSB[y,sim], h = h, r0 = r0, ssb0 = ssb0) *
-                                                                 exp(rec_devs[y,sim] - ((sigma_rec^2)/2)) # Add lognormal correction and recdevs
+      rec_total[y,sim] <- round(beverton_holt_recruit_new(ssb = SSB[y,sim], h = h, r0 = r0, ssb0 = ssb0) *
+                                  exp(rec_devs[y,sim] - ((sigma_rec^2)/2))) # Add lognormal correction and recdevs
 
     }  # if we are in the first year of the simulation
     
@@ -144,11 +135,8 @@ for(sim in 1:n_sims) {
         
       } # ages loop
       
-
-    ### Update Values + Generate New Recruits + Get Catch at Age -----------------------------------
+    ###  Get Catch at Age (Only F to C for now) -----------------------------------
       
-      if(F_to_C == TRUE) { #  catch equation 
-        
         # Calculate Z at age - total mortality
         Z_at_age <- (Mort_at_age[y-1,,sim] + (fish_mort[y-1,sim] * Fish_selex_at_age[y-1,,sim]))
         
@@ -158,20 +146,6 @@ for(sim in 1:n_sims) {
         # Now, get catch at age
         Catch_at_age[y-1,,sim] <- Prop_fish_mort * N_at_age[y-1,,sim] * (1-exp(-Z_at_age)) * wt_at_age[y,,sim]
         
-      } # Going from F to C
-      
-      # Update Biomass at age (Note that during the last year, N_at_age, Biomass_at_age,
-      # and SSB has not had impacts from natural mortality or fishing mortality - it represents
-      # what's left in the terminal year)
-      Biom_at_age[y,,sim] <- N_at_age[y,,sim] * wt_at_age[y,,sim]
-      
-      # Now, update SSB for year y and generate recruits for the new year with the updated SSB
-      SSB[y,sim] <- sum(mat_at_age[y,,sim] * wt_at_age[y,,sim] * N_at_age[y,,sim], na.rm = TRUE)
-      
-      # Now generate new recruits with the updated SSB
-      rec_total[y,sim] <- beverton_holt_recruit_new(ssb = SSB[y,sim], h = h, r0 = r0, ssb0 = ssb0) *
-                                                          exp(rec_devs[y,sim] - ((sigma_rec^2)/2)) # Add lognormal correction and recdev
-      
 # Observation Model (Survey and Fishery) ----------------------------------
 
     ### Fishery -----------------------------------------------------------------
@@ -209,10 +183,23 @@ for(sim in 1:n_sims) {
         # Sample from the expected proportions at age in the index
         Prob_Surv_at_age <- Survey_Index_at_age[y-1,,sim]/sum(Survey_Index_at_age[y-1,,sim])
         
-        # Generate comps based on the expected CPUE at age
+        # Generate comps based on the expected CPUE at agew
         Survey_Age_Comps[y-1,,sim] <- rmultinom(n = 1, size = N_eff_surv, prob = Prob_Surv_at_age)
         
       } # Only start sampling if we are at the start of the survey start year
+        
+        
+        ### Update Biomass values and Numbers + Generate Recruits -------------------
+        
+        # Update Biomass at age 
+        Biom_at_age[y,,sim] <- N_at_age[y,,sim] * wt_at_age[y,,sim]
+        
+        # Now, update SSB for year y and generate recruits for the new year with the updated SSB
+        SSB[y,sim] <- sum(mat_at_age[y,,sim] * wt_at_age[y,,sim] * N_at_age[y,,sim], na.rm = TRUE)
+        
+        # Now generate new recruits with the updated SSB
+        rec_total[y,sim] <- beverton_holt_recruit_new(ssb = SSB[y,sim], h = h, r0 = r0, ssb0 = ssb0) *
+          exp(rec_devs[y,sim] - ((sigma_rec^2)/2)) # Add lognormal correction and recdev
       
     } # if we are no longer in the first year
 
@@ -227,7 +214,54 @@ for(sim in 1:n_sims) {
 dir.figs <- here("figs", "Base_OM_Figs")
 dir.create(dir.figs)
 
-plot_OM(path = dir.figs)
+plot_OM(path = dir.figs, file_name = "F_contrast.pdf")
+plot_OM(path = dir.figs, file_name = "Equilibrium_Checks.pdf")
+
+
+# WHAM checks -------------------------------------------------------------
+
+library(wham)
+
+# Create output folder
+dir.output <- here("output", "WHAM_output")
+dir.create(dir.output)
+
+wham.dir <- find.package("wham")
+asap.file.path = file.path(wham.dir,"extdata","ex1_SNEMAYT.dat")
+asap3 <- read_asap3_dat(asap.file.path)
+# 
+
+fit_wham()
+
+
+
+
+
+# F testing ---------------------------------------------------------------
+
+# Get mean natural mortality rate
+mean_nat_mort <- mean(Mort_at_age[,,sim])
+
+# Set 0 to fmort init
+fish_mort[1:(Fish_Start_yr-1),] <- 0
+
+# Increase
+fish_mort[Fish_Start_yr:round(mean(Fish_Start_yr:n_years)),] <- seq(0.05, (1.5 * mean_nat_mort),length.out = length(Fish_Start_yr:round(mean(Fish_Start_yr:n_years))))
+
+# Ramp down
+fish_mort[round(mean(Fish_Start_yr:n_years)):n_years,] <- seq((1.5 * mean_nat_mort), (0.75 * mean_nat_mort), 
+                                                              length.out = length(round(mean(Fish_Start_yr:n_years)):n_years))
+
+# fish_mort[,] <-0.2
+
+fish_mort_df <- melt(fish_mort)
+ggplot(fish_mort_df, aes(x = as.numeric(Var1), y = value, color = Var2)) +
+  geom_line()
+
+
+mid = 160
+nby = 
+ matrix(0.2 + c(seq(0,0.4,length.out = mid),seq(0.4,0,length.out=nby-mid)),125)
 
 
 
