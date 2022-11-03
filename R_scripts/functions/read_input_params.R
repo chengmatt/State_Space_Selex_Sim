@@ -113,6 +113,7 @@ read_params_create_OM_objects <- function(spreadsheet_path) {
   r0 <<- recruitment_pars$Value[recruitment_pars$Par == "r0"] # Virgin Recruitment
   ssb0 <<- recruitment_pars$Value[recruitment_pars$Par == "ssb0"] # Virgin SSB
   sigma_rec <<- recruitment_pars$Value[recruitment_pars$Par == "sigma_rec"] # Recruitment variability
+  # mu_rec <<- recruitment_pars$Value[recruitment_pars$Par == "mu_rec"] # Mean recruitment
   
   print("### Input parameters have been read in and OM objects have been created ###")
 

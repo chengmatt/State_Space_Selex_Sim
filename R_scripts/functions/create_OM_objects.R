@@ -65,10 +65,9 @@ create_OM_objects <<- function(n_years, ages, n_sims) {
                           ))
   
   # Fishery Index across years
-  Fishery_Index_at_age <<- array(dim = c(n_years,length(ages), n_sims), 
+  Fishery_Index <<- array(dim = c(n_years, n_sims), 
                          dimnames = list( # Set up dimensions names
                            c(paste("Year", 1:n_years, sep = "_")), # Years 
-                           c(paste("Age", ages, sep = "_")), # Years 
                            c(paste("Sim",1:n_sims)) # Simulation 
                          ))
   
@@ -80,10 +79,9 @@ create_OM_objects <<- function(n_years, ages, n_sims) {
                           ))
   
   # Fishery Index across years
-  Survey_Index_at_age <<- array(dim = c(n_years, length(ages), n_sims), 
+  Survey_Index <<- array(dim = c(n_years, n_sims), 
                          dimnames = list( # Set up dimensions names
                            c(paste("Year", 1:n_years, sep = "_")), # Years 
-                           c(paste("Age", ages, sep = "_")), # Years 
                            c(paste("Sim",1:n_sims)) # Simulation 
                          ))
   

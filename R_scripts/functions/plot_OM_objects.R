@@ -184,12 +184,12 @@ print(
 # Indices of abundance ----------------------------------------------------
 
   # Fishery index
-  idx_fish <- melt(Fishery_Index_at_age) 
-  names(idx_fish) <- c("Year", "Age", "Sim", "Index")
+  idx_fish <- melt(Fishery_Index) 
+  names(idx_fish) <- c("Year", "Sim", "Index")
   
 print(
   # Across ages
-  ggplot(idx_fish %>% drop_na(), aes(as.numeric(Year), y = Index, color = Age))+
+  ggplot(idx_fish %>% drop_na(), aes(as.numeric(Year), y = Index))+
     geom_line(size = 1.1) +
     facet_wrap(~Sim, ncol = 1, scales = "free") +
     theme_bw() +
@@ -197,48 +197,18 @@ print(
     labs(x = "Year",y = "Biomass index at age", title = "Fishery Index") 
 )
   
-print(
-  # Aggregated
-  idx_fish %>% 
-    drop_na() %>% 
-    group_by(Year, Sim) %>% 
-    summarize(Index = sum(Index, na.rm = TRUE)) %>% 
-    ggplot(aes(as.numeric(Year), y = Index, color = Sim))+
-    geom_line(size = 1.1, alpha = 0.75) +
-    geom_point(size = 2) +
-    facet_wrap(~Sim, ncol = 1, scales = "free") +
-    theme_bw() +
-    theme(legend.position = "none") +
-    labs(x = "Year",y = "Biomass index", title = "Fishery Index") 
-)
-  
   # Survey index
-  idx_surv <- melt(Survey_Index_at_age)
-  names(idx_surv) <- c("Year", "Age", "Sim", "Index")
+  idx_surv <- melt(Survey_Index)
+  names(idx_surv) <- c("Year", "Sim", "Index")
   
 print(
   # Across ages
-  ggplot(idx_surv %>% drop_na(), aes(as.numeric(Year), y = Index, color = Age))+
+  ggplot(idx_surv %>% drop_na(), aes(as.numeric(Year), y = Index))+
     geom_line(size = 1.1) +
     facet_wrap(~Sim, ncol = 1, scales = "free") +
     theme_bw() +
     theme(legend.position = "top") +
     labs(x = "Year",y = "Biomass index at age", title = "Survey Index") 
-)
-  
-print(
-  # Aggregated
-  idx_surv %>% 
-    drop_na() %>% 
-    group_by(Year, Sim) %>% 
-    summarize(Index = sum(Index, na.rm = TRUE)) %>% 
-    ggplot(aes(as.numeric(Year), y = Index, color = Sim))+
-    geom_line(size = 1.1, alpha = 0.75) +
-    geom_point(size = 2) +
-    facet_wrap(~Sim, ncol = 1, scales = "free") +
-    theme_bw() +
-    theme(legend.position = "none") +
-    labs(x = "Year",y = "Biomass index", title = "Survey Index") 
 )
 
   }, error = function(error) {cat("ERROR :",conditionMessage(error), "\n")}) # end try catch statement
@@ -342,8 +312,8 @@ print(
   ### Fishing Mortality -------------------------------------------------------
   
   fmort_df <- melt(fish_mort)
-  names(fmort_df) <- c("Year", "Sim", "F_Mort")
-    
+  names(fmort_df) <- c("Year", "Sim", "F_Mort") 
+
   print(
     ggplot(fmort_df, aes(x = as.numeric(Year), y = F_Mort, color = Sim)) +
       geom_line(size = 1.3) +
@@ -353,6 +323,12 @@ print(
       labs(x = "Year",y = "Fishing Mortality", title = "Fishing Mortality") 
   )
 
+
+# Selectivity -------------------------------------------------------------
+
+  plot(Fish_selex_at_age[1,,], main = 'Fishery Selex')
+  plot(Surv_selex_at_age[1,,], main = 'Survey Selex')
+  
   dev.off()
   
 } # end function

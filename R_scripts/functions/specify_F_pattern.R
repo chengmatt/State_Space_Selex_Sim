@@ -11,7 +11,7 @@
 specify_F_pattern <- function(Fish_Start_yr, Start_F, F_type, F_sigma_dev = 0) {
   
   # Get mean natural mortality rate
-  mean_nat_mort <- mean(Mort_at_age[,,sim])
+  mean_nat_mort <- mean(Mort_at_age[,,])
   
   # Set fishing mortality to be 0 before the fishery starts
   fish_mort[1:(Fish_Start_yr-1),] <- 0

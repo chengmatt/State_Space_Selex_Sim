@@ -29,22 +29,22 @@ fish_surv_data_scenarios <- function(Fish_Start_yr, Surv_Start_yr, n_years,
   if(Scenario == "Low") {
     Fishery_CV <<- 0.3
     Survey_CV <<- 0.2
-    N_eff_fish <<- 20
-    N_eff_surv <<- 30
+    N_eff_fish <<- 40
+    N_eff_surv <<- 50
   } # Low data quality and quantity scenario
   
   if(Scenario == "Medium") {
     Fishery_CV <<- 0.2
     Survey_CV <<- 0.15
-    N_eff_fish <<- 40
-    N_eff_surv <<- 50
+    N_eff_fish <<- 80
+    N_eff_surv <<- 100
   } # Medium data quality and quantity scenario
   
   if(Scenario == "High") {
     Fishery_CV <<- 0.15
     Survey_CV <<- 0.1
-    N_eff_fish <<- 80
-    N_eff_surv <<- 100
+    N_eff_fish <<- 150
+    N_eff_surv <<- 200
   } # Low data quality and quantity scenario
   
 } # end function
