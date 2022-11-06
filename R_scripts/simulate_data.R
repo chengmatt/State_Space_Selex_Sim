@@ -8,6 +8,8 @@
 library(here)
 library(reshape2)
 library(tidyverse)
+library(wham)
+library(TMB)
 
 # load in functions here 
 source(here("R_scripts", "functions", "create_OM_objects.R")) # Create OM objects to hold stuff in
@@ -23,6 +25,7 @@ source(here("R_scripts", "functions", "specify_rec_devs.R")) # Specify recruitme
 source(here("R_scripts", "functions", "sample_index.R")) # Generate index data
 source(here("R_scripts", "functions", "sample_age_comps.R")) # Generate age comp data
 source(here("R_scripts", "functions", "make_input.R")) # Put stuff into WHAM format
+source(here("R_scripts", "functions", "get_results.R")) # Get WHAM data from model
 
 # Path to general input biological parameters
 spreadsheet_path <- here("input", "Sablefish_Inputs.xlsx")
@@ -33,27 +36,27 @@ spreadsheet_path <- here("input", "Sablefish_Inputs.xlsx")
 read_params_create_OM_objects(spreadsheet_path = spreadsheet_path)
 
 # Specify data scenarios here
-fish_surv_data_scenarios(Fish_Start_yr = 125, Surv_Start_yr = 150, n_years = n_years,
-                         Fish_freq = 1, Surv_freq = 1, Scenario = "High")
+fish_surv_data_scenarios(Fish_Start_yr = 190, Surv_Start_yr = 190, n_years = n_years,
+                           Fish_freq = 1, Surv_freq = 1, Scenario = "High")
 
 # Specify selectivity parameterizations here
 specify_selex(Fish_Funct_Form = "Asymp", Surv_Funct_Form = "Asymp", ages = ages,
-              Fish_Time = "Constant", a50_fish = 5, k_fish = 1, a50_surv = 5, k_surv = 1)
+              Fish_Time = "Constant", a50_fish = 7, k_fish = 1, a50_surv = 3, k_surv = 1)
 
 # Specify Natural Mortality
-specify_nat_mort(Mort_Time = "Constant", Mean_M = 0.1)
+specify_nat_mort(Mort_Time = "Constant", Mean_M = Mean_M)
 
 # Specify catchability for the fishery and survey
-specify_q(q_Fish_Time = "Constant", q_Surv_Time = "Constant", q_Mean_Fish = 0.001, q_Mean_Surv = 0.0001)
+specify_q(q_Fish_Time = "Constant", q_Surv_Time = "Constant", 
+          q_Mean_Fish = 0.035, q_Mean_Surv = 0.01)
 
 # Specify fishing mortality pattern
-specify_F_pattern(Fish_Start_yr = Fish_Start_yr, F_type = "Contrast", Start_F = 0.001, F_sigma_dev = 0.001)
+specify_F_pattern(Fish_Start_yr = Fish_Start_yr, F_type = "Contrast", Start_F = 0.001, F_sigma_dev = 0)
 
-# Specify recruitment deviates here
-specify_rec_devs(Rec_Dev_Type = "iid", rho_rec = NA)
+# Specify recruitment deviates here - loops though each simulation
+specify_rec_devs(Rec_Dev_Type = "iid", rho_rec = NA) 
 
 check_equil <- FALSE
-
 
 # Start Simulation to get to equilibrium conditions --------------------------------------------------------
 
@@ -64,8 +67,6 @@ for(sim in 1:n_sims) {
 
   if(check_equil == TRUE) {
     
-    # Turn recruitment variation off
-    rec_devs[,] <- 0
     # Turn fishing off
     Fish_selex_at_age[,,] <- 0 # Selectivity
     fish_mort[,] <- 0
@@ -74,11 +75,13 @@ for(sim in 1:n_sims) {
     Surv_yrs <- NA # no survey occuring
     Surv_Start_yr <- NA # no survey occuring
     
+    print("### Checking whether equilibrium conditions have been met ###")
+    
   } # checking equilibrium conditions
 
   # Print simulation iteration
   print(paste("Simulation",sim,"out of", n_sims))
-
+  
 # Years loop  -------------------------------------------------------------
 
   for(y in 1:n_years) {
@@ -88,17 +91,17 @@ for(sim in 1:n_sims) {
     if(y == 1) { 
       # Initialize the population here first. We are going to seed the population with age-2s at 1600
       # Put that into our N_at_age array
-      N_at_age[y,1,sim] <- round(N_1)
+      N_at_age[y,1,sim] <- N_1
       
       # Update Biomass at age 
       Biom_at_age[y,1,sim] <- N_at_age[y,1,sim] * wt_at_age[y,1,sim]
 
       # Now, calculate our SSB in the first year
-      SSB[y,sim] <- sum(mat_at_age[y,,sim] * wt_at_age[y,,sim] * N_at_age[y,,sim], na.rm = TRUE)
-      
-      # Now, calculate the number of recruits we get - this returns abundance - N at age 2
-      rec_total[y,sim] <- round(beverton_holt_recruit_new(ssb = SSB[y,sim], h = h, r0 = r0, ssb0 = ssb0) *
-                                  exp(rec_devs[y,sim] - ((sigma_rec^2)/2))) # Add lognormal correction and recdevs
+      SSB[y,sim] <- sum(mat_at_age[y,,sim] * Biom_at_age[y,1,sim], na.rm = TRUE)
+
+        # Now, calculate the number of recruits we get - this returns abundance - N at age 2
+        rec_total[y,sim] <- beverton_holt_recruit_new(ssb = SSB[y,sim], h = h, r0 = r0, ssb0 = ssb0) *
+          exp(rec_devs[y,sim] - ((sigma_rec^2)/2)) # Add lognormal correction and recdevs
 
     }  # if we are in the first year of the simulation
     
@@ -113,12 +116,12 @@ for(sim in 1:n_sims) {
         if(a != length(ages)) {
           
           # Apply a natural mortality rate and fishing mortality rate to decrement the population (Z = M + F)
-          N_at_age[y,a+1,sim] <- round(  N_at_age[y-1,a,sim] * # Indexing our numbers at age
-                                        exp(-(Mort_at_age[y-1,a,sim] + (fish_mort[y-1,sim] * Fish_selex_at_age[y-1,a,sim])))
-                                    ) # Z = M + F
+          N_at_age[y,a+1,sim] <- N_at_age[y-1,a,sim] * # Indexing our numbers at age
+                                 exp(-(Mort_at_age[y-1,a,sim] + (fish_mort[y-1,sim] * Fish_selex_at_age[y-1,a,sim])))
+                                     # Z = M + F
           
           # Now, add in the recruits generated from the previous year to the numbers at age matrix to recruit age
-          N_at_age[y,1,sim] <- round(rec_total[y-1,sim])
+          N_at_age[y,1,sim] <- rec_total[y-1,sim]
           
         } # if we are not in the plus group
         
@@ -131,10 +134,9 @@ for(sim in 1:n_sims) {
           # has already been decremeneted and added into the plus group here )
           
           # Applying natural and fishing mortality to indivduals from the previous year  that were in the plus group
-          N_at_age[y,length(ages),sim] <- round(
-            (N_at_age[y-1,length(ages),sim] * exp(-(Mort_at_age[y-1,a,sim] + (fish_mort[y-1,sim] * Fish_selex_at_age[y-1,a,sim])))) + # Z = M + F
-              N_at_age[y,length(ages),sim] # Adding back the individuals that recently recruited into + group
-          )
+          N_at_age[y,length(ages),sim] <-  (N_at_age[y-1,length(ages),sim] * exp(-(Mort_at_age[y-1,a,sim] + (fish_mort[y-1,sim] * Fish_selex_at_age[y-1,a,sim])))) + # Z = M + F
+                                            N_at_age[y,length(ages),sim] # Adding back the individuals that recently recruited into + group
+          
                                            
         } # if we are in the plus group and we had a plus group in the previous year (so we are not accidentally
         # adding additional plus groups together)
@@ -147,7 +149,7 @@ for(sim in 1:n_sims) {
         Z_at_age <- (Mort_at_age[y-1,,sim] + (fish_mort[y-1,sim] * Fish_selex_at_age[y-1,,sim]))
         
         # Calculate our proportion of mortality via fishing
-        Prop_fish_mort <- (fish_mort[y-1,sim] * Fish_selex_at_age[y-1,a,sim]) / Z_at_age
+        Prop_fish_mort <- (fish_mort[y-1,sim] * Fish_selex_at_age[y-1,,sim]) / Z_at_age
         
         # Now, get catch at age
         Catch_at_age[y-1,,sim] <- Prop_fish_mort * N_at_age[y-1,,sim] * (1-exp(-Z_at_age)) * wt_at_age[y,,sim]
@@ -160,8 +162,8 @@ for(sim in 1:n_sims) {
         # We only sample when y > Fish_Start_yr because we need to wait for the lag in Fmort to catch up
         if(y > Fish_Start_yr & y %in% c(Fish_yrs)) { # Observation Model for Fishery
           
-          # Generate a fishery index using our function w/ normal error (biomass based)
-          Fishery_Index[y-1,sim] <- sample_index(Idx_Fleet = "Fishery", error = "normal")
+          # Generate a fishery index using our function w/ normal error (numbers based)
+          Fishery_Index[y-1,sim] <- sample_index(Idx_Fleet = "Fishery", error = "log_normal")
 
           # Generate comps based on the expected catch at age
           Fish_Age_Comps[y-1,,sim] <- sample_age_comps(Comp_Fleet = "Fishery", error = "multinomial")
@@ -178,11 +180,11 @@ for(sim in 1:n_sims) {
       
       if(y >= (Surv_Start_yr+1) & y %in% c(Surv_yrs)) {
 
-        # Get survey index here (biomass based)
-        Survey_Index[y-1,sim] <- sample_index(Idx_Fleet = "Survey", error = "normal")
+        # Get survey index here (numbers based) 
+        Survey_Index[y-1,sim] <- sample_index(Idx_Fleet = "Survey", error = "log_normal")
         
-        # Generate comps based on the expected CPUE at agew
-        Survey_Age_Comps[y-1,,sim] <- sample_age_comps(Comp_Fleet = "Fishery", error = "multinomial")
+        # Generate comps based on the expected CPUE at age
+        Survey_Age_Comps[y-1,,sim] <- sample_age_comps(Comp_Fleet = "Survey", error = "multinomial")
         
       } # Only start sampling if we are at the start of the survey start year
         
@@ -193,13 +195,12 @@ for(sim in 1:n_sims) {
         Biom_at_age[y,,sim] <- N_at_age[y,,sim] * wt_at_age[y,,sim]
         
         # Now, update SSB for year y and generate recruits for the new year with the updated SSB
-        SSB[y,sim] <- sum(mat_at_age[y,,sim] * wt_at_age[y,,sim] * N_at_age[y,,sim], na.rm = TRUE)
-        
-        # Now generate new recruits with the updated SSB
-        rec_total[y,sim] <- round( beverton_holt_recruit_new(ssb = SSB[y,sim], h = h, r0 = r0, ssb0 = ssb0) *
-                                       exp(rec_devs[y,sim] - ((sigma_rec^2)/2))
-                                   ) # Add lognormal correction and recdev
-                                  
+        SSB[y,sim] <- sum(mat_at_age[y,,sim] * Biom_at_age[y,,sim], na.rm = TRUE)
+          
+          # Now generate new recruits with the updated SSB
+          rec_total[y,sim] <- beverton_holt_recruit_new(ssb = SSB[y,sim], h = h, r0 = r0, ssb0 = ssb0) *
+                                                        exp(rec_devs[y,sim] - ((sigma_rec^2)/2))
+          
     } # if we are no longer in the first year
 
   } # end year loop
@@ -207,79 +208,103 @@ for(sim in 1:n_sims) {
 } # end simulation loop
 
 
-# WHAM checks -------------------------------------------------------------
+# WHAM checks ------------------------------------------------------------- (changed recruit var to be lower)
 
-library(wham)
-library(TMB)
+# Set modelling structure here
+selectivity <- list(model = rep("logistic", 2))
 
-# Force our inputs into a list - so that it reads into wham -
-basic <- make_input(n_fleets = 1, n_indices = 2, Catch_CV_Val = 0.05) # catch_cv needs to be > 0
+M <- list(model = "constant", initial_means = 0.1, est_ages = 1) # need to specify est_ages for M to be estimated!
 
-# Specify options
-# selectivity <- list(model = rep("logistic", basic$n_indices), 
-#                     initial_par = list(c(5,1), c(5,1)))
+catchability <- list(re = "none") # put bounds on q
 
-fish_s <- melt(Fish_selex_at_age) %>% 
-  group_by(Var2) %>% 
-  summarize(mean = mean(value))
+for(sim in 1:n_sims) {
+  
+  # Force our inputs into a list - so that it reads into wham -
+  basic <- make_input(n_fleets = 1, n_indices = 2, Catch_CV_Val = 0.05, catch_error = FALSE,
+                      n_sims = sim, bias_obs = TRUE, bias_process = TRUE) 
+  
+  # Make WHAM inputs here 
+  test_wham <- wham::prepare_wham_input(basic_info = basic, selectivity = selectivity, 
+                                        recruit_model = 2, M = M)
+  
+  # Fit WHAM here
+  em_fit <- wham::fit_wham(input = test_wham, do.fit = T, do.osa = F, do.retro = F,
+                           save.sdrep = TRUE, do.check = T)
+  
+} # end loop of number of simulations we want to run
 
-surv_s <- melt(Surv_selex_at_age) %>% 
-  group_by(Var2) %>% 
-  summarize(mean = mean(value))
-
-
-selectivity = list(model = rep("age-specific", basic$n_indices),
-                   fix_pars = list(1:30,2:30),
-                   initial_pars = list(c(fish_s$mean), c(surv_s$mean)
-                   ) )
-
-M <- list(model = "constant", re = "none", initial_means = 0.1)
-catchability <- list(re = "none", initial_q = c(0.001, 0.0001))
-age_comp <- "multinomial"
-
-# Make WHAM inputs here - need to use developmental version for it to work...
-test_wham <- wham::prepare_wham_input(basic_info = basic, selectivity = selectivity, recruit_model = 3,
-                                      catchability = catchability, M = M, age_comp = age_comp)
-
-
-# Fit WHAM here
-em_fit <- wham::fit_wham(input = test_wham, do.fit = T, do.osa = F, do.retro = F,
-                  save.sdrep = TRUE)
-
-# Output plots
-plot_wham_output(em_fit)
+# Debugging
 em_fit$sdrep
-
-# Check convergence
-convergence <- check_convergence(em_fit, ret = T)
-# report <- sdreport(em_fit)
-em_fit$sdrep
-
 rep <- em_fit$report()
 sapply(grep("nll",names(rep),value=T), function(x) sum(rep[[x]]))
 
-plot(SSB[125:200])
-plot(em_fit$rep$SSB)
 
-# Plot checks Conditions ---------------------------------------------
+# Fishery selectivity
+fish_sel_df <- melt(Fish_selex_at_age)
+names(fish_sel_df) <- c("Year", "Age", "Sim", "Selex")
+fish_sel_df <- fish_sel_df %>% 
+  group_by(Age) %>% 
+  summarize(Selex = mean(Selex)) %>% 
+  mutate(Type = "Fishery",
+         Age = parse_number(as.character(Age))-1)
 
-# Create output folder to visualize OM figures
-dir.figs <- here("figs", "Base_OM_Figs")
-dir.create(dir.figs)
+surv_sel_df <- melt(Surv_selex_at_age)
+names(surv_sel_df) <- c("Year", "Age", "Sim", "Selex")
+surv_sel_df <- surv_sel_df %>% 
+  group_by(Age) %>% 
+  summarize(Selex = mean(Selex)) %>% 
+  mutate(Type = "Survey",
+         Age = parse_number(as.character(Age))-1)
+  
+# Output plots
+# Create directory to ouptut plots to
+wham_out <- here("figs", "wham_checks")
+dir.create(wham_out)
+plot_wham_output(em_fit, dir.main = wham_out)
 
-plot_OM(path = dir.figs, file_name = "F_contrast.pdf")
-# plot_OM(path = dir.figs, file_name = "Equilibrium_Checks.pdf")
+# Check other stuff
+results <- get_results(em_fit)
+
+# Plot ssb
+ssb_df <- results[[1]]
+
+# SSB_TRUTH
+ssb_truth <- c(SSB[190:200,sim])
+ssb_df <- ssb_df %>% 
+  mutate(SSB_Truth = ssb_truth)
+
+ggplot(ssb_df, mapping = aes(x = Year, y = SSB, ymin = lwr, ymax = upr)) +
+  geom_line() +
+  geom_ribbon(alpha = 0.5) +
+  geom_line(mapping = aes(x = Year, y = SSB_Truth), col = "red") 
+
+# Plot F
+f_df <- results[[2]]
+
+# SSB_TRUTH
+f_truth <- c(fish_mort[190:200,20])
+f_df <- f_df %>% 
+  mutate(f_truth = f_truth)
+
+ggplot(f_df, mapping = aes(x = Year, y = F_val, ymin = lwr, ymax = upr)) +
+  geom_line() +
+  geom_ribbon(alpha = 0.5) +
+  geom_line(mapping = aes(x = Year, y = f_truth), col = "red")
 
 
 
-# Self test simulation ----------------------------------------------------
+truth_selex <- rbind(fish_sel_df, surv_sel_df) %>% 
+  rename(Selex_Truth = Selex)
+# Plot selex
+selex_df <- results[[3]] %>% 
+  group_by( Type, Age) %>% 
+  summarize(selex = mean(Selex)) %>% 
+  left_join(truth_selex, by  = c("Type", "Age"))
 
-self_sim <- em_fit$simulate()
+ggplot(selex_df, aes(x = Age, y = selex)) +
+  geom_line() +
+  geom_line(selex_df, mapping = aes(x = Age, y = Selex_Truth), col = "red") +
+  facet_wrap(~Type, scales = "free")
 
-# Selectivity
-selex_df <- melt(self_sim[["selAA"]][[2]]) %>% 
-  group_by(Var2) %>% 
-  summarize(mean = mean(value))
 
-plot(selex_df)
-
+# plot_OM(path = here("figs", "Base_OM_Figs"), file_name = "OM_Check.pdf")

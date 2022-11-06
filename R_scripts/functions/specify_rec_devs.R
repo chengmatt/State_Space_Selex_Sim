@@ -12,6 +12,16 @@ specify_rec_devs <- function(Rec_Dev_Type, rho_rec = 0) {
   # If correaltion parameter is not between 0 and 1
   if(rho_rec < 0 & rho_rec > 1 & Rec_Dev_Type == "Auto_Cor") stop("Correlation parameter is not between 0 and 1, please respecify!")
   
+  if(Rec_Dev_Type == "check_dev"){
+    
+    for(sim in 1:n_sims) {
+      
+      rec_devs[,sim] <- 0.0000001 # Make rec dev small to check errors
+      
+    } # end sim loop
+    
+  } # end if statement for check dev
+    
   if(Rec_Dev_Type == "iid") {
     
     for(sim in 1:n_sims) {

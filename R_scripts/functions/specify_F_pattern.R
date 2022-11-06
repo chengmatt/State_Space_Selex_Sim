@@ -4,7 +4,7 @@
 
 #' @param Fish_Start_yr Start fishing year
 #' @param Start_F Start value for F mort
-#' @param F_type Type of fishing mortality pattern (Contrast, Constant, and Increase)
+#' @param F_type Type of fishing mortality pattern (Contrast, Constant, Increase, and Increase_Plat)
 #' @param F_sigma_dev If we want to add some noise around the fishing mortality pattern, default
 #' is 0. 
 
@@ -68,6 +68,29 @@ specify_F_pattern <- function(Fish_Start_yr, Start_F, F_type, F_sigma_dev = 0) {
           # Add some normal random error around this
           rnorm(length(Fish_Start_yr:n_years), 0, F_sigma_dev)
       ) # Making absolute so they're always positive numbers
+      
+    } # end sims loop
+    
+  } # if statement for F pattern that is increasing
+  
+  
+  if(F_type == "Increase_Plat") { # if increas and plateaus out
+    
+    # Calculate plateau year
+    plat_year <- round(0.8 * n_years)  # make it 0.5 of the number of years in the simulation
+    
+    for(sim in 1:n_sims) {
+      
+      # Calculate increasing f mort
+      increasing <- abs(seq(Start_F, (0.75 * mean_nat_mort), length.out = length(Fish_Start_yr:plat_year)) +
+          rnorm(length(Fish_Start_yr:plat_year), 0, F_sigma_dev) # Add some normal random error around this
+      ) # Making absolute so they're always positive numbers
+      
+      # Get vector of plateau fmorts
+      plat <- rep((0.75 * mean_nat_mort), length.out = length((plat_year+1):n_years)) + 
+        rnorm(length((plat_year+1):n_years), 0, F_sigma_dev)
+      
+      fish_mort[Fish_Start_yr:n_years,sim] <- c(increasing, plat)
       
     } # end sims loop
     

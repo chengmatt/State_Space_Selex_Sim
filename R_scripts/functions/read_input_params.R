@@ -106,15 +106,17 @@ read_params_create_OM_objects <- function(spreadsheet_path) {
   } # end time varying
   
   
-# Recruitment -------------------------------------------------------------
+# Recruitment + Mortality-------------------------------------------------------------
   
-  recruitment_pars <- read_xlsx(spreadsheet_path, sheet = "Recruitment")
+  recruitment_pars <- read_xlsx(spreadsheet_path, sheet = "Recruitment_Mortality")
   h <<- recruitment_pars$Value[recruitment_pars$Par == "h"] # Steepness (Recruitment at 20% of SSB0)
   r0 <<- recruitment_pars$Value[recruitment_pars$Par == "r0"] # Virgin Recruitment
   ssb0 <<- recruitment_pars$Value[recruitment_pars$Par == "ssb0"] # Virgin SSB
   sigma_rec <<- recruitment_pars$Value[recruitment_pars$Par == "sigma_rec"] # Recruitment variability
-  # mu_rec <<- recruitment_pars$Value[recruitment_pars$Par == "mu_rec"] # Mean recruitment
+  mu_rec <<- recruitment_pars$Value[recruitment_pars$Par == "mu_rec"] # Mean recruitment
+  Mean_M <<- recruitment_pars$Value[recruitment_pars$Par == "M"] # Mortality
   
+
   print("### Input parameters have been read in and OM objects have been created ###")
 
 } # end function

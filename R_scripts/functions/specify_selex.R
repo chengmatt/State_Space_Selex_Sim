@@ -43,9 +43,9 @@ specify_selex <- function(Fish_Funct_Form, Surv_Funct_Form = "Asymp", ages,
 
   if(Fish_Funct_Form == "Asymp") {
     
-    # Base functional form here
-    Fish_Selex <- 1 / (1 + (exp(-(ages - a50_fish)/k_fish)) )
-      
+    # Base functional form here - scale to a max of 1
+    Fish_Selex <- 1 / (1 + exp(-1 * (ages - a50_fish) / k_fish)) / max( 1 / (1 + exp(-1 * (ages - a50_fish) / k_fish)) )
+                         
   } # if functional form is asymptotic
   
   
@@ -57,8 +57,8 @@ specify_selex <- function(Fish_Funct_Form, Surv_Funct_Form = "Asymp", ages,
     # Base Fucntional Form here - use Punt et al. 1994 parameterization (amax and delta)
     p_fish <- (0.5 * (sqrt(amax_fish^2 + 4*delta_fish^2) - amax_fish)) # Derive power parameter here first
     
-    # Now calculate Selex for dome-shaped
-    Fish_Selex <- (ages/amax_fish) ^ (amax_fish/p_fish) * exp((amax_fish - ages) / p_fish)
+    # Now calculate Selex for dome-shaped - scale to a max of 1
+    Fish_Selex <- (ages/amax_fish) ^ (amax_fish/p_fish) * exp((amax_fish - ages) / p_fish) / max( (ages/amax_fish) ^ (amax_fish/p_fish) * exp((amax_fish - ages) / p_fish) )
     
   } # if functional form is dome-shaped
   
