@@ -101,5 +101,121 @@ get_results <- function(model) {
   
   selex_rep <- rbind(fish_sel, surv_sel) # bind these together!
   
-  return(list(SSB = SSB_rep, F = F_rep, Selex = selex_rep))
+
+# Get catchability --------------------------------------------------------
+  if("q_re" %in% model$input$random) { # taken from WHAM plot_q function
+    se <- as.list(model$sdrep, "Std. Error", report=TRUE)$logit_q_mat
+  } else {
+    se <- t(matrix(as.list(model$sdrep, "Std. Error")$logit_q, nrow = NCOL(model$rep$logit_q_mat), 
+                     ncol = NROW(model$rep$logit_q_mat)))  
+  } # if else statement as to whether this is a random effect or not
+  
+  # Get bounds of logit
+  logit_q_lo <- model$rep$logit_q_mat - qnorm(0.975)*se
+  logit_q_hi <- model$rep$logit_q_mat + qnorm(0.975)*se
+  
+  # Now, get inverse logit q
+  q <- t(model$input$data$q_lower + (model$input$data$q_upper - model$input$data$q_lower)/
+                                                      (1+exp(-t(model$rep$logit_q_mat))))
+  q_lo <- t(model$input$data$q_lower + (model$input$data$q_upper - model$input$data$q_lower)/
+                                                                    (1+exp(-t(logit_q_lo))))
+  q_hi <- t(model$input$data$q_lower + (model$input$data$q_upper - model$input$data$q_lower)/
+                                                                    (1+exp(-t(logit_q_hi))))
+  
+  # Now, put these into a dataframe
+  # fishery
+  q_rep_Fish <- data.frame(Year = Fish_Start_yr:(n_years-1), q_Fish = q[,1], 
+                           q_Fish_lwr = q_lo[,1], q_Fish_upr = q_hi[,1])
+  # survey
+  q_rep_Surv <- data.frame(Fish_Start_yr:(n_years-1), q_Surv = q[,1], 
+                           q_Surv_lwr = q_lo[,1], q_Surv_upr = q_hi[,1])
+  
+  
+  return(list(SSB = SSB_rep, F = F_rep, Selex = selex_rep, q_Fish = q_rep_Fish,
+              q_Surv = q_rep_Surv))
 }
+
+
+
+# OM-EM comparisons -------------------------------------------------------
+
+#' @param n_sims Number of total simulations we ran
+#' @param EM_variable Variable name in the get_results object for the EM
+#' @param OM_df Variable name for the OM
+
+# Returns a df of unaggregated resutls paired with the OM EM, and 95%, 50% CIs w/ relative error
+# Right now, this function only does F and SSB and q
+
+om_em_results <- function(n_sims, EM_variable, OM_df) {
+  
+  df <- data.frame() # create empty dataframe to hold values in
+  
+  # Get SSB from EMs and compare to OMs
+  for(sim in 1:n_sims) {
+    
+    # Get ssb here from EM
+    em_df <- results_list[[sim]][[EM_variable]]
+    
+    # Next, get ssb from the corresponding OM simulation
+    om_df <- data.frame(OM_df[em_df$Year,sim]) %>% 
+      rename(Truth = OM_df.em_df.Year..sim.) %>% 
+      mutate(Sim = sim)
+    
+    # Now, cbind these together
+    om_em_df <- cbind(em_df, om_df)
+    
+    # And now rbind all of these together
+    df <- rbind(om_em_df, df) # Unaggregated data
+    
+  } # end sim loop
+  
+  # Return aggregated data w/ relative error, 95% and 50% CIs
+  if(EM_variable == "SSB") {
+    df_agg <- df %>% 
+      drop_na() %>% 
+      mutate(RE = (SSB - Truth)/Truth) %>% 
+      group_by(Year) %>% 
+      summarize(mean = mean(RE), sd = sd(RE),  n = n(),
+                lwr_95 = mean - (1.96 * (sd / sqrt(n))),
+                up_95 = mean + (1.96 * (sd / sqrt(n))),
+                lwr_50 = mean - (0.674 * (sd / sqrt(n))),
+                up_50 = mean + (0.674 * (sd / sqrt(n))))
+  } # end if variable == SSB
+  
+  if(EM_variable == "F") {
+    
+    df_agg <- df %>% 
+      drop_na() %>% 
+      mutate(RE = (F_val - Truth)/Truth) %>% 
+      group_by(Year) %>% 
+      summarize(mean = mean(RE), sd = sd(RE),  n = n(),
+                lwr_95 = mean - (1.96 * (sd / sqrt(n))),
+                up_95 = mean + (1.96 * (sd / sqrt(n))),
+                lwr_50 = mean - (0.674 * (sd / sqrt(n))),
+                up_50 = mean + (0.674 * (sd / sqrt(n))))
+    
+  } # end if variable == fishing mortality
+  
+  if(str_detect(EM_variable, "q")) {
+    
+    df_agg <- df %>% 
+      drop_na() # drops nas and nans
+    
+    # Next, create our relative error metric - we need to use indexing
+    # because we the q's differ by survey and fishery
+    df_agg$RE <- (df_agg[,2] - df_agg$Truth) / df_agg$Truth
+    
+    # Finally, summarize this!
+    df_agg <- df_agg %>% 
+      group_by(Year) %>% 
+      summarize(mean = mean(RE), sd = sd(RE),  n = n(),
+                lwr_95 = mean - (1.96 * (sd / sqrt(n))),
+                up_95 = mean + (1.96 * (sd / sqrt(n))),
+                lwr_50 = mean - (0.674 * (sd / sqrt(n))),
+                up_50 = mean + (0.674 * (sd / sqrt(n))))
+    
+  } # if this is a catchability variable
+  
+  return(list(df, df_agg))
+  
+} # end function

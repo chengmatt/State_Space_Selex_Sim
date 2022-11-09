@@ -19,7 +19,10 @@ specify_F_pattern <- function(Fish_Start_yr, Start_F, F_type, F_sigma_dev = 0) {
   if(F_type == "Contrast") {
     
     # Determine the mid point of when to ramp back down
-    midpoint <- round(mean(Fish_Start_yr:n_years))
+    midpoint <- round(mean(Fish_Start_yr:(n_years * 0.975)))
+    
+    # Determine when it flattens out
+    flatpoint <- round(mean(midpoint:(n_years)))
     
     for(sim in 1:n_sims) {
       
@@ -31,11 +34,14 @@ specify_F_pattern <- function(Fish_Start_yr, Start_F, F_type, F_sigma_dev = 0) {
           rnorm(length(Fish_Start_yr:Fish_Start_yr:midpoint), 0, F_sigma_dev)
       ) # absolute values so they're always positive
       
+      # Determine when it starts flattening out at a point
+      fish_mort[midpoint:flatpoint,sim] <- (1.5 * mean_nat_mort)
+      
       # Now, decrease fihsing mortality (ramp down) - decrease to 0.75 of the mean natural mortality
-      fish_mort[midpoint:n_years,sim] <- abs(
-        seq((1.5 * mean_nat_mort), (0.75 * mean_nat_mort), length.out = length(midpoint:n_years)) +
+      fish_mort[flatpoint:n_years,sim] <- abs(
+        seq((1.5 * mean_nat_mort), (0.75 * mean_nat_mort), length.out = length(flatpoint:n_years)) +
           # Add some noraml random error around this
-          rnorm(length(midpoint:n_years), 0, F_sigma_dev)
+          rnorm(length(flatpoint:n_years), 0, F_sigma_dev)
       ) # absolute values so they're always positive
       
     } # end sim loop

@@ -4,7 +4,7 @@
 
 
 #'
-#' @param Fish_Funct_Form Functional form for Fishery Selectivity - Options are Asmyp and Dome
+#' @param Fish_Funct_Form Functional form for Fishery Selectivity - Options are Asmyp and Dome_Gamma
 #' @param Surv_Funct_Form Functional form for Survey Selectivity - Default is Asymptotic
 #' @param ages ages we have in our assessment
 #' @param Fish_Time Whether we want time-varying selex or not - Options are constant and 2DAR1 - 2DAR1 is very preliminary
@@ -12,15 +12,19 @@
 #' @param k_fish Slope paramter for logistic selectivity for fishery
 #' @param amax_fish Age at max selection for selectivity in dome-shaped fishery selex
 #' @param delta_fish Slope parameter for selectivity in dome-shaped fishery selex
+#' @param slope_1_fish Increasing limb slope of 1st logistic function
+#' @param slope_2_fish Drecreasing limb slope of 2nd logistic function
+#' @param infl_1_fish Inflection point of 1st logisitic function (parameterized as age)
+#' @param infl_2_fish Infleciton point of 2nd logistic function (higher values = stronger dome). Generally, you want this to range around 0 - 0.5ish.
 #' @param a50_surv A50 parameter for logistic selectivity for survey 
 #' @param k_surv Slope parameter for logistic selectivity for survey 
 #' @param Sigma_Fish Variance parameter for Time varying processes
 #' @param rho_age_fish Correlation parameter for age varying fishery selex processes
 #' @param rho_time_fish Correlation parameter for time varying fishery selex processes
 
-
 specify_selex <- function(Fish_Funct_Form, Surv_Funct_Form = "Asymp", ages, 
                           Fish_Time, a50_fish, k_fish, amax_fish, delta_fish,
+                          slope_1_fish, slope_2_fish, infl_1_fish, infl_2_fish,
                           a50_surv, k_surv, Sigma_Fish, rho_age_fish, rho_time_fish) {
   
   require(mvtnorm) # For multivariate draws
@@ -49,10 +53,10 @@ specify_selex <- function(Fish_Funct_Form, Surv_Funct_Form = "Asymp", ages,
   } # if functional form is asymptotic
   
   
-  ### Dome Shaped Selex -------------------------------------------------------
+  ### Dome Shaped Selex (Gamma) -------------------------------------------------------
 
   
-  if(Fish_Funct_Form == "Dome") {
+  if(Fish_Funct_Form == "Dome_Gamma") {
     
     # Base Fucntional Form here - use Punt et al. 1994 parameterization (amax and delta)
     p_fish <- (0.5 * (sqrt(amax_fish^2 + 4*delta_fish^2) - amax_fish)) # Derive power parameter here first
@@ -60,6 +64,28 @@ specify_selex <- function(Fish_Funct_Form, Surv_Funct_Form = "Asymp", ages,
     # Now calculate Selex for dome-shaped - scale to a max of 1
     Fish_Selex <- (ages/amax_fish) ^ (amax_fish/p_fish) * exp((amax_fish - ages) / p_fish) / max( (ages/amax_fish) ^ (amax_fish/p_fish) * exp((amax_fish - ages) / p_fish) )
     
+  } # if functional form is dome-shaped
+  
+  ### Dome Shaped Selex (Double Logistic) -------------------------------------------------------
+  
+  
+  if(Fish_Funct_Form == "Dome_DL") {
+    
+    slope_1_fish <- 1
+    slope_2_fish <- 0.1
+    infl_1_fish <- 10
+    infl_2_fish <- 25
+    
+    # Calculate logistic curve 1 
+    logistic_1 <- 1/(1 + exp(-slope_1_fish * (ages - infl_1_fish))) 
+    # Calculate logistic curve 2 
+    logistic_2 <- 1 - (1/(1 + exp(-slope_2_fish * (ages - infl_2_fish))))
+    
+    # multiply the logistic curves and scale to a max of 1
+    Fish_Selex <- logistic_1 * logistic_2 / max(logistic_1 * logistic_2)
+     
+    plot(Fish_Selex)
+
   } # if functional form is dome-shaped
   
 

@@ -19,7 +19,7 @@ plot_OM <- function(path, file_name) {
   
   # Total recruitment across time and simulations
 print(  ggplot(rec_df, aes(x = as.numeric(Year), y = Rec, group = Sim)) +
-          geom_line(size = 1.5) +
+          geom_line(size = 1.5, color = "grey", alpha = 0.75) +
           # facet_wrap(~Sim, ncol = 1) +
           theme_bw() +
           theme(legend.position = "none") +
@@ -33,7 +33,7 @@ print(  ggplot(rec_df, aes(x = as.numeric(Year), y = Rec, group = Sim)) +
   
 print(
   ggplot(ssb_df, aes(x = as.numeric(Year), y = SSB)) +
-    geom_line(size = 1.5, color = "grey", aes(group = Sim)) +
+    geom_line(size = 1.5, color = "grey", aes(group = Sim), alpha = 0.75) +
     geom_smooth(se = FALSE) +
     theme_bw() +
     theme(legend.position = "none") +
@@ -49,7 +49,7 @@ print(
   
   ggplot(spr, aes(x = SSB, y = Rec, group = Sim)) +
     geom_point() +
-    geom_smooth() +
+    geom_smooth(aes(group = 1)) +
     # facet_wrap(~Sim, ncol = 1, scales = "free") +
     theme_bw() +
     theme(legend.position = "none") +
@@ -65,9 +65,12 @@ print(
   
 print(
   # Biomass at age
-  ggplot(biom_df, aes(x = as.numeric(Year), y = Biomass, fill = Age, group = Sim)) +
+  ggplot(biom_df %>% 
+           filter(Sim %in% c("Sim 1", 
+                             "Sim 2", "Sim 3")), 
+         aes(x = as.numeric(Year), y = Biomass, fill = Age, group = Sim)) +
     geom_col(position = "stack") +
-    # facet_wrap(~Sim, ncol = 1, scales = "free") +
+    facet_wrap(~Sim, ncol = 3, scales = "free") +
     theme_bw() +
     theme(legend.position = "none") +
     labs(x = "Year",y = "Biomass at age")
@@ -79,7 +82,7 @@ print(
     group_by(Year, Sim) %>% 
     summarize(Biomass = sum(Biomass, na.rm = TRUE)) %>% 
     ggplot(aes(x = as.numeric(Year), y = Biomass,  group = Sim)) +
-    geom_line(size = 1.5) +
+    geom_line(size = 1.5, color = "grey", alpha = 0.75) +
     # facet_wrap(~Sim, ncol = 1, scales = "free") +
     theme_bw() +
     theme(legend.position = "none") +
@@ -92,9 +95,12 @@ print(
   
 print(
   # Numbers across ages
-  ggplot(natage, aes(x = as.numeric(Year), y = Numbers, fill = Age, group = Sim)) +
+  ggplot(natage %>% 
+           filter(Sim %in% c("Sim 1", 
+                             "Sim 2", "Sim 3")), 
+         aes(x = as.numeric(Year), y = Numbers, fill = Age, group = Sim)) +
     geom_col(position = "stack") +
-    # facet_wrap(~Sim, ncol = 1, scales = "free") +
+    facet_wrap(~Sim, ncol = 3, scales = "free") +
     theme_bw() +
     theme(legend.position = "top") +
     labs(x = "Year",y = "Numbers at age")
@@ -106,7 +112,7 @@ print(
     group_by(Year, Sim) %>% 
     summarize(Numbers = sum(Numbers, na.rm = TRUE)) %>% 
     ggplot(aes(x = as.numeric(Year), y = Numbers, group = Sim)) +
-    geom_line(size = 1.5) +
+    geom_line(size = 1.5, color = "grey", alpha = 0.75) +
     # facet_wrap(~Sim, ncol = 1, scales = "free") +
     theme_bw() +
     theme(legend.position = "none") +
@@ -123,7 +129,7 @@ print(
     group_by(Age, Sim) %>% 
     summarize(prop_age = mean(Biomass/total, na.rm = TRUE)) %>% 
     ggplot(aes(x = as.numeric(Age), y = prop_age, group = Sim, group = Sim )) +
-    geom_line(size = 1.5) +
+    geom_line(size = 1.5, color = "grey", alpha = 0.75) +
     # facet_wrap(~Sim, ncol = 1, scales = "free") +
     theme_bw() +
     theme(legend.position = "none") +
@@ -143,7 +149,7 @@ print(
     group_by(Year, Sim) %>% # Aggregated catch
     summarize(Catch  = sum(Catch, na.rm = T)) %>% 
     ggplot(aes(x = as.numeric(Year), y = Catch, group = Sim)) +
-    geom_line(size = 1.5) +
+    geom_line(size = 1.5, color = "grey", alpha = 0.75) +
     # facet_wrap(~Sim, ncol = 1, scales = "free") +
     theme_bw() +
     theme(legend.position = "none") +
@@ -160,9 +166,12 @@ tryCatch({
   names(comps_fish) <- c("Year", "Age", "Sim", "Count")
   
 print(
-  ggplot(comps_fish, aes(x = as.numeric(Year), y = Count, fill = Age, group = Sim)) +
+  ggplot(comps_fish %>% 
+           filter(Sim %in% c("Sim 1", 
+                             "Sim 2", "Sim 3")),
+         aes(x = as.numeric(Year), y = Count, fill = Age, group = Sim)) +
     geom_col(position = "stack") +
-    # facet_wrap(~Sim, ncol = 1, scales = "free") +
+    facet_wrap(~Sim, ncol = 3, scales = "free") +
     theme_bw() +
     theme(legend.position = "top") +
     labs(x = "Year",y = "Count", title = "Fishery Comps")
@@ -172,9 +181,12 @@ print(
   names(comps_surv) <- c("Year", "Age", "Sim", "Count")
   
 print(
-  ggplot(comps_surv, aes(x = as.numeric(Year), y = Count, fill = Age, group = Sim)) +
+  ggplot(comps_surv %>% 
+           filter(Sim %in% c("Sim 1", 
+                             "Sim 2", "Sim 3")), 
+         aes(x = as.numeric(Year), y = Count, fill = Age, group = Sim)) +
     geom_col(position = "stack") +
-    # facet_wrap(~Sim, ncol = 1, scales = "free") +
+    facet_wrap(~Sim, ncol = 3, scales = "free") +
     theme_bw() +
     theme(legend.position = "top") +
     labs(x = "Year",y = "Count", title = "Survey Comps") 
@@ -190,7 +202,7 @@ print(
 print(
   # Across ages
   ggplot(idx_fish %>% drop_na(), aes(as.numeric(Year), y = Index, group = Sim))+
-    geom_line(size = 1.1) +
+    geom_line(size = 1.1, color = "grey", alpha = 0.75) +
     # facet_wrap(~Sim, ncol = 1, scales = "free") +
     theme_bw() +
     theme(legend.position = "top") +
@@ -204,7 +216,7 @@ print(
 print(
   # Across ages
   ggplot(idx_surv %>% drop_na(), aes(as.numeric(Year), y = Index, group = Sim))+
-    geom_line(size = 1.1) +
+    geom_line(size = 1.1, color = "grey", alpha = 0.75) +
     # facet_wrap(~Sim, ncol = 1, scales = "free") +
     theme_bw() +
     theme(legend.position = "top") +
@@ -228,10 +240,13 @@ print(
     mutate(Age = parse_number(substr(Age, 5, 10)))
   
 print(
-  ggplot(fish_sel_df, aes(x = as.numeric(Year), y = Age,
+  ggplot(fish_sel_df %>% 
+           filter(Sim %in% c("Sim 1", 
+                             "Sim 2", "Sim 3")),
+         aes(x = as.numeric(Year), y = Age,
                           fill = Selex, group = Sim)) +
     geom_tile() +
-    # facet_wrap(~Sim, ncol = 1, scales = "free") +
+    facet_wrap(~Sim, ncol = 3, scales = "free") +
     scale_fill_viridis_c() +
     theme_bw() +
     theme(legend.position = "top") +
@@ -246,10 +261,12 @@ print(
     mutate(Age = parse_number(substr(Age, 5, 10)))
 
 print(
-  ggplot(surv_sel_df, aes(x = as.numeric(Year), y = Age,
-                          fill = Selex, group = Sim)) +
+  ggplot(surv_sel_df %>% 
+           filter(Sim %in% c("Sim 1", 
+                             "Sim 2", "Sim 3")),
+         aes(x = as.numeric(Year), y = Age, fill = Selex, group = Sim)) +
     geom_tile() +
-    # facet_wrap(~Sim, ncol = 1, scales = "free") +
+    facet_wrap(~Sim, ncol = 3, scales = "free") +
     scale_fill_viridis_c() +
     theme_bw() +
     theme(legend.position = "top") +
@@ -265,10 +282,12 @@ print(
   nat_mort <- nat_mort %>% 
     mutate(Age = parse_number(substr(Age, 5, 10)))
 
-print( ggplot(nat_mort, aes(x = as.numeric(Year), y = Age,
-                          fill = Mortality, group = Sim)) +
+print( ggplot(nat_mort %>% 
+                filter(Sim %in% c("Sim 1", 
+                                  "Sim 2", "Sim 3")),
+              aes(x = as.numeric(Year), y = Age, fill = Mortality, group = Sim)) +
     geom_tile() +
-    # facet_wrap(~Sim, ncol = 1, scales = "free") +
+    facet_wrap(~Sim, ncol = 3, scales = "free") +
     scale_fill_viridis_c() +
     theme_bw() +
     theme(legend.position = "top") +
@@ -285,9 +304,12 @@ print( ggplot(nat_mort, aes(x = as.numeric(Year), y = Age,
   names(q_df_fish) <- c("Year", "Sim", "q")
   
 print(
-  ggplot(q_df_fish, aes(x = as.numeric(Year), y = q, color = Sim, group = Sim)) +
+  ggplot(q_df_fish %>% 
+           filter(Sim %in% c("Sim 1", 
+                             "Sim 2", "Sim 3")), 
+         aes(x = as.numeric(Year), y = q, color = Sim, group = Sim)) +
     geom_line(size = 1.3) +
-    # facet_wrap(~Sim, ncol = 1, scales = "free") +
+    facet_wrap(~Sim, ncol = 3, scales = "free") +
     theme_bw() +
     theme(legend.position = "top") +
     labs(x = "Year",y = "q", title = "Fishery Catchability") 
@@ -300,9 +322,12 @@ print(
   names(q_df_surv) <- c("Year", "Sim", "q")
   
   print(
-    ggplot(q_df_surv, aes(x = as.numeric(Year), y = q,  group = Sim)) +
+    ggplot(q_df_surv %>% 
+             filter(Sim %in% c("Sim 1", 
+                               "Sim 2", "Sim 3")),
+           aes(x = as.numeric(Year), y = q,  group = Sim)) +
       geom_line(size = 1.3) +
-      # facet_wrap(~Sim, ncol = 1, scales = "free") +
+      facet_wrap(~Sim, ncol = 3, scales = "free") +
       theme_bw() +
       theme(legend.position = "top") +
       labs(x = "Year",y = "q", title = "Survey Catchability") 
@@ -315,9 +340,12 @@ print(
   names(fmort_df) <- c("Year", "Sim", "F_Mort") 
 
   print(
-    ggplot(fmort_df, aes(x = as.numeric(Year), y = F_Mort, group = Sim)) +
+    ggplot(fmort_df %>% 
+             filter(Sim %in% c("Sim 1", 
+                               "Sim 2", "Sim 3")), 
+           aes(x = as.numeric(Year), y = F_Mort, group = Sim)) +
       geom_line(size = 1.3) +
-      # facet_wrap(~Sim, ncol = 1, scales = "free") +
+      facet_wrap(~Sim, ncol = 3, scales = "free") +
       theme_bw() +
       theme(legend.position = "top") +
       labs(x = "Year",y = "Fishing Mortality", title = "Fishing Mortality") 

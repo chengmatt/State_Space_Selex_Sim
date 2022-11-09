@@ -11,10 +11,14 @@
 #' @param n_sims Which simulation we are at - for use in continuous loop
 #' @param bias_process Wheter we want to bias correct process error
 #' @param bias_obs Whether we want to bias correct observations
-
+#' @param units_indices Units for abundance indices (1 = biomass, 2 = numbers) needs to be specified as a vector
+#' @param units_index_paa Units for proportions at age (1 = biomass, 2 = numbers) needs to be specified as a vector
 
 make_input <- function(n_fleets = 1, n_indices = 2, Catch_CV_Val = 0, catch_error = TRUE,
-                       n_sims, bias_process = FALSE, bias_obs = FALSE) {
+                       n_sims, bias_process = FALSE, bias_obs = FALSE, units_indices,
+                       units_index_paa) {
+  
+  if(n_indices != length(units_indices) & n_indices != length(units_index_paa)) stop("units_indices and units_index_paa vectors need to be the same length as the number of indices")
   
   require(tidyverse)
   
@@ -164,10 +168,10 @@ make_input <- function(n_fleets = 1, n_indices = 2, Catch_CV_Val = 0, catch_erro
   input$index_Neff <- index_Neff
   
   
-  # Set units for the indices 
-  input$units_indices <- c(2,2) # if 1 = biomass, 2 = abundance
-  # Set units for index proprotions at age - abundnace e.g., numbers for both age comps
-  input$units_index_paa <- c(2,2) # if 1 = biomass, 2 = abundance
+  # Set units for the indices 1 = biomass, 2 = abundance
+  input$units_indices <- units_indices
+  # Set units for index proprotions at age - abundnace e.g., numbers for both age comps 1 = biomass, 2 = abundance
+  input$units_index_paa <- units_index_paa
   
   # Both indices and index_paa are in abundnace units - although somewaht unrealistic
   # for the fishery index, its just a realtive abundance trend, so it should be fine...

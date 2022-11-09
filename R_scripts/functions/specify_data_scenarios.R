@@ -25,6 +25,10 @@ fish_surv_data_scenarios <- function(Fish_Start_yr, Surv_Start_yr, n_years,
   # Frequency of survey years that data are collected
   Surv_yrs <<- seq(Surv_Start_yr, n_years, Surv_freq)
   
+  # Output the frequency of sampling into environment
+  Fish_freq <<- Fish_freq
+  Surv_freq <<- Surv_freq
+  
   # Specify Data quality and quantity scenarios
   if(Scenario == "Low") {
     Fishery_CV <<- 0.3

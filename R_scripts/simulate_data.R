@@ -36,7 +36,7 @@ spreadsheet_path <- here("input", "Sablefish_Inputs.xlsx")
 read_params_create_OM_objects(spreadsheet_path = spreadsheet_path)
 
 # Specify data scenarios here
-fish_surv_data_scenarios(Fish_Start_yr = 190, Surv_Start_yr = 190, n_years = n_years,
+fish_surv_data_scenarios(Fish_Start_yr = 180, Surv_Start_yr = 180, n_years = n_years,
                            Fish_freq = 1, Surv_freq = 1, Scenario = "High")
 
 # Specify selectivity parameterizations here
@@ -48,7 +48,8 @@ specify_nat_mort(Mort_Time = "Constant", Mean_M = Mean_M)
 
 # Specify catchability for the fishery and survey
 specify_q(q_Fish_Time = "Constant", q_Surv_Time = "Constant", 
-          q_Mean_Fish = 0.035, q_Mean_Surv = 0.01)
+          q_Mean_Fish = 0.01, q_Mean_Surv = 0.01, 
+          q_Fish_rho = 0.5, q_Fish_sigma = 0.005)
 
 # Specify fishing mortality pattern
 specify_F_pattern(Fish_Start_yr = Fish_Start_yr, F_type = "Contrast", Start_F = 0.001, F_sigma_dev = 0)
@@ -80,7 +81,7 @@ for(sim in 1:n_sims) {
   } # checking equilibrium conditions
 
   # Print simulation iteration
-  print(paste("Simulation",sim,"out of", n_sims))
+  print(paste("### Simulation",sim,"out of", n_sims, "###"))
   
 # Years loop  -------------------------------------------------------------
 
@@ -208,103 +209,177 @@ for(sim in 1:n_sims) {
 } # end simulation loop
 
 
-# WHAM checks ------------------------------------------------------------- (changed recruit var to be lower)
+# WHAM checks ------------------------------------------------------------- 
 
 # Set modelling structure here
 selectivity <- list(model = rep("logistic", 2))
-
 M <- list(model = "constant", initial_means = 0.1, est_ages = 1) # need to specify est_ages for M to be estimated!
+catchability <- list(re = c("none", "none")) # put bounds on q
+NAA_model <- list(sigma = "rec", cor = "iid")
 
-catchability <- list(re = "none") # put bounds on q
+# Create objects to store stuff in
+conv_vec <- vector()
+results_list <- list() # to store results
+sigma_rec_val <- vector()
+m_val <- vector()
 
 for(sim in 1:n_sims) {
   
   # Force our inputs into a list - so that it reads into wham -
   basic <- make_input(n_fleets = 1, n_indices = 2, Catch_CV_Val = 0.05, catch_error = FALSE,
-                      n_sims = sim, bias_obs = TRUE, bias_process = TRUE) 
+                      n_sims = sim, bias_obs = TRUE, bias_process = TRUE, 
+                      units_indices = c(2,2), units_index_paa = c(2,2)) 
   
   # Make WHAM inputs here 
   test_wham <- wham::prepare_wham_input(basic_info = basic, selectivity = selectivity, 
-                                        recruit_model = 2, M = M)
+                                        recruit_model = 2, M = M, catchability = catchability,
+                                        NAA_re = NAA_model)
   
   # Fit WHAM here
-  em_fit <- wham::fit_wham(input = test_wham, do.fit = T, do.osa = F, do.retro = F,
-                           save.sdrep = TRUE, do.check = T)
+  tryCatch( {
+    em_fit <- wham::fit_wham(input = test_wham, do.fit = T, do.osa = F, do.retro = F,
+                             save.sdrep = TRUE, do.check = F, MakeADFun.silent = TRUE)
+    
+    convergence_check <- check_convergence(em_fit, ret = T) 
+    
+    results_list[[sim]] <- get_results(em_fit)
+  } , error = function(error) {cat("ERROR :",conditionMessage(error), "\n")})
   
+  # Get convergence status
+  if(convergence_check$convergence == 0 & convergence_check$maxgr <= 0.001 &
+     convergence_check$is_sdrep == TRUE & convergence_check$na_sdrep == FALSE) {
+      conv_vec[sim] <- "Converged"
+  } else conv_vec[sim] <- "Not Converged"
+  
+  # Get sigma rec re value
+  sigma_rec_val[sim] <- em_fit$sdrep$value[which(names(em_fit$sdrep$value) == "NAA_sigma")]
+  m_val[sim] <- exp(em_fit$sdrep$par.fixed[which(names(em_fit$sdrep$par.fixed) == "M_a")]) # Get M
+  print(paste("### Done with Simulation", sim, "###")) 
+
 } # end loop of number of simulations we want to run
 
-# Debugging
-em_fit$sdrep
-rep <- em_fit$report()
-sapply(grep("nll",names(rep),value=T), function(x) sum(rep[[x]]))
+
+# Plot checks -------------------------------------------------------------
+
+# Recdevs RE
+dir.rec.re <- here("output", "rec_dev_RE")
+dir.create(dir.rec.re)
+save(results_list, file = here(dir.rec.re, "rec_re.RData"))
 
 
-# Fishery selectivity
-fish_sel_df <- melt(Fish_selex_at_age)
-names(fish_sel_df) <- c("Year", "Age", "Sim", "Selex")
-fish_sel_df <- fish_sel_df %>% 
-  group_by(Age) %>% 
-  summarize(Selex = mean(Selex)) %>% 
-  mutate(Type = "Fishery",
-         Age = parse_number(as.character(Age))-1)
+### SSB ---------------------------------------------------------------------
 
-surv_sel_df <- melt(Surv_selex_at_age)
-names(surv_sel_df) <- c("Year", "Age", "Sim", "Selex")
-surv_sel_df <- surv_sel_df %>% 
-  group_by(Age) %>% 
-  summarize(Selex = mean(Selex)) %>% 
-  mutate(Type = "Survey",
-         Age = parse_number(as.character(Age))-1)
+# Do some cleaning up and get RE
+ssb_df <- om_em_results(n_sims = n_sims, EM_variable = "SSB", OM_df = SSB)
+
+# Plot SSB with the trend across simulations
+ssb_df[[1]] %>% 
+  ggplot(aes(x = Year, y = SSB, group = Sim, ymin = lwr, ymax = upr)) +
+  geom_line() +
+  geom_ribbon(alpha = 0.5) + 
+  geom_line(aes(x = Year, y = Truth), color = "red") +
+  facet_wrap(~Sim) +
+  theme_bw() +
+  labs(x = "Year", y  = "SSB") 
+
+# Plot relative error
+ggplot(ssb_df[[2]], aes(x = Year, y = mean)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = lwr_95, ymax = up_95), alpha = 0.5) +
+  geom_ribbon(aes(ymin = lwr_50, ymax = up_50), alpha = 0.5) +
+  geom_hline(aes(yintercept = 0), col = "red", lty = 2, size = 1.5) +
+  theme_bw() + 
+  labs(x = "Year", y  ="Relative Error in SSB") +
+  ylim(-0.3,0.3)
+
+
+### F -----------------------------------------------------------------------
+
+# Do some cleaning up and get RE
+f_df <- om_em_results(n_sims = n_sims, EM_variable = "F", OM_df = fish_mort)
+
+# Plot F with the trend across simulations
+f_df[[1]] %>% 
+  ggplot(aes(x = Year, y = F_val, group = Sim, ymin = lwr, ymax = upr)) +
+  geom_line() +
+  geom_ribbon(alpha = 0.5) + 
+  geom_line(aes(x = Year, y = Truth), color = "red") +
+  facet_wrap(~Sim) +
+  theme_bw() +
+  labs(x = "Year", y  = "Fishing Mortality Rate") 
+
+# Plot relative error
+ggplot(f_df[[2]], aes(x = Year, y = mean)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = lwr_95, ymax = up_95), alpha = 0.5) +
+  geom_ribbon(aes(ymin = lwr_50, ymax = up_50), alpha = 0.5) +
+  geom_hline(aes(yintercept = 0), col = "red", lty = 2, size = 1.5) +
+  theme_bw() +
+  labs(x = "Year", y  ="Relative Error in Fishing Mortality") +
+  ylim(-0.3,0.3)
+
+
+### Catchability (Fishery) ------------------------------------------------------------
+
+q_Fish_df <- om_em_results(n_sims = n_sims, EM_variable = "q_Fish", OM_df = q_Fish)
+
+# Plot F with the trend across simulations
+q_Fish_df[[1]] %>% 
+  ggplot(aes(x = Year, y = q_Fish, group = Sim, ymin = q_Fish_lwr, ymax = q_Fish_upr)) +
+  geom_line() +
+  geom_ribbon(alpha = 0.5) +
+  geom_line(aes(x = Year, y = Truth), color = "red") +
+  facet_wrap(~Sim) +
+  theme_bw() +
+  labs(x = "Year", y  = "Fishing Mortality Rate") 
+
+# Plot relative error
+ggplot(q_Fish_df[[2]], aes(x = Year, y = mean)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = lwr_95, ymax = up_95), alpha = 0.5) +
+  geom_ribbon(aes(ymin = lwr_50, ymax = up_50), alpha = 0.5) +
+  geom_hline(aes(yintercept = 0), col = "red", lty = 2, size = 1.5) +
+  theme_bw() +
+  labs(x = "Year", y  ="Relative Error in Fishery Catchability") +
+  ylim(-0.3,0.3)
+
+
+# Sigma rec + Mortality ---------------------------------------------------------------
+save(sigma_rec_val, file = here(dir.rec.re, "sigma_rec_values.RData"))
+save(m_val, file = here(dir.rec.re, "m_values.RData"))
+
+sig_rec_df <- data.frame(sigma_rec = sigma_rec_val, truth = sigma_rec) %>% 
+  mutate(RE = (sigma_rec - truth )/ truth,
+         par = "Sigma_Rec (0.5)") %>% 
+  select(par, RE)
+
+mort_df <- data.frame(m = m_val, truth = Mean_M) %>% 
+  mutate(RE = (m_val - truth )/ truth,
+         par = "Natural Mortality (0.1)") %>% 
+  select(par, RE)
+
+all_par <- rbind(sig_rec_df, mort_df)
+
+ggplot(all_par, aes(x = par, y = RE)) +
+  geom_violin(width = 0.3, alpha = 0.75) +
+  geom_hline(aes(yintercept = 0), col = "red", lty = 2, size = 1.5) +
+  theme_bw() + stat_summary(
+    fun.min = function(z) { quantile(z,0.95) },
+    fun.max = function(z) { quantile(z,0.05) },
+    fun = median, size = 1, color = "black") +
+  theme(axis.text = element_text(size = 15))
   
+  
+
+
+# Other plots -------------------------------------------------------------
+
+plot_OM(path = here("figs", "Base_OM_Figs"), file_name = "OM_Check.pdf")
+ 
 # Output plots
 # Create directory to ouptut plots to
 wham_out <- here("figs", "wham_checks")
-dir.create(wham_out)
+# dir.create(wham_out)
 plot_wham_output(em_fit, dir.main = wham_out)
 
-# Check other stuff
-results <- get_results(em_fit)
 
-# Plot ssb
-ssb_df <- results[[1]]
-
-# SSB_TRUTH
-ssb_truth <- c(SSB[190:200,sim])
-ssb_df <- ssb_df %>% 
-  mutate(SSB_Truth = ssb_truth)
-
-ggplot(ssb_df, mapping = aes(x = Year, y = SSB, ymin = lwr, ymax = upr)) +
-  geom_line() +
-  geom_ribbon(alpha = 0.5) +
-  geom_line(mapping = aes(x = Year, y = SSB_Truth), col = "red") 
-
-# Plot F
-f_df <- results[[2]]
-
-# SSB_TRUTH
-f_truth <- c(fish_mort[190:200,20])
-f_df <- f_df %>% 
-  mutate(f_truth = f_truth)
-
-ggplot(f_df, mapping = aes(x = Year, y = F_val, ymin = lwr, ymax = upr)) +
-  geom_line() +
-  geom_ribbon(alpha = 0.5) +
-  geom_line(mapping = aes(x = Year, y = f_truth), col = "red")
-
-
-
-truth_selex <- rbind(fish_sel_df, surv_sel_df) %>% 
-  rename(Selex_Truth = Selex)
-# Plot selex
-selex_df <- results[[3]] %>% 
-  group_by( Type, Age) %>% 
-  summarize(selex = mean(Selex)) %>% 
-  left_join(truth_selex, by  = c("Type", "Age"))
-
-ggplot(selex_df, aes(x = Age, y = selex)) +
-  geom_line() +
-  geom_line(selex_df, mapping = aes(x = Age, y = Selex_Truth), col = "red") +
-  facet_wrap(~Type, scales = "free")
-
-
-# plot_OM(path = here("figs", "Base_OM_Figs"), file_name = "OM_Check.pdf")
