@@ -20,7 +20,6 @@ plot_OM <- function(path, file_name) {
   # Total recruitment across time and simulations
 print(  ggplot(rec_df, aes(x = as.numeric(Year), y = Rec, group = Sim)) +
           geom_line(size = 1.5, color = "grey", alpha = 0.75) +
-          # facet_wrap(~Sim, ncol = 1) +
           theme_bw() +
           theme(legend.position = "none") +
           labs(x = "Year",y = "Recruitment Total") )
@@ -48,8 +47,8 @@ print(
 print(
   
   ggplot(spr, aes(x = SSB, y = Rec, group = Sim)) +
-    geom_point() +
-    geom_smooth(aes(group = 1)) +
+    geom_point(alpha = 0.3) +
+    geom_smooth(aes(color = Sim), se = FALSE) +
     # facet_wrap(~Sim, ncol = 1, scales = "free") +
     theme_bw() +
     theme(legend.position = "none") +
@@ -61,16 +60,28 @@ print(
   
   # biomass at age
   biom_df <- melt(Biom_at_age)
-  names(biom_df) <- c("Year", "Age", "Sim", "Biomass")
+  names(biom_df) <- c("Year", "Age", "Sex", "Sim", "Biomass")
   
 print(
-  # Biomass at age
+  # Biomass at age across sexes
   ggplot(biom_df %>% 
-           filter(Sim %in% c("Sim 1", 
-                             "Sim 2", "Sim 3")), 
+           filter(Sim %in% c("Sim 1", "Sim 2", "Sim 3")), 
          aes(x = as.numeric(Year), y = Biomass, fill = Age, group = Sim)) +
     geom_col(position = "stack") +
     facet_wrap(~Sim, ncol = 3, scales = "free") +
+    theme_bw() +
+    theme(legend.position = "top") +
+    labs(x = "Year",y = "Biomass at age")
+)
+
+
+print(
+  # Biomass at age differntiated by sex
+  ggplot(biom_df %>% 
+           filter(Sim %in% c("Sim 1", "Sim 2", "Sim 3")), 
+         aes(x = as.numeric(Year), y = Biomass, fill = Age, group = Sim)) +
+    geom_col(position = "stack") +
+    facet_grid(Sex~Sim, scales = "free") +
     theme_bw() +
     theme(legend.position = "none") +
     labs(x = "Year",y = "Biomass at age")
@@ -83,7 +94,6 @@ print(
     summarize(Biomass = sum(Biomass, na.rm = TRUE)) %>% 
     ggplot(aes(x = as.numeric(Year), y = Biomass,  group = Sim)) +
     geom_line(size = 1.5, color = "grey", alpha = 0.75) +
-    # facet_wrap(~Sim, ncol = 1, scales = "free") +
     theme_bw() +
     theme(legend.position = "none") +
     labs(x = "Year",y = "Biomass")
@@ -91,16 +101,15 @@ print(
   
   # Plot Numbers at age
   natage <- melt(N_at_age)
-  names(natage) <- c("Year", "Age", "Sim", "Numbers")
+  names(natage) <- c("Year", "Age", "Sex", "Sim", "Numbers")
   
 print(
-  # Numbers across ages
+  # Numbers across ages - aggregated sex
   ggplot(natage %>% 
-           filter(Sim %in% c("Sim 1", 
-                             "Sim 2", "Sim 3")), 
+           filter(Sim %in% c("Sim 1",  "Sim 2", "Sim 3")), 
          aes(x = as.numeric(Year), y = Numbers, fill = Age, group = Sim)) +
     geom_col(position = "stack") +
-    facet_wrap(~Sim, ncol = 3, scales = "free") +
+    facet_grid(Sex~Sim,  scales = "free") +
     theme_bw() +
     theme(legend.position = "top") +
     labs(x = "Year",y = "Numbers at age")
@@ -113,7 +122,21 @@ print(
     summarize(Numbers = sum(Numbers, na.rm = TRUE)) %>% 
     ggplot(aes(x = as.numeric(Year), y = Numbers, group = Sim)) +
     geom_line(size = 1.5, color = "grey", alpha = 0.75) +
-    # facet_wrap(~Sim, ncol = 1, scales = "free") +
+    geom_smooth(group = 1, se = F, alpha = 0.5)+
+    theme_bw() +
+    theme(legend.position = "none") +
+    labs(x = "Year",y = "Numbers")
+)
+
+print(
+  # Numbers aggregated by ages differenitaed by sex
+  natage %>% 
+    group_by(Year, Sim, Sex) %>% 
+    summarize(Numbers = sum(Numbers, na.rm = TRUE)) %>% 
+    ggplot(aes(x = as.numeric(Year), y = Numbers, group = Sim)) +
+    geom_line(size = 1.5, color = "grey", alpha = 0.75) +
+    geom_smooth(group = 1, se = F, alpha = 0.5)+
+    facet_wrap(~Sex) +
     theme_bw() +
     theme(legend.position = "none") +
     labs(x = "Year",y = "Numbers")
@@ -141,16 +164,15 @@ print(
 # Catch at age ------------------------------------------------------------
 
   catch_df <- melt(Catch_at_age)
-  names(catch_df) <- c("Year", "Age", "Sim", "Catch")
+  names(catch_df) <- c("Year", "Age", "Fleet", "Sex", "Sim", "Catch")
   
 print(
   catch_df %>% 
-    drop_na() %>% 
-    group_by(Year, Sim) %>% # Aggregated catch
+    group_by(Year, Fleet, Sex, Sim) %>% # Aggregated catch
     summarize(Catch  = sum(Catch, na.rm = T)) %>% 
     ggplot(aes(x = as.numeric(Year), y = Catch, group = Sim)) +
     geom_line(size = 1.5, color = "grey", alpha = 0.75) +
-    # facet_wrap(~Sim, ncol = 1, scales = "free") +
+    facet_grid(Sex~Fleet, scales = "free") +
     theme_bw() +
     theme(legend.position = "none") +
     labs(x = "Age",y = "Catch")
@@ -163,30 +185,28 @@ tryCatch({
   
   # Fishery Comps
   comps_fish <- melt(Fish_Age_Comps)
-  names(comps_fish) <- c("Year", "Age", "Sim", "Count")
+  names(comps_fish) <- c("Year", "Age", "Fleet", "Sex","Sim", "Count")
   
 print(
   ggplot(comps_fish %>% 
-           filter(Sim %in% c("Sim 1", 
-                             "Sim 2", "Sim 3")),
+           filter(Sim %in% c("Sim 1")),
          aes(x = as.numeric(Year), y = Count, fill = Age, group = Sim)) +
     geom_col(position = "stack") +
-    facet_wrap(~Sim, ncol = 3, scales = "free") +
+    facet_grid(Sex~Fleet, scales = "free") +
     theme_bw() +
     theme(legend.position = "top") +
     labs(x = "Year",y = "Count", title = "Fishery Comps")
 )
   
   comps_surv <- melt(Survey_Age_Comps)
-  names(comps_surv) <- c("Year", "Age", "Sim", "Count")
+  names(comps_surv) <- c("Year", "Age", "Fleet", "Sex","Sim", "Count")
   
 print(
   ggplot(comps_surv %>% 
-           filter(Sim %in% c("Sim 1", 
-                             "Sim 2", "Sim 3")), 
+           filter(Sim %in% c("Sim 1")), 
          aes(x = as.numeric(Year), y = Count, fill = Age, group = Sim)) +
     geom_col(position = "stack") +
-    facet_wrap(~Sim, ncol = 3, scales = "free") +
+    facet_grid(Sex~Fleet, scales = "free") +
     theme_bw() +
     theme(legend.position = "top") +
     labs(x = "Year",y = "Count", title = "Survey Comps") 
@@ -196,28 +216,28 @@ print(
 # Indices of abundance ----------------------------------------------------
 
   # Fishery index
-  idx_fish <- melt(Fishery_Index) 
-  names(idx_fish) <- c("Year", "Sim", "Index")
+  idx_fish <- melt(Fishery_Index_Agg) 
+  names(idx_fish) <- c("Year", "Fleet","Sim", "Index")
   
 print(
   # Across ages
-  ggplot(idx_fish %>% drop_na(), aes(as.numeric(Year), y = Index, group = Sim))+
+  ggplot(idx_fish, aes(as.numeric(Year), y = Index, group = Sim))+
     geom_line(size = 1.1, color = "grey", alpha = 0.75) +
-    # facet_wrap(~Sim, ncol = 1, scales = "free") +
+    facet_wrap(~Fleet, scales = "free_x") +
     theme_bw() +
     theme(legend.position = "top") +
-    labs(x = "Year",y = "Biomass index at age", title = "Fishery Index") 
+    labs(x = "Year",y = "Biomass index", title = "Fishery Index") 
 )
   
   # Survey index
-  idx_surv <- melt(Survey_Index)
-  names(idx_surv) <- c("Year", "Sim", "Index")
+  idx_surv <- melt(Survey_Index_Agg)
+  names(idx_surv) <- c("Year", "Fleet","Sim", "Index")
   
 print(
   # Across ages
-  ggplot(idx_surv %>% drop_na(), aes(as.numeric(Year), y = Index, group = Sim))+
+  ggplot(idx_surv, aes(as.numeric(Year), y = Index, group = Sim))+
     geom_line(size = 1.1, color = "grey", alpha = 0.75) +
-    # facet_wrap(~Sim, ncol = 1, scales = "free") +
+    facet_wrap(~Fleet, scales = "free_x") +
     theme_bw() +
     theme(legend.position = "top") +
     labs(x = "Year",y = "Biomass index at age", title = "Survey Index") 
@@ -234,43 +254,60 @@ print(
 
   # Fishery selectivity
   fish_sel_df <- melt(Fish_selex_at_age)
-  names(fish_sel_df) <- c("Year", "Age", "Sim", "Selex")
+  names(fish_sel_df) <- c("Year", "Age", "Fleet", "Sex", "Sim", "Selex")
   
   fish_sel_df <- fish_sel_df %>% 
     mutate(Age = parse_number(substr(Age, 5, 10)))
   
-print(
-  ggplot(fish_sel_df %>% 
-           filter(Sim %in% c("Sim 1", 
-                             "Sim 2", "Sim 3")),
-         aes(x = as.numeric(Year), y = Age,
-                          fill = Selex, group = Sim)) +
+print( # print tiles here
+  ggplot(fish_sel_df %>% filter(Sim %in% c("Sim 1")),
+         aes(x = as.numeric(Year), y = Age, fill = Selex)) +
     geom_tile() +
-    facet_wrap(~Sim, ncol = 3, scales = "free") +
+    facet_grid(Sex~Fleet, scales = "free") +
     scale_fill_viridis_c() +
     theme_bw() +
     theme(legend.position = "top") +
     labs(x = "Year",y = "Age", title = "Fishery Selectivity") 
 )
 
+print( # Print lines here!
+  ggplot(fish_sel_df, aes(x = Age, y = Selex, group = as.numeric(Year))) +
+    geom_line(color = "grey", size = 1.5) +
+    facet_grid(Sex~Fleet, scales = "free") +
+    scale_fill_viridis_c() +
+    theme_bw() +
+    theme(legend.position = "top") +
+    labs(x = "Age",y = "Prop of Selex", title = "Fishery Selectivity") 
+)
+
+
   # Survey selectivity
   surv_sel_df <- melt(Surv_selex_at_age)
-  names(surv_sel_df) <- c("Year", "Age", "Sim", "Selex")
+  names(surv_sel_df) <- c("Year", "Age", "Fleet", "Sex", "Sim", "Selex")
   
   surv_sel_df <- surv_sel_df %>% 
     mutate(Age = parse_number(substr(Age, 5, 10)))
 
-print(
+print( # print tiles here
   ggplot(surv_sel_df %>% 
-           filter(Sim %in% c("Sim 1", 
-                             "Sim 2", "Sim 3")),
-         aes(x = as.numeric(Year), y = Age, fill = Selex, group = Sim)) +
+           filter(Sim %in% c("Sim 1")),
+         aes(x = as.numeric(Year), y = Age, fill = Selex)) +
     geom_tile() +
-    facet_wrap(~Sim, ncol = 3, scales = "free") +
+    facet_grid(Sex~Fleet, scales = "free") +
     scale_fill_viridis_c() +
     theme_bw() +
     theme(legend.position = "top") +
     labs(x = "Year",y = "Age", title = "Survey Selectivity") 
+)
+
+print( # Print lines here!
+  ggplot(surv_sel_df, aes(x = Age, y = Selex, group = as.numeric(Year))) +
+    geom_line(color = "grey", size = 1.5) +
+    facet_grid(Sex~Fleet, scales = "free") +
+    scale_fill_viridis_c() +
+    theme_bw() +
+    theme(legend.position = "top") +
+    labs(x = "Age",y = "Prop of Selex", title = "Survey Selectivity") 
 )
 
 
@@ -283,8 +320,7 @@ print(
     mutate(Age = parse_number(substr(Age, 5, 10)))
 
 print( ggplot(nat_mort %>% 
-                filter(Sim %in% c("Sim 1", 
-                                  "Sim 2", "Sim 3")),
+                filter(Sim %in% c("Sim 1")),
               aes(x = as.numeric(Year), y = Age, fill = Mortality, group = Sim)) +
     geom_tile() +
     facet_wrap(~Sim, ncol = 3, scales = "free") +
@@ -301,15 +337,14 @@ print( ggplot(nat_mort %>%
   ### Fishery -----------------------------------------------------------------
 
   q_df_fish <- melt(q_Fish)
-  names(q_df_fish) <- c("Year", "Sim", "q")
+  names(q_df_fish) <- c("Year", "Fleet", "Sim", "q")
   
 print(
   ggplot(q_df_fish %>% 
-           filter(Sim %in% c("Sim 1", 
-                             "Sim 2", "Sim 3")), 
-         aes(x = as.numeric(Year), y = q, color = Sim, group = Sim)) +
+           filter(Sim %in% c("Sim 1")), 
+         aes(x = as.numeric(Year), y = q)) +
     geom_line(size = 1.3) +
-    facet_wrap(~Sim, ncol = 3, scales = "free") +
+    facet_wrap(~Fleet, ncol = 3, scales = "free_y") +
     theme_bw() +
     theme(legend.position = "top") +
     labs(x = "Year",y = "q", title = "Fishery Catchability") 
@@ -319,15 +354,14 @@ print(
   ### Survey ------------------------------------------------------------------
   
   q_df_surv <- melt(q_Surv)
-  names(q_df_surv) <- c("Year", "Sim", "q")
+  names(q_df_surv) <- c("Year", "Fleet", "Sim", "q")
   
   print(
     ggplot(q_df_surv %>% 
-             filter(Sim %in% c("Sim 1", 
-                               "Sim 2", "Sim 3")),
-           aes(x = as.numeric(Year), y = q,  group = Sim)) +
+             filter(Sim %in% c("Sim 1")),
+           aes(x = as.numeric(Year), y = q)) +
       geom_line(size = 1.3) +
-      facet_wrap(~Sim, ncol = 3, scales = "free") +
+      facet_wrap(~Fleet, ncol = 3, scales = "free_y") +
       theme_bw() +
       theme(legend.position = "top") +
       labs(x = "Year",y = "q", title = "Survey Catchability") 
@@ -337,19 +371,19 @@ print(
   ### Fishing Mortality -------------------------------------------------------
   
   fmort_df <- melt(fish_mort)
-  names(fmort_df) <- c("Year", "Sim", "F_Mort") 
+  names(fmort_df) <- c("Year", "Fleet", "Sim", "F_Mort") 
 
   print(
     ggplot(fmort_df %>% 
-             filter(Sim %in% c("Sim 1", 
-                               "Sim 2", "Sim 3")), 
-           aes(x = as.numeric(Year), y = F_Mort, group = Sim)) +
+             filter(Sim %in% c("Sim 1")), 
+           aes(x = as.numeric(Year), y = F_Mort)) +
       geom_line(size = 1.3) +
-      facet_wrap(~Sim, ncol = 3, scales = "free") +
+      facet_wrap(~Fleet, ncol = 3, scales = "free") +
       theme_bw() +
       theme(legend.position = "top") +
       labs(x = "Year",y = "Fishing Mortality", title = "Fishing Mortality") 
-  )
+  ) +
+    xlim(150, 200)
   
   dev.off()
   

@@ -21,7 +21,10 @@ read_params_create_OM_objects <- function(spreadsheet_path) {
   n_sims <<- ctl$Value[ctl$Par == "n_sims"] # Number of simulations
   n_years <<- ctl$Value[ctl$Par == "n_years"] # Number of years
   N_1 <<- ctl$Value[ctl$Par == "N_1"] # Numbers at year 1 in first age of recruitment
-  
+  n_sex <<- ctl$Value[ctl$Par == "n_sex"] # Numbers of sexes
+  n_fish_fleets <<- ctl$Value[ctl$Par == "n_fish_fleets"] # Numbers of fishery fleets
+  n_srv_fleets <<- ctl$Value[ctl$Par == "n_srv_fleets"] # Numbers of survey fleets
+
 # Age Bins ----------------------------------------------------------------
 
   age_pars <- read_xlsx(spreadsheet_path, sheet = "Age_Bins")
@@ -30,7 +33,8 @@ read_params_create_OM_objects <- function(spreadsheet_path) {
   ages <<- age_pars$ages
   
   # Create OM objects here
-  create_OM_objects(n_years = n_years, n_sims = n_sims, ages = ages)
+  create_OM_objects(n_years = n_years, n_sims = n_sims, ages = ages, n_sex = n_sex,
+                    n_fish_fleets = n_fish_fleets)
 
 # Maturity at age ---------------------------------------------------------
 
@@ -38,15 +42,19 @@ read_params_create_OM_objects <- function(spreadsheet_path) {
   
   # Munge maturity at age - pivot longer
   maturity_long <- maturity %>% 
-    pivot_longer(!c(Year, Time), names_to = "Ages", values_to = "Maturity")
+    pivot_longer(!c(Year, Time, Sex), names_to = "Ages", values_to = "Maturity")
   
   # If this is time-invariant 
   if(unique(maturity_long$Time) == "Time_Inv") {
     
     # Fill this in
-    for(y in 1:nrow(mat_at_age)) {
+    for(s in 1:length(unique(maturity_long$Sex))) {
       
-      mat_at_age[y,,] <<-  maturity_long$Maturity
+      for(y in 1:nrow(mat_at_age)) {
+        
+        mat_at_age[y,,s,] <-  maturity_long$Maturity[maturity_long$Sex == s]
+        
+      } # end s sex loop
 
     } # end i
     
@@ -60,30 +68,39 @@ read_params_create_OM_objects <- function(spreadsheet_path) {
     } 
     
     # Fill this in
-    for(y in 1:nrow(mat_at_age)) {
+    for(s in 1:length(unique(maturity_long$Sex))) {
       
-      mat_at_age[y,,] <<- maturity_long$Maturity[maturity_long$Year == y]
+      for(y in 1:nrow(mat_at_age)) {
+        
+        mat_at_age[y,,s,] <-  maturity_long$Maturity[maturity_long$Sex == s & maturity_long$Year == y]
+        
+      } # end s sex loop
       
     } # end i
     
   } # end time varying
   
-
+  mat_at_age <<- mat_at_age # Output this to environment
+  
 # Weight at Age -----------------------------------------------------------
 
   weight <- read_xlsx(spreadsheet_path, sheet = "Weight_At_Age")
   
   # Munge maturity at age - pivot longer
   weight_long <- weight %>% 
-    pivot_longer(!c(Year, Time), names_to = "Ages", values_to = "Weight")
+    pivot_longer(!c(Year, Time, Sex), names_to = "Ages", values_to = "Weight")
   
   # If this is time-invariant 
   if(unique(weight_long$Time) == "Time_Inv") {
     
     # Fill this in
-    for(y in 1:nrow(wt_at_age)) {
+    for(s in 1:length(unique(weight_long$Sex))) {
       
-      wt_at_age[y,,] <<- weight_long$Weight
+      for(y in 1:nrow(wt_at_age)) {
+        
+        wt_at_age[y,,s,] <-  weight_long$Weight[weight_long$Sex == s]
+        
+      } # end s sex loop
       
     } # end i
     
@@ -97,13 +114,19 @@ read_params_create_OM_objects <- function(spreadsheet_path) {
     } 
     
     # Fill this in
-    for(y in 1:nrow(wt_at_age)) {
+    for(s in 1:length(unique(weight_long$Sex))) {
       
-      wt_at_age[y,,] <<- weight_long$Weight[weight_long$Year == y]
+      for(y in 1:nrow(wt_at_age)) {
+        
+        wt_at_age[y,,s,] <-  weight_long$Weight[weight_long$Sex == s & weight_long$Year == y]
+        
+      } # end s sex loop
       
     } # end i
     
   } # end time varying
+  
+  wt_at_age <<- wt_at_age # Output to environment
   
   
 # Recruitment + Mortality-------------------------------------------------------------

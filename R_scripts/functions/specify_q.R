@@ -1,35 +1,25 @@
-# Purpose: To specify catchability for the fishery and the survey in the OM
+# Purpose: To specify catchability for the fishery and the survey in the OM (only time-invariant options for now)
 # Creator: Matthew LH. Cheng
 # Date: 10/30/22
 
-
-#' @param q_Fish_Time Time parameterization of catchability for fishery
-#' @param q_Surv_Time Time parameterization of catchability for survey
 #' @param q_Mean_Fish Mean catchability parameter for the fishery
 #' @param q_Mean_Surv Mean catchability parameter for the survey
-#' @param q_Fish_rho Correaltion for AR1 in q fish
-#' @param q_Fish_sigma Standard deviation for AR1 in q fish
 
-specify_q <- function(q_Fish_Time = "Constant", q_Surv_Time = "Constant",
-                             q_Mean_Fish, q_Mean_Surv, 
-                             q_Fish_rho, q_Fish_sigma) {
+specify_q <- function(q_Mean_Fish, q_Mean_Surv) {
   
-  if(q_Fish_Time == "Constant") {
-    # Input value into array
-    q_Fish[,] <- q_Mean_Fish
-  } # time invariant catchability
+  if(n_fish_fleets != length(q_Mean_Fish)) stop("Length of q vector for fishery does not equal the number of fishery fleets specified!")
+  if(n_srv_fleets != length(q_Mean_Surv)) stop("Length of q vector for syrvey does not equal the number of survey fleets specified!")
   
+  for(f in 1:n_fish_fleets) {
+    q_Fish[,f,] <- q_Mean_Fish[f]
+  } # loop through to input q_Mean_Fish into this
   
-  if(q_Surv_Time == "Constant") {
-    # Input value into array
-    q_Surv[,] <- q_Mean_Surv
-  } # time invariant catchability
+  for(sf in 1:n_srv_fleets) {
+    q_Surv[,sf,] <- q_Mean_Surv[sf]
+  } # loop through for survey fleets
   
   # Output these to the environment
   q_Fish <<- q_Fish
   q_Surv <<- q_Surv
-  
-  print(paste("Catchability for the Fishery is specified as:", q_Fish_Time))
-  print(paste("Catchability for the Survey is specified as:", q_Surv_Time))
   
 } # end function

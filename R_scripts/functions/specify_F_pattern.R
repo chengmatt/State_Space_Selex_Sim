@@ -2,112 +2,113 @@
 # Creator: Matthew LH. Cheng
 # Date: 10/31/22
 
-#' @param Fish_Start_yr Start fishing year
-#' @param Start_F Start value for F mort
-#' @param F_type Type of fishing mortality pattern (Contrast, Constant, Increase, and Increase_Plat)
-#' @param F_sigma_dev If we want to add some noise around the fishing mortality pattern, default
-#' is 0. 
 
-specify_F_pattern <- function(Fish_Start_yr, Start_F, F_type, F_sigma_dev = 0) {
-  
-  # Get mean natural mortality rate
-  mean_nat_mort <- mean(Mort_at_age[,,])
-  
-  # Set fishing mortality to be 0 before the fishery starts
-  fish_mort[1:(Fish_Start_yr-1),] <- 0
+# Specify Fs --------------------------------------------------------------
+
+#' @param Start_F Starting F vector
+#' @param Fish_Start_yr Starting Fishing years for fleets
+#' @param n_years Number of years in simulation
+#' @param max_rel_F_M Maximum F value relative to the M
+#' @param desc_rel_F_M Descending F value relative to the M
+#' @param F_type Specify type of fishing mortality pattern
+#' @param mean_nat_mort Mean natural mortality
+
+specify_F_pattern <- function(Start_F, Fish_Start_yr, F_type, n_years, max_rel_F_M, desc_rel_F_M,
+                              mean_nat_mort) {
   
   if(F_type == "Contrast") {
     
+    if(desc_rel_F_M > max_rel_F_M) stop("Descending limb of fishing mortality contrast is larger than ascending limb! Specify another pattern or adjust the relative mortality rates to reflect a contrast pattern!")
+    
     # Determine the mid point of when to ramp back down
-    midpoint <- round(mean(Fish_Start_yr:(n_years * 0.975)))
+    midpoint <- round(mean(Fish_Start_yr:(n_years * 0.95)))
     
     # Determine when it flattens out
     flatpoint <- round(mean(midpoint:(n_years)))
     
-    for(sim in 1:n_sims) {
-      
-      # Increase fishing mortality (ramp up); here we are specifying fishing mortality relative to natural mortality.
-      # We will allow it go over natural mortality first by 1.5x
-      fish_mort[Fish_Start_yr:midpoint,sim] <- abs(
-        seq(Start_F, (1.5 * mean_nat_mort), length.out = length(Fish_Start_yr:midpoint)) +
-          # Add some normal random error around this
-          rnorm(length(Fish_Start_yr:Fish_Start_yr:midpoint), 0, F_sigma_dev)
-      ) # absolute values so they're always positive
-      
-      # Determine when it starts flattening out at a point
-      fish_mort[midpoint:flatpoint,sim] <- (1.5 * mean_nat_mort)
-      
-      # Now, decrease fihsing mortality (ramp down) - decrease to 0.75 of the mean natural mortality
-      fish_mort[flatpoint:n_years,sim] <- abs(
-        seq((1.5 * mean_nat_mort), (0.75 * mean_nat_mort), length.out = length(flatpoint:n_years)) +
-          # Add some noraml random error around this
-          rnorm(length(flatpoint:n_years), 0, F_sigma_dev)
-      ) # absolute values so they're always positive
-      
-    } # end sim loop
-
+    # Increase fishing mortality (ramp up); here we are specifying fishing mortality relative to natural mortality.
+    # We will allow it go over natural mortality first by 1.5x
+    fish_mort_1 <- seq(Start_F, (max_rel_F_M * mean_nat_mort), length.out = length(Fish_Start_yr:(midpoint-1))) 
+    
+    # Determine when it starts flattening out at a point
+    fish_mort_2 <- rep((max_rel_F_M * mean_nat_mort), length.out = length(midpoint:(flatpoint-1)))
+    
+    # Now, decrease fihsing mortality (ramp down) - decrease to 0.75 of the mean natural mortality
+    fish_mort_3 <- seq((max_rel_F_M * mean_nat_mort), (desc_rel_F_M * mean_nat_mort), length.out = length(flatpoint:n_years))
+    
+    # Now bind all of these fish morts into a vector
+    F_vec <- c(fish_mort_1, fish_mort_2, fish_mort_3)
+    
   } # if statement for F pattern that is contrasting
   
-  if(F_type == "Constant") {
-    
-    # does not use the Start_F argument - automatically scales it up to 0.75 of the natural mortality 
-    
-    for(sim in 1:n_sims) { 
-      
-      # Constant fishing mortality - 0.75 of natural mortality
-      fish_mort[Fish_Start_yr:n_years,] <- abs(
-        rep((0.75 * mean_nat_mort), times = length(Fish_Start_yr:n_years)) +
-          # Add some normal random error around this
-          rnorm(length(Fish_Start_yr:n_years), 0, F_sigma_dev)
-      ) # Absolute values so they're always positive
-      
-    } # end sim loop
+  if(F_type == "Constant") {  # does not use the Start_F argument - automatically scales it up to 0.75 of the natural mortality 
+
+    # Constant fishing mortality - 0.75 of natural mortality
+    F_vec <- rep((0.75 * mean_nat_mort), times = length(Fish_Start_yr:n_years)) 
     
   } # if statement for F pattern that is Constant
   
   if(F_type == "Increase") {
     
-    for(sim in 1:n_sims) {
-      
-      fish_mort[Fish_Start_yr:n_years,sim] <- abs(
-        seq(Start_F, (1.5 * mean_nat_mort), length.out = length(Fish_Start_yr:n_years)) +
-          # Add some normal random error around this
-          rnorm(length(Fish_Start_yr:n_years), 0, F_sigma_dev)
-      ) # Making absolute so they're always positive numbers
-      
-    } # end sims loop
+    F_vec <- seq(Start_F, (max_rel_F_M * mean_nat_mort), length.out = length(Fish_Start_yr:n_years))
     
   } # if statement for F pattern that is increasing
-  
-  
-  if(F_type == "Increase_Plat") { # if increas and plateaus out
+
+  if(F_type == "Increase_Plat") { # if increases and plateaus out
     
     # Calculate plateau year
-    plat_year <- round(0.8 * n_years)  # make it 0.5 of the number of years in the simulation
+    plat_year <- round(0.95 * n_years)  # make it 0.5 of the number of years in the simulation
     
-    for(sim in 1:n_sims) {
-      
-      # Calculate increasing f mort
-      increasing <- abs(seq(Start_F, (0.75 * mean_nat_mort), length.out = length(Fish_Start_yr:plat_year)) +
-          rnorm(length(Fish_Start_yr:plat_year), 0, F_sigma_dev) # Add some normal random error around this
-      ) # Making absolute so they're always positive numbers
-      
-      # Get vector of plateau fmorts
-      plat <- rep((0.75 * mean_nat_mort), length.out = length((plat_year+1):n_years)) + 
-        rnorm(length((plat_year+1):n_years), 0, F_sigma_dev)
-      
-      fish_mort[Fish_Start_yr:n_years,sim] <- c(increasing, plat)
-      
-    } # end sims loop
+    # Calculate increasing f mort
+    increasing <- seq(Start_F, (max_rel_F_M * mean_nat_mort), length.out = length(Fish_Start_yr:(plat_year-1))) 
+    
+    # Get vector of plateau fmorts
+    plat <- rep((max_rel_F_M * mean_nat_mort), length.out = length((plat_year):n_years))
+    
+    F_vec <- c(increasing, plat)
     
   } # if statement for F pattern that is increasing
   
-  # Output into environment
-  fish_mort <<- fish_mort
-  
-  print(paste("Fishing mortality specified as:" , F_type))
+  return(F_vec)
   
 } # end function
 
+
+# Get fishing mortality rates ---------------------------------------------
+
+#' @param Start_F Starting F vector
+#' @param Fish_Start_yr Starting Fishing years for fleets
+#' @param n_years Number of years in simulation
+#' @param max_rel_F_M Maximum F value relative to the M
+#' @param desc_rel_F_M Descending F value relative to the M
+#' @param F_type Specify type of fishing mortality pattern
+#' @param mean_nat_mort Mean natural mortality
+
+get_Fs <- function(Start_F, Fish_Start_yr, F_type, n_years, max_rel_F_M, desc_rel_F_M,
+                   mean_nat_mort) {
+  
+  if(n_fish_fleets != length(Start_F) & n_fish_fleets != length(Fish_Start_yr) &
+     n_fish_fleets != length(F_type) & n_fish_fleets != length(max_rel_F_M) &
+     n_fish_fleets != length(desc_rel_F_M)
+     ) stop("Vector length of Start_F, Fish_Start_yr, F_type, max_rel_F_M, desc_rel_F_M does not equal the number of fleets specified.")
+  
+  
+  # Loop through fleets to specify Fs
+  for(f in 1:n_fish_fleets) {
+    
+    # Set Fs to 0 before fishery starts
+    fish_mort[1:(Fish_Start_yr-1)[f],f,] <- 0
+    
+    # Set F pattern to fishery - feed in inputs to arguments above
+    fish_mort[Fish_Start_yr[f]:n_years,f,] <- specify_F_pattern(Start_F = Start_F[f],
+                                              Fish_Start_yr = Fish_Start_yr[f],   F_type = F_type[f],
+                                              n_years = n_years, max_rel_F_M = max_rel_F_M[f],
+                                              desc_rel_F_M = desc_rel_F_M[f],  mean_nat_mort = mean_nat_mort)
+  } # end f loop
+
+  # Output into environment
+  fish_mort <<- fish_mort
+  
+} # end function
 
 

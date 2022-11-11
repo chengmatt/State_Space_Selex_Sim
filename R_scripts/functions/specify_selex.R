@@ -2,177 +2,274 @@
 # Creator: Matthew LH. Cheng
 # Date: 10/30/22
 
+# Selectivity options -----------------------------------------------------
 
-#'
-#' @param Fish_Funct_Form Functional form for Fishery Selectivity - Options are Asmyp and Dome_Gamma
-#' @param Surv_Funct_Form Functional form for Survey Selectivity - Default is Asymptotic
-#' @param ages ages we have in our assessment
-#' @param Fish_Time Whether we want time-varying selex or not - Options are constant and 2DAR1 - 2DAR1 is very preliminary
-#' @param a50_fish A50 parameter for logistic selectivity for fishery 
-#' @param k_fish Slope paramter for logistic selectivity for fishery
-#' @param amax_fish Age at max selection for selectivity in dome-shaped fishery selex
-#' @param delta_fish Slope parameter for selectivity in dome-shaped fishery selex
-#' @param slope_1_fish Increasing limb slope of 1st logistic function
-#' @param slope_2_fish Drecreasing limb slope of 2nd logistic function
-#' @param infl_1_fish Inflection point of 1st logisitic function (parameterized as age)
-#' @param infl_2_fish Infleciton point of 2nd logistic function (higher values = stronger dome). Generally, you want this to range around 0 - 0.5ish.
-#' @param a50_surv A50 parameter for logistic selectivity for survey 
-#' @param k_surv Slope parameter for logistic selectivity for survey 
-#' @param Sigma_Fish Variance parameter for Time varying processes
-#' @param rho_age_fish Correlation parameter for age varying fishery selex processes
-#' @param rho_time_fish Correlation parameter for time varying fishery selex processes
+#' @param selex_type Selectivity type (Options are: uniform, logistic, gamma, double_logistic, double_normal)
+#' @param bins vector of age or length bins
+#' @param par_values parameter values specific for each selectivity type
+#' # This fxn is meant to be used within the specify_selex fxn.
 
-specify_selex <- function(Fish_Funct_Form, Surv_Funct_Form = "Asymp", ages, 
-                          Fish_Time, a50_fish, k_fish, amax_fish, delta_fish,
-                          slope_1_fish, slope_2_fish, infl_1_fish, infl_2_fish,
-                          a50_surv, k_surv, Sigma_Fish, rho_age_fish, rho_time_fish) {
+selex_opts <- function(selex_type, bins, par_values) {
   
-  require(mvtnorm) # For multivariate draws
-  
-  if(Fish_Time %in% c("2DAR1", "1DAR1_a", "1DAR1_y")) {
+  if(selex_type != "uniform") {
     
-    # Create an array to store deviation parameters in if we are specifying time varying stuff
-    Selex_dev <- array(dim = c(n_years, length(ages), n_sims),
-                       dimnames = list( # Set up dimensions names
-                         c(paste("Year", 1:n_years, sep = "_")), # Years 
-                         c(paste("Age", ages, sep = "_")), # Ages 
-                         c(paste("Sim",1:n_sims)) # Simulation 
-                       ))
+    # List out all the different parameters there are
+    par_vec <- c("a50", "k", "amax", "delta", "slope_1", "slope_2", "infl_1", "infl_2",
+                 "p1", "p2", "p3", "p4", "p5", "p6")
     
-  } # if statement to create a selectivity array
-  
-# Fishery -----------------------------------------------------------------
-
-  ### Asymptotic Selex --------------------------------------------------------------
-
-  if(Fish_Funct_Form == "Asymp") {
+    # Create a matrix to assign values to - input parameter names in the 2nd col and nas (values) in the 1st
+    par_mat <- matrix(data = c(rep(NA, length(par_vec)), par_vec), ncol = 2, nrow = length(par_vec))
     
-    # Base functional form here - scale to a max of 1
-    Fish_Selex <- 1 / (1 + exp(-1 * (ages - a50_fish) / k_fish)) / max( 1 / (1 + exp(-1 * (ages - a50_fish) / k_fish)) )
-                         
-  } # if functional form is asymptotic
-  
-  
-  ### Dome Shaped Selex (Gamma) -------------------------------------------------------
+    # Get parameter names specified in the array
+    par_names <- names(par_values)
+    
+    # Put parameter values in the corresponding area
+    par_mat[,1][par_mat[,2] %in% c(par_names)] <- par_values
+    
+  } # only look for par values if selectivity is not uniform
 
+  if(selex_type == "logistic") { # 2 parameters
+    
+    # Get a50 value
+    a50 <- as.numeric(par_mat[,1][par_mat[,2] == "a50"])
+    # Get k value
+    k <- as.numeric(par_mat[,1][par_mat[,2] == "k"])
+    # Compute selex and scale to max of 1
+    selex <- 1 / (1 + exp(-1 * (bins - a50) / k)) / max( 1 / (1 + exp(-1 * (bins - a50) / k)) ) / max(1 / (1 + exp(-1 * (bins - a50) / k)) / max( 1 / (1 + exp(-1 * (bins - a50) / k)) ))
+    
+  } # logistic selectivity
   
-  if(Fish_Funct_Form == "Dome_Gamma") {
+  if(selex_type == "uniform") { # 0 parameters 
+    selex <- rep(1, length(bins))
+  } # uniform selectivity
+  
+  if(selex_type == "gamma") { # 2 parameters 
+    
+    # Get delta value
+    delta <- as.numeric(par_mat[,1][par_mat[,2] == "delta"])
+    # Get amax value
+    amax <- as.numeric(par_mat[,1][par_mat[,2] == "amax"])
     
     # Base Fucntional Form here - use Punt et al. 1994 parameterization (amax and delta)
-    p_fish <- (0.5 * (sqrt(amax_fish^2 + 4*delta_fish^2) - amax_fish)) # Derive power parameter here first
+    p <- (0.5 * (sqrt(amax^2 + 4*delta^2) - amax)) # Derive power parameter here first
     
     # Now calculate Selex for dome-shaped - scale to a max of 1
-    Fish_Selex <- (ages/amax_fish) ^ (amax_fish/p_fish) * exp((amax_fish - ages) / p_fish) / max( (ages/amax_fish) ^ (amax_fish/p_fish) * exp((amax_fish - ages) / p_fish) )
+    selex <- (bins/amax) ^ (amax/p) * exp((amax - bins) / p) / 
+                  max( (bins/amax) ^ (amax/p) * exp((amax - bins) / p) )
     
-  } # if functional form is dome-shaped
+  } # gamma dome-shaped selectivity
   
-  ### Dome Shaped Selex (Double Logistic) -------------------------------------------------------
-  
-  
-  if(Fish_Funct_Form == "Dome_DL") {
+  if(selex_type == "double_logistic") { # 4 parameters
     
-    slope_1_fish <- 1
-    slope_2_fish <- 0.1
-    infl_1_fish <- 10
-    infl_2_fish <- 25
+    # TESTING 
+    # slope_1 <- 3 # ascending limb
+    # slope_2 <- 0.2 # descending limb
+    # infl_1 <- 5 # inflection point for ascending limb
+    # infl_2 <- 20 # inflection point for descending limb
     
-    # Calculate logistic curve 1 
-    logistic_1 <- 1/(1 + exp(-slope_1_fish * (ages - infl_1_fish))) 
-    # Calculate logistic curve 2 
-    logistic_2 <- 1 - (1/(1 + exp(-slope_2_fish * (ages - infl_2_fish))))
+    # Get slope1 value
+    slope_1 <- as.numeric(par_mat[,1][par_mat[,2] == "slope_1"])
+    # Get slope2 value
+    slope_2 <- as.numeric(par_mat[,1][par_mat[,2] == "slope_2"])
+    # Get inflection point 1 value
+    infl_1 <- as.numeric(par_mat[,1][par_mat[,2] == "infl_1"])
+    # Get inflection point 2 value
+    infl_2 <- as.numeric(par_mat[,1][par_mat[,2] == "infl_2"])
+    
+    # Calculate logistic curve 1 - mediates the ascending limb
+    logistic_1 <- 1/(1 + exp(-slope_1 * (bins - infl_1))) 
+    
+    # Calculate logistic curve 2 - mediates the descending limb
+    logistic_2 <- 1 - (1/(1 + exp(-slope_2 * (bins - infl_2))))
     
     # multiply the logistic curves and scale to a max of 1
-    Fish_Selex <- logistic_1 * logistic_2 / max(logistic_1 * logistic_2)
-     
-    plot(Fish_Selex)
-
-  } # if functional form is dome-shaped
-  
-
-# Constant Selex for the Fishery ----------------------------------------------------------
-  
-  if(Fish_Time == "Constant") {
+    selex <- logistic_1 * logistic_2 / max(logistic_1 * logistic_2)
     
-    # Loop through this to fill them in
-    for(y in 1:nrow(Fish_selex_at_age)) {
-      
-      Fish_selex_at_age[y,,] <<- Fish_Selex
-      
-    } # end y for time-invariant loop
-
-  } # if statement for constant selectivity
-  
+    # plot(selex)
     
-
-# 2DAR1 Selex for the Fishery (Preliminary) -------------------------------------------------------------------
+  } # double logistic selectivity
   
-  if(Fish_Time == "2DAR1") {
+  if(selex_type == "double_normal") { # 6 parameters
     
-    # Get multivariate random draws
-    for(sim in 1:n_sims) {
+    # p1 = when age at selex = 1 starts (should probably bound by min and max age)
+    # p2 = partially controls where selex ends (should be between 0 and 1 needs to be in logit space)
+    # p3 = slope of ascending section (higher values = less steep ascending)
+    # p4 = slope of descending section (higher values = less steep decline)
+    # p5 = selex at age 0/young ages (needs to be in logit space or between 0 and 1)
+    # p6 = if set at 1 - asymptotic (where the right half of the curve limb ends, should also be in logit space)
+    
+    # TESTING
+    # bins <- 2:30
+    # p1 <- 5
+    # p2 <- 0.01
+    # p3 <- 3
+    # p4 <- 10
+    # p5 <- 0.2
+    # p6 <- 0.1
+    
+    # Get input parameter values
+    p1 <- as.numeric(par_mat[,1][par_mat[,2] == "p1"]) # p1
+    p2 <- as.numeric(par_mat[,1][par_mat[,2] == "p2"]) # p2
+    p3 <- as.numeric(par_mat[,1][par_mat[,2] == "p3"]) # p3
+    p4 <- as.numeric(par_mat[,1][par_mat[,2] == "p4"]) # p4
+    p5 <- as.numeric(par_mat[,1][par_mat[,2] == "p5"]) # p5
+    p6 <- as.numeric(par_mat[,1][par_mat[,2] == "p6"]) # p6
+ 
+    # Derive gamma (age at which selex = 1 ends)
+    gamma <- p1 + 1 + (0.99 * length(bins) - p1 - 1) / (1 + exp(-p2))
+    
+    # Derive joiner function 1 (ascending) mimics a logistic-like function but w/ knife-edged dynamics
+    j1 <- 1 / (1 + exp( -1 * (20 / (1 + abs(bins - p1))) * (bins - p1) ))
+    
+    # Derive joiner function 2 (descending)
+    j2 <- 1 / (1 + exp( -1 * (20 / (1 + abs(bins - gamma))) * (bins - gamma) ))
+
+    # Derive alpha parameter vector
+    alpha <- p5 + (1 - p5) * (exp( (-1*((bins - p1)^2)) / p3 ) - exp(-1*((1 - p1)^2)/p3)) / (1 - exp(-1*((1 - p1)^2)/p3))
+    
+    # Derive beta parameter vector
+    beta <- 1 + (p6 - 1) * (exp( (-((bins - gamma)^2)) / p4 ) -1 )/ (exp(-((length(bins) - gamma)^2)/p4) - 1)
+    
+    # Now, get selectivity values - scale to a max of 1
+    selex <- alpha * (1 - j1) + (j1 * ( (1-j2) + j2 * beta)) 
+    
+    # plot(selex)
+    
+  } # double normal selectivity
+  
+  return(selex)
+  
+} # end selectivity options function
+
+
+
+
+# Specify selectivity -----------------------------------------------------
+
+
+fish_selex <- c("logistic", "double_normal")
+srv_selex <- c("logistic", "uniform")
+
+
+fish_pars <- list(
+  Fleet_1_l <- matrix(data = c(2,3,
+                               4,3), nrow = n_sex, byrow = TRUE),
+  Fleet_2_dn <- matrix(data = c(5,0.01,3,10,0.2,0.1,
+                                10,0.01,3,15,0.2,0.05), nrow = n_sex, byrow = TRUE)
+)
+
+srv_pars <- list(
+  Fleet_1_l <- matrix(data = c(2,3,
+                               4,3), nrow = n_sex, byrow = TRUE),
+  Fleet_2_u <- matrix(data = 0)
+)
+  
+#' @param fish_selex selectivity types for fishery selectivity (should be a vector if > 1 fleet) 
+#' # (Options are: uniform, logistic, gamma, double_logistic, double_normal)
+#' @param srv_selex selectivity types for survey selectivity (should be a vector if > 1 fleet) 
+#' # (Options are: uniform, logistic, gamma, double_logistic, double_normal) 
+#' @param fish_pars parameters for the respective fishery fleets and selectivity forms (needs to be a list)
+#' if we are specifying uniform selectivity, the matrix can be specified just as matrix()
+#' @param srv_pars parameters for the respective survey fleets and selectivity forms (needs to be a list of matrices with col length equal to
+#' the number of parameters and row length equal to the number of rows)
+#' @param bins age of length bins
+
+#' @examples fish_pars <- list(Fleet_1_l <- matrix(data = c(2,3,
+#'                             4,3), nrow = n_sex, byrow = TRUE),
+#' Fleet_2_dn <- matrix(data = c(5,0.01,3,10,0.2,0.1,
+#'                              10,0.01,3,15,0.2,0.05), nrow = n_sex, byrow = TRUE))
+
+#'srv_pars <- list(Fleet_1_l <- matrix(data = c(2,3,
+#'                               4,3), nrow = n_sex, byrow = TRUE),
+#'                               Fleet_2_u <- matrix())
+
+specify_selex <- function(fish_selex, srv_selex, fish_pars, srv_pars, bins) {
+  
+  # Create objects to loop through
+  fish_par_list <- list()
+  srv_par_list <- list()
+
+# Fishery Selex -----------------------------------------------------------
+
+  # Loop through to construct objects to use within the function
+  for(f in 1:n_fish_fleets) {
+    
+      # Specify number of cols needed for constructing our matrix using npars
+      if(fish_selex[f] == "uniform") {n_pars <- 0; par_names <- NULL}
+      if(fish_selex[f] == "logistic") {n_pars <- 2; par_names <- c("a50", "k") }
+      if(fish_selex[f] == "gamma") {n_pars <- 2; par_names <- c("amax", "delta")}
+      if(fish_selex[f] == "double_logistic") {n_pars <- 4; par_names <- c("slope_1", "slope_2", "infl_1", "infl_2")}
+      if(fish_selex[f] == "double_normal") {n_pars <- 6; par_names <- c("p1", 'p2', "p3", "p4", "p5", "p6")}
       
-      # Create covariance matrix to feed into rmvnorm
+      # Create an empty named matrix to store specified values in
+      fish_mat <- matrix(data = fish_pars[[f]], nrow = n_sex, ncol = n_pars) # fIrst row = female, second row = male if 2 sexes
+      # Specify column names based on the selectivity type
+      colnames(fish_mat) <- par_names
       
-      # Sigma_Fish^2 * Correlation (rho_age_fish) = the covariance, diagonals get populated by the
-      # variance, and the off diagonals get populated by the covariance
-      Cov_Age_Year <- Sigma_Fish^2 * rho_age_fish^as.matrix(dist(min(ages):max(ages), diag = TRUE, upper = TRUE))
+      fish_par_list[[f]] <- fish_mat 
       
-      # Mean vector of draws (mean of 0) - repeated by max ages - 1
-      mean_0_vec <- rep(0,(max(ages)-1))
+  } # end f loop for fishery fleets
+  
+  # Loop through to assign values
+  for(y in 1:n_years) {
+    
+    for(f in 1:n_fish_fleets) {
       
-      for(y in 1:n_years) {
+      for(s in 1:n_sex) {
         
-        if(y == 1) { # put deviations in the first row - across ages if year = 1
-          
-          # Put deviations by age into the selex dev array for the first year
-          Selex_dev[y,,sim] <- mvtnorm::rmvnorm( n=1, mean=mean_0_vec, sigma=Cov_Age_Year )[1,]
-          
-        } else{ # if year != 1
-          
-          # Now, derive our correaltion and variance across time, generated by deviations by ages
-          # Rho time fish * Selex dev specifies how much they're correlated by time 
-          # sqrt(1-rho_time_fish^2) species the degree of nonassociation. We then multiply
-          # that by our next set of multivariate draws by age
-          Selex_dev[y,,sim] <- rho_time_fish * Selex_dev[y-1,,sim] + sqrt(1-rho_time_fish^2) * 
-            mvtnorm::rmvnorm( n=1, mean=mean_0_vec, sigma= Cov_Age_Year )[1,]
-        } # end 2DAR1 error draws
+      # Selectivity type within a fleet across sexes remain the same
+      Fish_selex_at_age[y,,f,s,] <- selex_opts(selex_type = fish_selex[f], bins = bins, 
+                                           par_values = fish_par_list[[f]][s,]) 
+      # Note that fish_par_list is a list so we need to do some weird indexing 
         
-        # Mutliply these multivariate draws by the selectivity at age - scale to a max of 1
-        Fish_selex_at_age[y,,sim] <- Fish_Selex * exp(Selex_dev[y,,sim]) / max(Fish_Selex * exp(Selex_dev[y,,sim]))
-        
-      } # end year loop
+      } # end s loop with number of sexes
       
-    } # end sim loop
+    } # end f loop - number of fishery fleets
     
-  } # end 2DAR1
-
-
-# Survey Selex------------------------------------------------------------------
+  } # end y loop years
   
-  # Survey is always assumed time-invariant and asymptotic
+
+# Survey Selex ------------------------------------------------------------
+
   
-    # Base functional form here
-    Surv_Selex <- 1 / (1 + (exp(-(ages - a50_surv)/k_surv)) )
+  # Loop through to construct objects to use within the function
+  for(sf in 1:n_srv_fleets) {
     
-      # Loop through this to fill them in
-      for(y in 1:nrow(Fish_selex_at_age)) {
+    # Specify number of cols needed for constructing our matrix using npars
+    if(srv_selex[sf] == "uniform") {n_pars <- 0; par_names <- NULL}
+    if(srv_selex[sf] == "logistic") {n_pars <- 2; par_names <- c("a50", "k") }
+    if(srv_selex[sf] == "gamma") {n_pars <- 2; par_names <- c("amax", "delta")}
+    if(srv_selex[sf] == "double_logistic") {n_pars <- 4; par_names <- c("slope_1", "slope_2", "infl_1", "infl_2")}
+    if(srv_selex[sf] == "double_normal") {n_pars <- 6; par_names <- c("p1", 'p2', "p3", "p4", "p5", "p6")}
+    
+    # Create an empty named matrix to store specified values in
+    srv_mat <- matrix(data = srv_pars[[sf]], nrow = n_sex, ncol = n_pars) # fIrst row = female, second row = male if 2 sexes
+    # Specify column names based on the selectivity type
+    colnames(srv_mat) <- par_names
+    
+    srv_par_list[[sf]] <- srv_mat # stick into list
+    
+  } # end f loop for fishery fleets
+  
+  # Loop through to assign values
+  for(y in 1:n_years) {
+    
+    for(sf in 1:n_fish_fleets) {
+      
+      for(s in 1:n_sex) {
         
-        Surv_selex_at_age[y,,] <- Surv_Selex
+        # Selectivity type within a fleet across sexes remain the same
+        Surv_selex_at_age[y,,sf,s,] <- selex_opts(selex_type = srv_selex[sf], bins = bins, 
+                                                 par_values = srv_par_list[[sf]][s,]) 
+        # Note that fish_par_list is a list so we need to do some weird indexing 
         
-      } # end y for time-invariant loop
+      } # end s loop with number of sexes
+      
+    } # end sf loop - number of survey fleets
     
-    
-    # Output fishery selectivity into environment
-    Fish_selex_at_age <<- Fish_selex_at_age
-    
-    # Output values for Survey Selex
-    Surv_selex_at_age <<- Surv_selex_at_age
-    
-    print(paste("Fishery Selectivity is specified as:", Fish_Funct_Form, "and", Fish_Time))
-    print(paste("Survey Selectivity is specified as:", Surv_Funct_Form))
-    
+  } # end y loop years  
+
+  Surv_selex_at_age <<- Surv_selex_at_age # Output into environment
+  Fish_selex_at_age <<- Fish_selex_at_age # Output into environment
   
-} # end function
-
-
-
+} # end function here
