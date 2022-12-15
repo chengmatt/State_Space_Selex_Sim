@@ -11,10 +11,14 @@
 #' @param srv_CV Survey CVs for indices
 #' @param Neff_Fish_Time Whether Neff for the fisheries remain constant, or vary as a function of time (Constant or F_Vary)
 #' @param fish_mort Input fishing mortality array if we want to allow fish_Neff to vary as a function of that
+#' @param fixed_Neff Value for which Neff is fixed at - user-specified so that F_vary's N_eff determination doesn't
+#' drop below a certain value. 
 
 fish_surv_data_scenarios <- function(Fish_Start_yr, Surv_Start_yr, fish_Neff, srv_Neff,
-                                     fish_CV, srv_CV, Neff_Fish_Time = "Constant", fish_mort = NULL) {
+                                     fish_CV, srv_CV, Neff_Fish_Time = "Constant", fish_mort = NULL,
+                                     fixed_Neff) {
   
+  # Warning/Error Messages
   if(n_fish_fleets != length(Fish_Start_yr) & 
      n_fish_fleets != length(fish_Neff) &
      n_fish_fleets != length(fish_CV) ) stop("Vector lengths of fishery start years, Neff, or CV are not the same as the number of fishery fleets specified")
@@ -23,10 +27,11 @@ fish_surv_data_scenarios <- function(Fish_Start_yr, Surv_Start_yr, fish_Neff, sr
      n_srv_fleets != length(srv_Neff) &
      n_srv_fleets != length(srv_CV) ) stop("Vector lengths of survey start years, Neff, or CV are not the same as the number of fishery fleets specified")
   
+  if(!Neff_Fish_Time %in% c("Constant", "F_Vary")) stop("Neff_Fish_Time is not specified correctly")
+
   # Create objects to output into the environment for use
   Fish_Start_yr <<- Fish_Start_yr # Fishery start year
   Surv_Start_yr <<- Surv_Start_yr # Survey Start Year
-  srv_Neff <<- srv_Neff # Survey effective sample sizes
   fish_CV <<- fish_CV # Fishery CV
   srv_CV <<- srv_CV # Survey CV
   
@@ -58,9 +63,30 @@ fish_surv_data_scenarios <- function(Fish_Start_yr, Surv_Start_yr, fish_Neff, sr
       
     } # end year loop
     
+    # Fix Neff at a specified value for those that are < said specified value
+    fish_Neff_mat[fish_Neff_mat < fixed_Neff & fish_Neff_mat != 0] <- fixed_Neff
+    
   } # effective sample sizes vary as a function of fishery specific Fs
+  
+  # create empty matrix for survey Neff
+  srv_Neff_mat <- matrix(data = NA, nrow = n_years, ncol = n_srv_fleets, byrow = TRUE)
+  
+  # specify matrix for survey neff
+  for(sf in 1:n_srv_fleets) {
+    
+    for(y in 1:n_years) {
+      
+      if(y < Surv_Start_yr[sf]) {
+        srv_Neff_mat[y,sf] <- 0 # force neff to be 0 when fishing is not occuring
+      } else{
+        srv_Neff_mat[y,sf] <- srv_Neff[sf]
+      }
+    }
+    
+  } # end sf loop
   
   # output into environment
   fish_Neff <<- fish_Neff_mat
+  srv_Neff <<- srv_Neff_mat
   
 } # end function

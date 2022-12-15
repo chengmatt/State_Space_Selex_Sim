@@ -119,6 +119,7 @@ print(
   # Numbers aggregated by ages
   natage %>% 
     group_by(Year, Sim) %>% 
+    filter(Sim == "Sim 1") %>% 
     summarize(Numbers = sum(Numbers, na.rm = TRUE)) %>% 
     ggplot(aes(x = as.numeric(Year), y = Numbers, group = Sim)) +
     geom_line(size = 1.5, color = "grey", alpha = 0.75) +
@@ -132,6 +133,7 @@ print(
   # Numbers aggregated by ages differenitaed by sex
   natage %>% 
     group_by(Year, Sim, Sex) %>% 
+    filter(Sim == "Sim 1") %>% 
     summarize(Numbers = sum(Numbers, na.rm = TRUE)) %>% 
     ggplot(aes(x = as.numeric(Year), y = Numbers, group = Sim)) +
     geom_line(size = 1.5, color = "grey", alpha = 0.75) +
@@ -151,7 +153,7 @@ print(
     mutate(total = sum(Biomass)) %>% 
     group_by(Age, Sim) %>% 
     summarize(prop_age = mean(Biomass/total, na.rm = TRUE)) %>% 
-    ggplot(aes(x = as.numeric(Age), y = prop_age, group = Sim, group = Sim )) +
+    ggplot(aes(x = as.numeric(Age), y = prop_age, group = Sim)) +
     geom_line(size = 1.5, color = "grey", alpha = 0.75) +
     # facet_wrap(~Sim, ncol = 1, scales = "free") +
     theme_bw() +
@@ -175,7 +177,8 @@ print(
     facet_grid(Sex~Fleet, scales = "free") +
     theme_bw() +
     theme(legend.position = "none") +
-    labs(x = "Age",y = "Catch")
+    labs(x = "Age",y = "Catch") +
+    xlim(Fish_Start_yr[1], n_years-1)
 )
   
 
@@ -189,7 +192,7 @@ tryCatch({
   
 print(
   ggplot(comps_fish %>% 
-           filter(Sim %in% c("Sim 1")),
+           filter(Sim %in% c("Sim 3")),
          aes(x = as.numeric(Year), y = Count, fill = Age, group = Sim)) +
     geom_col(position = "stack") +
     facet_grid(Sex~Fleet, scales = "free") +
@@ -203,7 +206,7 @@ print(
   
 print(
   ggplot(comps_surv %>% 
-           filter(Sim %in% c("Sim 1")), 
+           filter(Sim %in% c("Sim 2")), 
          aes(x = as.numeric(Year), y = Count, fill = Age, group = Sim)) +
     geom_col(position = "stack") +
     facet_grid(Sex~Fleet, scales = "free") +
@@ -226,7 +229,8 @@ print(
     facet_wrap(~Fleet, scales = "free_x") +
     theme_bw() +
     theme(legend.position = "top") +
-    labs(x = "Year",y = "Biomass index", title = "Fishery Index") 
+    labs(x = "Year",y = "Biomass index", title = "Fishery Index") +
+    xlim(Fish_Start_yr[1], n_years-1)
 )
   
   # Survey index
@@ -240,7 +244,8 @@ print(
     facet_wrap(~Fleet, scales = "free_x") +
     theme_bw() +
     theme(legend.position = "top") +
-    labs(x = "Year",y = "Biomass index at age", title = "Survey Index") 
+    labs(x = "Year",y = "Biomass index at age", title = "Survey Index") +
+    xlim(Fish_Start_yr[1], n_years-1)
 )
 
   }, error = function(error) {cat("ERROR :",conditionMessage(error), "\n")}) # end try catch statement
@@ -376,14 +381,27 @@ print(
   print(
     ggplot(fmort_df %>% 
              filter(Sim %in% c("Sim 1")), 
-           aes(x = as.numeric(Year), y = F_Mort)) +
+           aes(x = as.numeric(Year), y = F_Mort, color = Fleet)) +
       geom_line(size = 1.3) +
-      facet_wrap(~Fleet, ncol = 3, scales = "free") +
+      # facet_wrap(~Fleet, ncol = 3, scales = "free") +
       theme_bw() +
       theme(legend.position = "top") +
-      labs(x = "Year",y = "Fishing Mortality", title = "Fishing Mortality") 
-  ) +
-    xlim(150, 200)
+      labs(x = "Year",y = "Fishing Mortality", title = "Fishing Mortality") +
+      xlim(Fish_Start_yr[1], n_years-1)
+  )
+  
+  # Total F
+  print(
+    fmort_df %>% 
+      group_by(Year, Sim) %>% 
+      summarize(Total_F = sum(F_Mort)) %>% 
+      ggplot(aes(x = as.numeric(Year), y = Total_F, group = Sim)) +
+      geom_line(color = "grey", alpha = 0.95) +
+      theme_bw() +
+      labs(x = "Year",y = "Total Fishing Mortality", title = "Total Fishing Mortality") +
+      xlim(Fish_Start_yr[1], n_years-1)
+  )
+  
   
   dev.off()
   

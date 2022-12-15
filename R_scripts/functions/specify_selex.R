@@ -92,20 +92,20 @@ selex_opts <- function(selex_type, bins, par_values) {
   if(selex_type == "double_normal") { # 6 parameters
     
     # p1 = when age at selex = 1 starts (should probably bound by min and max age)
-    # p2 = partially controls where selex ends (should be between 0 and 1 needs to be in logit space)
+    # p2 = partially controls where selex ends - should be in log space
     # p3 = slope of ascending section (higher values = less steep ascending)
     # p4 = slope of descending section (higher values = less steep decline)
-    # p5 = selex at age 0/young ages (needs to be in logit space or between 0 and 1)
-    # p6 = if set at 1 - asymptotic (where the right half of the curve limb ends, should also be in logit space)
+    # p5 = selex at age 0/young ages (needs to be in inv logit space or between 0 and 1)
+    # p6 = if set at 1 - asymptotic (where the right half of the curve limb ends, should also be in inv logit space)
     
     # TESTING
-    # bins <- 2:30
-    # p1 <- 5
-    # p2 <- 0.01
-    # p3 <- 3
-    # p4 <- 10
-    # p5 <- 0.2
-    # p6 <- 0.1
+    bins <- 2:30
+    p1 <- 5
+    p2 <- 0.01
+    p3 <- 3
+    p4 <- 10
+    p5 <- 0.2
+    p6 <- 0.1
     
     # Get input parameter values
     p1 <- as.numeric(par_mat[,1][par_mat[,2] == "p1"]) # p1
@@ -116,7 +116,7 @@ selex_opts <- function(selex_type, bins, par_values) {
     p6 <- as.numeric(par_mat[,1][par_mat[,2] == "p6"]) # p6
  
     # Derive gamma (age at which selex = 1 ends)
-    gamma <- p1 + 1 + (0.99 * length(bins) - p1 - 1) / (1 + exp(-p2))
+    gamma <- p1 + 1 + (0.99 * max(bins) - p1 - 1) / (1 + exp(-p2))
     
     # Derive joiner function 1 (ascending) mimics a logistic-like function but w/ knife-edged dynamics
     j1 <- 1 / (1 + exp( -1 * (20 / (1 + abs(bins - p1))) * (bins - p1) ))
@@ -125,15 +125,15 @@ selex_opts <- function(selex_type, bins, par_values) {
     j2 <- 1 / (1 + exp( -1 * (20 / (1 + abs(bins - gamma))) * (bins - gamma) ))
 
     # Derive alpha parameter vector
-    alpha <- p5 + (1 - p5) * (exp( (-1*((bins - p1)^2)) / p3 ) - exp(-1*((1 - p1)^2)/p3)) / (1 - exp(-1*((1 - p1)^2)/p3))
+    alpha <- p5 + (1 - p5) * (exp( (-1*((bins - p1)^2)) / exp(p3) ) - exp(-1*((1 - p1)^2)/ exp(p3) )) / (1 - exp(-1*((1 - p1)^2)/ exp(p3)))
     
     # Derive beta parameter vector
-    beta <- 1 + (p6 - 1) * (exp( (-((bins - gamma)^2)) / p4 ) -1 )/ (exp(-((length(bins) - gamma)^2)/p4) - 1)
+    beta <- 1 + (p6 - 1) * (exp( (-((bins - gamma)^2)) / exp(p4) ) -1 )/ (exp(-((max(bins) - gamma)^2)/exp(p4)) - 1)
     
     # Now, get selectivity values - scale to a max of 1
     selex <- alpha * (1 - j1) + (j1 * ( (1-j2) + j2 * beta)) 
     
-    # plot(selex)
+    plot(selex)
     
   } # double normal selectivity
   
@@ -145,24 +145,6 @@ selex_opts <- function(selex_type, bins, par_values) {
 
 
 # Specify selectivity -----------------------------------------------------
-
-
-fish_selex <- c("logistic", "double_normal")
-srv_selex <- c("logistic", "uniform")
-
-
-fish_pars <- list(
-  Fleet_1_l <- matrix(data = c(2,3,
-                               4,3), nrow = n_sex, byrow = TRUE),
-  Fleet_2_dn <- matrix(data = c(5,0.01,3,10,0.2,0.1,
-                                10,0.01,3,15,0.2,0.05), nrow = n_sex, byrow = TRUE)
-)
-
-srv_pars <- list(
-  Fleet_1_l <- matrix(data = c(2,3,
-                               4,3), nrow = n_sex, byrow = TRUE),
-  Fleet_2_u <- matrix(data = 0)
-)
   
 #' @param fish_selex selectivity types for fishery selectivity (should be a vector if > 1 fleet) 
 #' # (Options are: uniform, logistic, gamma, double_logistic, double_normal)
@@ -185,6 +167,9 @@ srv_pars <- list(
 
 specify_selex <- function(fish_selex, srv_selex, fish_pars, srv_pars, bins) {
   
+  if(length(fish_selex) != n_fish_fleets) stop("Fishery selex options are not of equal length to number of fishery fleets specified!")
+  if(length(srv_selex) != n_srv_fleets) stop("Survey selex options are not of equal length to number of survey fleets specified!")
+  
   # Create objects to loop through
   fish_par_list <- list()
   srv_par_list <- list()
@@ -194,12 +179,18 @@ specify_selex <- function(fish_selex, srv_selex, fish_pars, srv_pars, bins) {
   # Loop through to construct objects to use within the function
   for(f in 1:n_fish_fleets) {
     
+    if(nrow(fish_pars[[f]]) != n_sex) stop("The number of sexes in the list of matrices (fishery) does not equal the number of sexes specified")
+    
       # Specify number of cols needed for constructing our matrix using npars
       if(fish_selex[f] == "uniform") {n_pars <- 0; par_names <- NULL}
-      if(fish_selex[f] == "logistic") {n_pars <- 2; par_names <- c("a50", "k") }
-      if(fish_selex[f] == "gamma") {n_pars <- 2; par_names <- c("amax", "delta")}
-      if(fish_selex[f] == "double_logistic") {n_pars <- 4; par_names <- c("slope_1", "slope_2", "infl_1", "infl_2")}
-      if(fish_selex[f] == "double_normal") {n_pars <- 6; par_names <- c("p1", 'p2', "p3", "p4", "p5", "p6")}
+      if(fish_selex[f] == "logistic") {n_pars <- 2; par_names <- c("a50", "k")
+      if(ncol(fish_pars[[f]]) != n_pars) stop("Number of parameters specified does not equal number of parameters required for a logistic (2)!")}
+      if(fish_selex[f] == "gamma") {n_pars <- 2; par_names <- c("amax", "delta")
+      if(ncol(fish_pars[[f]]) != n_pars) stop("Number of parameters specified does not equal number of parameters required for a gamma (2)!")}
+      if(fish_selex[f] == "double_logistic") {n_pars <- 4; par_names <- c("slope_1", "slope_2", "infl_1", "infl_2")
+      if(ncol(fish_pars[[f]]) != n_pars) stop("Number of parameters specified does not equal number of parameters required for a double logistic (4)!")}
+      if(fish_selex[f] == "double_normal") {n_pars <- 6; par_names <- c("p1", 'p2', "p3", "p4", "p5", "p6") 
+      if(ncol(fish_pars[[f]]) != n_pars) stop("Number of parameters specified does not equal number of parameters required for a double normal (6)!")}
       
       # Create an empty named matrix to store specified values in
       fish_mat <- matrix(data = fish_pars[[f]], nrow = n_sex, ncol = n_pars) # fIrst row = female, second row = male if 2 sexes
@@ -235,12 +226,18 @@ specify_selex <- function(fish_selex, srv_selex, fish_pars, srv_pars, bins) {
   # Loop through to construct objects to use within the function
   for(sf in 1:n_srv_fleets) {
     
-    # Specify number of cols needed for constructing our matrix using npars
+    if(nrow(srv_pars[[sf]]) != n_sex) stop("The number of sexes in the list of matrices (survey) does not equal the number of sexes specified")
+    
+    # Specify number of cols needed for constructing our matrix using npars - adding some stops to make sure things are being specified correctly.
     if(srv_selex[sf] == "uniform") {n_pars <- 0; par_names <- NULL}
-    if(srv_selex[sf] == "logistic") {n_pars <- 2; par_names <- c("a50", "k") }
-    if(srv_selex[sf] == "gamma") {n_pars <- 2; par_names <- c("amax", "delta")}
-    if(srv_selex[sf] == "double_logistic") {n_pars <- 4; par_names <- c("slope_1", "slope_2", "infl_1", "infl_2")}
-    if(srv_selex[sf] == "double_normal") {n_pars <- 6; par_names <- c("p1", 'p2', "p3", "p4", "p5", "p6")}
+    if(srv_selex[sf] == "logistic") {n_pars <- 2; par_names <- c("a50", "k")
+    if(ncol(srv_pars[[sf]]) != n_pars) stop("Number of parameters specified does not equal number of parameters required for a logistic (2)!")}
+    if(srv_selex[sf] == "gamma") {n_pars <- 2; par_names <- c("amax", "delta")
+    if(ncol(srv_pars[[sf]]) != n_pars) stop("Number of parameters specified does not equal number of parameters required for a gamma (2)!")}
+    if(srv_selex[sf] == "double_logistic") {n_pars <- 4; par_names <- c("slope_1", "slope_2", "infl_1", "infl_2")
+    if(ncol(srv_pars[[sf]]) != n_pars) stop("Number of parameters specified does not equal number of parameters required for a double logistic (4)!")}
+    if(srv_selex[sf] == "double_normal") {n_pars <- 6; par_names <- c("p1", 'p2', "p3", "p4", "p5", "p6") 
+    if(ncol(srv_pars[[sf]]) != n_pars) stop("Number of parameters specified does not equal number of parameters required for a double normal (6)!")}
     
     # Create an empty named matrix to store specified values in
     srv_mat <- matrix(data = srv_pars[[sf]], nrow = n_sex, ncol = n_pars) # fIrst row = female, second row = male if 2 sexes
@@ -254,7 +251,7 @@ specify_selex <- function(fish_selex, srv_selex, fish_pars, srv_pars, bins) {
   # Loop through to assign values
   for(y in 1:n_years) {
     
-    for(sf in 1:n_fish_fleets) {
+    for(sf in 1:n_srv_fleets) {
       
       for(s in 1:n_sex) {
         

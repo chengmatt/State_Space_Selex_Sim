@@ -20,10 +20,10 @@ get_sdrep_values <- function(sd_rep = sd_rep, parameter) {
     # The code here is adapted from WHAM - from plot.SSB.F.trend()
     
     # Stick these values into a matrix (nrow = years, length = ages)
-    log_faa <- matrix(sd_rep[idx,1], length(Fish_Start_yr:(n_years-1)), length(ages))
+    log_faa <- matrix(sd_rep[idx,1], length(min(Fish_Start_yr):(n_years-1)), length(ages))
     
     # Get CIs for the above
-    faa_ci <- matrix(sd_rep[idx,2], length(Fish_Start_yr:(n_years-1)), length(ages))
+    faa_ci <- matrix(sd_rep[idx,2], length(min(Fish_Start_yr):(n_years-1)), length(ages))
     
     # Get max F - fully selected F 
     full_selex_F_index <- apply(log_faa,1, function(x) max(which(x == max(x)))) 
@@ -75,14 +75,14 @@ get_results <- function(model) {
   ssb_values <- get_sdrep_values(sd_rep = sd_rep, parameter = "log_SSB")
   
   # Stick these into a dataframe and calculate CIs
-  SSB_rep <- data.frame(Year = Fish_Start_yr:(n_years-1), log_SSB = ssb_values[[1]], SE = ssb_values[[2]]) %>% 
+  SSB_rep <- data.frame(Year = min(Fish_Start_yr):(n_years-1), log_SSB = ssb_values[[1]], SE = ssb_values[[2]]) %>% 
     mutate(SSB = exp(log_SSB),
            lwr = exp(log_SSB - (1.96*SE)),
            upr = exp(log_SSB + (1.96*SE)))
   
   # Get fishing mortality rates
   f_values <- get_sdrep_values(sd_rep = sd_rep, parameter = "log_FAA_tot")
-  F_rep <- data.frame(Year = Fish_Start_yr:(n_years-1), log_F = f_values[[1]], SE = f_values[[2]]) %>% 
+  F_rep <- data.frame(Year = min(Fish_Start_yr):(n_years-1), log_F = f_values[[1]], SE = f_values[[2]]) %>% 
     mutate(F_val = exp(log_F),
            lwr = exp(log_F - (1.96*SE)),
            upr = exp(log_F + (1.96*SE)))
@@ -124,10 +124,10 @@ get_results <- function(model) {
   
   # Now, put these into a dataframe
   # fishery
-  q_rep_Fish <- data.frame(Year = Fish_Start_yr:(n_years-1), q_Fish = q[,1], 
+  q_rep_Fish <- data.frame(Year = min(Fish_Start_yr):(n_years-1), q_Fish = q[,1], 
                            q_Fish_lwr = q_lo[,1], q_Fish_upr = q_hi[,1])
   # survey
-  q_rep_Surv <- data.frame(Fish_Start_yr:(n_years-1), q_Surv = q[,1], 
+  q_rep_Surv <- data.frame(min(Fish_Start_yr):(n_years-1), q_Surv = q[,1], 
                            q_Surv_lwr = q_lo[,1], q_Surv_upr = q_hi[,1])
   
   
@@ -142,11 +142,13 @@ get_results <- function(model) {
 #' @param n_sims Number of total simulations we ran
 #' @param EM_variable Variable name in the get_results object for the EM
 #' @param OM_df Variable name for the OM
+#' @param conv_vec Vector of whether models converged or not
 
 # Returns a df of unaggregated resutls paired with the OM EM, and 95%, 50% CIs w/ relative error
 # Right now, this function only does F and SSB and q
 
-om_em_results <- function(n_sims, EM_variable, OM_df) {
+om_em_results <- function(results_list, n_sims, EM_variable, OM_df,
+                          conv_vec) {
   
   df <- data.frame() # create empty dataframe to hold values in
   
@@ -158,9 +160,11 @@ om_em_results <- function(n_sims, EM_variable, OM_df) {
     
     # Next, get ssb from the corresponding OM simulation
     om_df <- data.frame(OM_df[em_df$Year,sim]) %>% 
-      rename(Truth = OM_df.em_df.Year..sim.) %>% 
-      mutate(Sim = sim)
+      mutate(Sim = sim,
+             Convergence = conv_vec[sim])
     
+    names(om_df)[1] <- "Truth"
+     
     # Now, cbind these together
     om_em_df <- cbind(em_df, om_df)
     
@@ -172,10 +176,10 @@ om_em_results <- function(n_sims, EM_variable, OM_df) {
   # Return aggregated data w/ relative error, 95% and 50% CIs
   if(EM_variable == "SSB") {
     df_agg <- df %>% 
-      drop_na() %>% 
+      filter(Convergence != "Not Converged") %>%
       mutate(RE = (SSB - Truth)/Truth) %>% 
       group_by(Year) %>% 
-      summarize(mean = mean(RE), sd = sd(RE),  n = n(),
+      summarize(mean = median(RE), sd = sd(RE),  n = n(),
                 lwr_95 = mean - (1.96 * (sd / sqrt(n))),
                 up_95 = mean + (1.96 * (sd / sqrt(n))),
                 lwr_50 = mean - (0.674 * (sd / sqrt(n))),
@@ -185,7 +189,7 @@ om_em_results <- function(n_sims, EM_variable, OM_df) {
   if(EM_variable == "F") {
     
     df_agg <- df %>% 
-      drop_na() %>% 
+      filter(Convergence != "Not Converged") %>%
       mutate(RE = (F_val - Truth)/Truth) %>% 
       group_by(Year) %>% 
       summarize(mean = mean(RE), sd = sd(RE),  n = n(),
