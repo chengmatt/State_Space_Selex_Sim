@@ -4,7 +4,6 @@
 
 // TO DO:
 // Recruitment options - rec devs and BH
-// Figure out issues w/ values
 
 #include<TMB.hpp>
 template<class Type>
@@ -21,6 +20,8 @@ Type objective_function<Type>::operator() ()
   DATA_INTEGER(n_fleets); // Number of fishery fleets we want to model
   DATA_INTEGER(n_fish_indices); // Number of fishery indices of abundance 
   DATA_INTEGER(n_srv_indices); // Number of survey indices of abundance 
+  DATA_INTEGER(n_fish_comps); // Number of fishery comps
+  DATA_INTEGER(n_srv_comps); // Number of survey comps
   
   int n_ages = ages.size(); // Determine length of age vector
   int n_years = years.size(); // Determine length of years vector
@@ -45,6 +46,7 @@ Type objective_function<Type>::operator() ()
   // Controls on assessment ----------------------------------------------
   DATA_INTEGER(init_model); // Model for determining initial population, == 0 equilibrium
   DATA_INTEGER(rec_model); // Recruitment model, == 0 Mean Recruitment, == 1 Beverton Holt 
+  DATA_ARRAY(F_Slx_model); // Fishery Selectivity Model, == 0 Logistic n_fleets * n_years * n_sexes
   
   // PARAMETER SECTION ----------------------------------------------
   // PARAMETER(ln_R0); // log R0 for BH
@@ -52,9 +54,11 @@ Type objective_function<Type>::operator() ()
   // PARAMETER(ln_SigmaRec); // log sigma for recruitment
   PARAMETER(ln_M); // log natural mortality
   PARAMETER_MATRIX(ln_F_y); // Annual Fishing Mortality ; n_years * n_fleets
-  PARAMETER_VECTOR(log_q_fish); // log catchability for fishery; n_fish_indices
-  PARAMETER_VECTOR(log_q_srv); // log catchability for survey; n_srv_indices
-    
+  PARAMETER_VECTOR(ln_q_fish); // log catchability for fishery; n_fish_indices
+  PARAMETER_VECTOR(ln_q_srv); // log catchability for survey; n_srv_indices
+  PARAMETER(ln_a50); // a50 logistic
+  PARAMETER(ln_k); // k logistic
+
   // Parameter Transformations ----------------------------------------------
   // Type R0 = exp(ln_R0); // Virgin Recruitment
   Type MeanRec = exp(ln_MeanRec); // Mean Recruitment
@@ -73,11 +77,10 @@ Type objective_function<Type>::operator() ()
   array<Type> ZAA(n_years, n_ages, n_sexes); // Total Mortality
   array<Type> FAA(n_years, n_ages, n_fleets, n_sexes); // Fishing Mortality
   array<Type> CAA(n_years, n_ages, n_fleets, n_sexes); // Catch at Age
-  array<Type> P_CAA(n_years, n_ages, n_fleets, n_sexes); // Proportions of Catch at Age
   array<Type> Total_Fish_F(n_years, n_ages, n_sexes); // Total fishing mortality (sum of fleets)
   vector<Type> SSB(n_years + 1); // Spawning stock biomass; n_years + 1 because year 0 is for numbers at age prior to fishing
-  // array<Type> F_Slx(n_years, n_ages, n_fleets, n_sexes); // Fishery Selectivities
-  // F_Slx.setZero(); // Set selex at zero
+  array<Type> F_Slx(n_years, n_ages, n_fleets, n_sexes); // Fishery Selectivities
+  array<Type> Total_Fishery_Numbers(n_years, n_fleets, n_sexes); // Store Total Fishery Numbers for Proportions
   // array<Type> S_Slx(n_years, n_ages, n_srv_indices, n_sexes); // Survey Selectivities
   // S_Slx.setZero(); // Set selex at zero
   
@@ -88,29 +91,43 @@ Type objective_function<Type>::operator() ()
   fish_index_nLL.setZero();
   vector<Type> srv_index_nLL(n_srv_indices); 
   srv_index_nLL.setZero();
-  vector<Type> fish_comp_nLL(n_fleets); 
-  fish_comp_nLL.setZero();
-  vector<Type> srv_comp_nLL(n_srv_indices);
-  srv_comp_nLL.setZero();
+  matrix<Type> fish_comp_nLL(n_fish_comps, n_sexes); 
+  matrix<Type> srv_comp_nLL(n_srv_comps, n_sexes);
   Type jnLL = 0; // Joint Negative log Likelihood
   
   // TESTING 
-  DATA_ARRAY(F_Slx);
   DATA_ARRAY(S_Slx);
   DATA_MATRIX(Init_N_at_age);
   
   // MODEL STRUCTURE ----------------------------------------------
   // y = year, a = age, s = sex, f = fishery fleet, sf = survey fleet
+  
+  
+  // Selectivity ----------------------------------------------
+  
+  for(int f = 0; f < n_fleets; f++) {
+    for(int s = 0; s < n_sexes; s++) {
+      for(int y = 0; y < n_years; y++) {
+        for(int a = 0; a < n_ages; a++) {
+          
+          if(F_Slx_model(f, y, s) == 0) { // time invariant logistic
+            F_Slx(y, a, f, s) = Type(1.0) / (Type(1.0) + exp(-(ages(a) - exp(ln_a50) ) /exp(ln_k) ));
+          } // time invariant logistic
+          
+        } // a loop
+      } // y loop
+    } // s loop
+  } // f loop
    
-  // Deaths and Removals (Fishing Mortality and Natural Mortality)
+   
+  // Deaths and Removals (Fishing Mortality and Natural Mortality) ---------------------------------
+  
   for(int y = 0; y < n_years; y++) {
       for(int s = 0; s < n_sexes; s ++) {
         for(int a = 0; a < n_ages; a++) {
           for(int f = 0; f < n_fleets; f ++) {
           // Calculate F_at_age
           FAA(y, a, f, s) = (exp(ln_F_y(y, f) ))* F_Slx(y, a, f, s);
-          // TESTING CALCULATIONS
-          // FAA(y, a, f, s) = F_Mort(y, f)  * F_Slx(y, a, f, s);
           // Add fishing mortality to get Total F
           Total_Fish_F(y, a, s) += FAA(y, a, f, s); 
         } // f loop
@@ -206,7 +223,7 @@ Type objective_function<Type>::operator() ()
         } // a loop
       } // s loop
          // Apply catchability after summing
-         pred_fish_indices(y, fi) = exp(log_q_fish(fi)) * pred_fish_indices(y, fi); 
+         pred_fish_indices(y, fi) = exp(ln_q_fish(fi)) * pred_fish_indices(y, fi); 
     } // fi loop
   } // y loop
   
@@ -219,20 +236,44 @@ Type objective_function<Type>::operator() ()
         } // a loop
       } // s loop
           // Apply catchability after summing
-          pred_srv_indices(y, si) = exp(log_q_srv(si)) * pred_srv_indices(y, si);
+          pred_srv_indices(y, si) = exp(ln_q_srv(si)) * pred_srv_indices(y, si);
     } // si loop
   } // y loop
+
+    
+  // Compositions ----------------------------------------------
   
-  // Selectivity + Comps ----------------------------------------------
+  // Fishery Compositions 
+  for(int y = 0; y < n_years; y++) {
+    for(int fc = 0; fc < n_fish_comps; fc++) {
+      for(int s = 0; s < n_sexes; s++) {
+        for(int a = 0; a < n_ages; a++) {
+          // Get predicted comps here prior to normalizing
+          pred_fish_age_comps(y, a, fc, s) = NAA(y, a, s) * F_Slx(y, a, fc, s);
+          // Increment to get total numbers at age for a given fleet
+          Total_Fishery_Numbers(y, fc, s) += pred_fish_age_comps(y, a, fc, s);
+        } // a loop
+      } // s loop
+    } // fc loop
+  } // y loop
   
+  // Normalize to get fishery proportions here
+  for(int y = 0; y < n_years; y++) {
+    for(int fc = 0; fc < n_fish_comps; fc++) {
+      for(int s = 0; s < n_sexes; s++) {
+        for(int a = 0; a < n_ages; a++) {
+          pred_fish_age_comps(y, a, fc, s) /= Total_Fishery_Numbers(y, fc, s);
+        } // a loop
+      } // s loop
+    } // fc loop
+  } // y loop
   
   // Likelihoods ----------------------------------------------
   
   // Catch likelihood (Log-normal likelihood) ----------------------------------------------
   vector<Type> catch_sd(n_fleets);   // Convert catch CV to standard deviation
   for(int f = 0; f < n_fleets; f++) catch_sd(f) = log(pow(catch_cv(f), Type(2.0)) + 1);
-  // std::cout<<"Catch CV_to_SD = "<< catch_sd << "\n";
-  
+
   for(int y = 0; y < n_years; y ++) { 
     for(int f = 0; f < n_fleets; f++) {
       catch_nLL(f) -= dnorm(log(obs_catches(y, f)), log(pred_catches(y, f)) -  
@@ -290,11 +331,32 @@ Type objective_function<Type>::operator() ()
     } // y loop
   } // end simulate for survey index
   
+  // Composition likelihoods (Multinomial likelihood) ----------------------------------------------
+  
+  Type c = 0.0001; // Create a small constant to add for zeros
+  vector<Type> obs_F_vec(n_ages); // Obs vector to hold and pass values to nLL
+  vector<Type> pred_F_vec(n_ages); // Pred cector to hold and pass values to nLL
+  
+  for(int y = 0; y < n_years; y++) {
+    for(int fc = 0; fc < n_fish_comps; fc++) {
+      for(int s = 0; s < n_sexes; s++) {
+        for(int a = 0; a < n_ages; a++) {
+          obs_F_vec(a) = obs_fish_age_comps(y, a, fc, s) + c;
+          pred_F_vec(a) = pred_fish_age_comps(y, a, fc, s) + c;
+      } // a loop
+        // true = gives log probability density - calculate nLL here
+        fish_comp_nLL(fc, s) -= dmultinom(obs_F_vec, pred_F_vec, true);
+    } // s loop
+  } // fc loop
+} // y loop
+  
+  
   // Sum Joint negative log-likelihood
   for(int f = 0; f < n_fleets; f++) jnLL += catch_nLL(f); // Catch nLL
   for(int fi = 0; fi < n_fish_indices; fi++) jnLL += fish_index_nLL(fi); // Fish Index nLL
   for(int si = 0; si < n_srv_indices; si++) jnLL += srv_index_nLL(si); // Survey Index nLL
-  
+  for(int fc = 0; fc < n_fish_comps; fc++) for(int s = 0; s < n_sexes; s++) jnLL += fish_comp_nLL(fc, s); // Fishery Comps nLL
+
   // REPORT SECTION ----------------------------------------------
   REPORT(NAA); // Numbers at age
   REPORT(ZAA); // Total Mortality
@@ -305,6 +367,9 @@ Type objective_function<Type>::operator() ()
   REPORT(SSB); // Spawning Stock Biomass
   REPORT(pred_srv_indices); // Survey Indices
   REPORT(pred_fish_indices); // Fishery Indices
+  REPORT(F_Slx); // Fishery Selectivity
+  REPORT(pred_fish_age_comps); // Predicted fishery age comps
+  REPORT(Total_Fishery_Numbers); // Sum of NAA * F_Slx
   
   // Report likelihoods
   REPORT(catch_nLL);
@@ -313,6 +378,9 @@ Type objective_function<Type>::operator() ()
   REPORT(fish_comp_nLL);
   REPORT(srv_comp_nLL);
   REPORT(jnLL);
+  
+  // ADREPORT
+  ADREPORT(SSB);
 
   return jnLL;
   

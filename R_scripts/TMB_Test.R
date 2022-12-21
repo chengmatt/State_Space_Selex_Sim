@@ -78,35 +78,59 @@ Init_N_at_age <- N_at_age[(Fish_Start_yr-1),,,]
 data <- list( ages = ages, years = years,
              n_sexes = n_sexes, n_fleets = n_fleets,
              n_fish_indices = n_fish_indices, n_srv_indices = n_srv_indices,
-             obs_catches = obs_catches, obs_fish_age_comps = obs_fish_age_comps,
-             obs_fish_age_Neff = obs_fish_age_Neff, obs_srv_age_comps = obs_srv_age_comps,
+             obs_catches = obs_catches, 
+             obs_fish_age_comps = array(obs_fish_age_comps, dim = c(31, 30, 1, 1)),
+             obs_fish_age_Neff = obs_fish_age_Neff, 
+             obs_srv_age_comps = array(obs_srv_age_comps, dim = c(31, 30, 1, 1)),
              obs_srv_age_Neff = obs_srv_age_Neff, obs_fish_indices =  obs_fish_indices,
              obs_srv_indices = obs_srv_indices, WAA = array(WAA, dim = c(32, 30, 1)), 
              MatAA = array(MatAA, dim = c(32, 30, 1)),
              Sex_Ratio = Sex_Ratio, init_model = 0, rec_model = 0, catch_cv = 0.05,
              fish_cv = fish_cv, srv_cv = srv_cv, F_Slx = array(F_Slx, dim = c(31, 30, 1, 1)),
              S_Slx = array(S_Slx, dim = c(31, 30, 1, 1)), F_Mort = as.matrix(F_Mort),
-             Init_N_at_age = as.matrix(Init_N_at_age)
+             Init_N_at_age = as.matrix(Init_N_at_age),
+             F_Slx_model = array(0, dim=c(1, 31, 1)), n_fish_comps = 1, n_srv_comps = 1
              )
 
+set.seed(123)
 # Define parameter inits here
 parameters <- list(ln_R0 = 20, ln_SigmaRec = 1.2,ln_MeanRec = log(2),
-                   ln_M = log(0.1), 
-                   ln_F_y = as.matrix(c(rnorm(length(Fish_Start_yr:(n_years - 1)), 1, 0.05))),
-                   log_q_fish = as.matrix(log(rep(0.03, n_fish_fleets))), 
-                   log_q_srv = as.matrix(log(rep(0.05, n_srv_fleets))))
+                   ln_M = log(0.1),  ln_a50 = 5, ln_k =0.2,
+                   ln_F_y = as.matrix(c(rnorm(length(Fish_Start_yr:(n_years - 1)), 5, 0.0005))),
+                   ln_q_fish = as.matrix(log(rep(11, n_fish_fleets))), 
+                   ln_q_srv = as.matrix(log(rep(11, n_srv_fleets))))
 
 compile("EM.cpp") # Compile .cpp file
 dyn.load(dynlib("EM")) # Load in .cpp
 
 # Make ADFun
-mod <- MakeADFun(data, parameters, DLL="EM")
-mod$opt <- stats::nlminb(mod$par, mod$fn, mod$gr, 
-                     control = list(iter.max = 1500, eval.max = 1000))
-sd_rep <- TMB::sdreport(mod)
+my_model <- MakeADFun(data, parameters, DLL="EM")
+mle_optim <- stats::nlminb(mod$par, mod$fn, mod$gr, 
+                     control = list(iter.max = 10000, eval.max = 10000))
 
+# Additional newton steps to take
+n.newton <- 10
+try_improve <- tryCatch(expr =
+                         for(i in 1:n.newton) {
+                           g = as.numeric(my_model$gr(mle_optim$par))
+                           h = optimHess(mle_optim$par, fn = my_model$fn, gr = my_model$gr)
+                           mle_optim$par = mle_optim$par - solve(h,g)
+                           mle_optim$objective = my_model$fn(mle_optim$par)
+                         }
+                       , error = function(e){e})
+
+my_model$rep <- my_model$report()
+sd_rep <- TMB::sdreport(my_model)
+
+# Check SSB
+plot(sd_rep$value)
+lines(SSB[Fish_Start_yr:n_years,], col = "red")
+
+# Check F
 plot(exp(sd_rep$par.fixed[3:33]))
-lines(fish_mort[(Fish_Start_yr:(n_years - 1)),,], col = "red")
-sd_rep$gradient.fixed
+lines(fish_mort[Fish_Start_yr:(n_years-1),,], col = "red")
 
+# Check Selex
+plot(mod$rep$F_Slx[1,,,])
+lines(Fish_selex_at_age[1,,,,], col = "red")
 
