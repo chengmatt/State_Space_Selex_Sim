@@ -180,6 +180,19 @@ print(
     labs(x = "Age",y = "Catch") +
     xlim(Fish_Start_yr[1], n_years-1)
 )
+
+print(
+  catch_df %>% 
+    group_by(Year, Sex, Sim) %>% # Aggregated catch
+    summarize(Catch  = sum(Catch, na.rm = T)) %>% 
+    ggplot(aes(x = as.numeric(Year), y = Catch, group = Sim)) +
+    geom_line(size = 1.5, color = "grey", alpha = 0.75) +
+    facet_grid(~Sex, scales = "free") +
+    theme_bw() +
+    theme(legend.position = "none") +
+    labs(x = "Age",y = "Catch") +
+    xlim(Fish_Start_yr[1], n_years-1)
+)
   
 
 # Composition data --------------------------------------------------------
@@ -283,6 +296,17 @@ print( # Print lines here!
     theme_bw() +
     theme(legend.position = "top") +
     labs(x = "Age",y = "Prop of Selex", title = "Fishery Selectivity") 
+)
+
+print( # Overlay
+  ggplot(fish_sel_df %>% 
+           filter(Year == "Year_1"), aes(x = Age, y = Selex, group = Fleet, color = Fleet)) +
+    geom_line( size = 1.5) +
+    # facet_grid(Sex~Fleet, scales = "free") +
+    # scale_fill_viridis_c() +
+    theme_bw() +
+    theme(legend.position = "top") +
+    labs(x = "Age",y = "Prop of Selex", title = "Fishery Selectivity, Year 1") 
 )
 
 

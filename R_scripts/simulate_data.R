@@ -39,45 +39,44 @@ spreadsheet_path <- here("input", "Sablefish_Inputs.xlsx")
 read_params_create_OM_objects(spreadsheet_path = spreadsheet_path)
 
 # Specify fishing mortality pattern
-get_Fs(Start_F = c(0.01, 0.01), 
-       Fish_Start_yr = c(70, 70), 
-       F_type = c("Contrast", "Const_Inc"),
+get_Fs(Start_F = c(0.01), 
+       Fish_Start_yr = c(70), 
+       F_type = c("Contrast"),
        n_years = n_years, 
-       max_rel_F_M = c(1.5, 1.5), 
-       desc_rel_F_M = c(0.15,NULL), 
+       max_rel_F_M = c(1.5), 
+       desc_rel_F_M = c(0.15), 
        mean_nat_mort = Mean_M,
        yr_chng = 86)
 
 # Specify data scenarios here
-fish_surv_data_scenarios(Fish_Start_yr = c(70, 70), 
+fish_surv_data_scenarios(Fish_Start_yr = c(70), 
                          Surv_Start_yr = c(70),
-                         fish_Neff = c(100, 100),
+                         fish_Neff = c(100),
                          srv_Neff = c(200), 
-                         fish_CV = c(0.1, 0.1), 
+                         fish_CV = c(0.15), 
                          srv_CV = c(0.1), 
                          Neff_Fish_Time = "F_Vary", 
                          fish_mort = fish_mort,
-                         fixed_Neff = 50)
+                         fixed_Neff = 20)
 
 # Specify Natural Mortality
 specify_nat_mort(Mort_Time = "Constant", 
                  Mean_M = Mean_M)
 
 # Specify q for the fishery and survey
-specify_q(q_Mean_Fish = c(0.08, 0.05),
-          q_Mean_Surv = c(0.05))
+specify_q(q_Mean_Fish = c(0.08),
+          q_Mean_Surv = c(0.01))
 
 # Specify recruitment deviates here - loops though each simulation
 specify_rec_devs(Rec_Dev_Type = "iid", 
                  rho_rec = NA) 
 
 # Specify selectivity parameterizations here
-specify_selex(fish_selex = c("logistic", "logistic"), srv_selex = c("logistic"), 
+specify_selex(fish_selex = c("logistic"), srv_selex = c("logistic"), 
 # Fishery parameters
-fish_pars = list(Fleet_1_L = matrix(data = c(9,0.3), nrow = n_sex, byrow = TRUE),
-                 Fleet_2_L = matrix(data = c(3,2), nrow = n_sex, byrow = TRUE)),
+fish_pars = list(Fleet_1_L = matrix(data = c(6,1), nrow = n_sex, byrow = TRUE)),
 # Survey parameters
-srv_pars = list(Fleet_3_SL = matrix(data = c(5,0.95), nrow = n_sex, byrow = TRUE)), 
+srv_pars = list(Fleet_3_SL = matrix(data = c(3.5,0.4), nrow = n_sex, byrow = TRUE)), 
 bins = ages)
 
 # Specify sex ratios
@@ -85,8 +84,8 @@ specify_sex(f_ratio = 1,
             m_ratio = 0) 
 
 check_equil <- FALSE
-rec_type <- "BH"
-
+rec_type <- "mean_rec"
+sigma_rec <<- 0 # Equlibrium test
 # Simulation Loop ---------------------------------------------------------
 
 for(sim in 1:n_sims) {
@@ -302,312 +301,176 @@ plot_OM(path = here("figs", "Base_OM_Figs"), file_name = "OM_Check.pdf")
 
 # WHAM checks ------------------------------------------------------------- 
 
-# Set modelling structure here
-selectivity <- list(model = c("logistic", "logistic"), 
-                    re = c("none", "none"),
-                    n_selblocks = 2)
-
 # Fix M for now
-M <- list(model = "constant", 
-          initial_means = Mean_M) # need to specify est_ages for M to be estimated!
+M <- list(model = "constant", initial_means = Mean_M) # need to specify est_ages for M to be estimated!
 
-catchability <- list(re = c("none", "none"),
-                     q_upper = c(0.5, 0.5)) # put bounds on q
+# Set modelling structure here
+selectivity <- list(Fleet_2 = list(model = rep("logistic", 3), re = rep("none", 3)),
+                    Fleet_1 = list(model = rep("logistic", 2), re = rep("none", 2)),
+                    Fleet_1_1TB = list(model = rep("logistic", 3), re = rep("none", 3)),
+                    Fleet_1_6TB = list(model = rep("logistic", 7), re = rep("none", 7)),
+                    Fleet_1_ar1_y = list(model = rep("logistic", 2 ), re = c("ar1_y", "none")),
+                    Fleet_1_2dar1 = list(model = rep("logistic", 2), re = c("2dar1", "none")))
 
-NAA_model <- list(sigma = "rec", 
-                  cor = "iid")
 
-# Create objects to store stuff in
-conv_vec <- vector(length = n_sims)
-results_list <- list() # to store results
-sdrep_list <- list()
-wham_mod <- list()
+# Set catchability
+catchability <- list(Fleet_2 = list(re = rep("none", 3), q_upper = rep(0.5, 3)),
+                     Fleet_1 = list(re = rep("none", 1), q_upper = rep(0.5, 1)),
+                     Fleet_1_1TB = list(re = rep("none", 1), q_upper = rep(0.5, 1)),
+                     Fleet_1_6TB = list(re = rep("none", 1), q_upper = rep(0.5, 1)),
+                     Fleet_1_ar1_y = list(re = rep("none", 1), q_upper = rep(0.5, 1)),
+                     Fleet_1_2dar1 = list(re = rep("none", 1), q_upper = rep(0.5, 1))) 
 
-# trace(fit_wham, edit = TRUE)
+# Specify single fleet + timeblock
+single_fleet <- c(F, rep(T, 5))
+time_block <- c(rep(F,2), rep(T,2), rep(F,2))
 
-for(sim in 1:n_sims) {
+# Block period sel and index
+block_period_sel <- list(NA, NA, list(16, NA),
+                         list(c(5, 10, 15, 20, 26), NA),
+                         NA, NA)
+
+block_period_idx <- list(NA, NA, list(16, NA),
+                         list(c(5, 10, 15, 20, 26), NA),
+                         NA, NA)
+
+# N fleets, indicies, and cv specifiation
+n_fleets <- c(2, rep(1,5))
+n_indices <- c(3, rep(2,5))
+
+# Catch cv
+Catch_CV_Val <- list(c(0.05, 0.05), 0.05, 0.05, 0.05, 0.05, 0.05)
+units_indices <- list(c(1,1,2), c(1,2), c(1,2), c(1,2), c(1,2), c(1,2))
+units_index_paa <- list(c(2,2,2), c(2,2), c(2,2), c(2,2), c(2,2), c(2,2))
+noFish_Idx <- c(FALSE, TRUE, TRUE, TRUE, TRUE, TRUE)
+
+# Save results
+ssb_results <- data.frame()
+f_results <- data.frame()
+
+for(i in 1:length(selectivity)) {
   
-  # set.seed(123)
-  # Force our inputs into a list - so that it reads into wham
-  basic <- make_input(n_fleets = 1, n_indices = 2, 
-                      Catch_CV_Val = c(0.05), catch_error = FALSE,
-                      n_sims = sim, bias_obs = TRUE, bias_process = TRUE,
-                      units_indices = c(1,2), units_index_paa = c(2,2),
-                      single_fleet = T, time_block = F, 
-                      block_period_sel = list(c( 26), NA), 
-                      block_period_idx = list(c( 26), NA))
-  
-  # Getting time blocks to work here
-  # basic$index_cv[,] <- 0.2
-  
-  # Make WHAM inputs here 
-  test_wham <- wham::prepare_wham_input(basic_info = basic, selectivity = selectivity, 
-                                        recruit_model = 2, M = M, catchability = catchability,
-                                        NAA_re = NULL)
+  # Create objects to store stuff in
+  conv_vec <- vector(length = n_sims)
+  results_list <- list() # to store results
+  sdrep_list <- list()
+  wham_mod <- list()
 
-  # Fit WHAM here
-  tryCatch( {
-    em_fit <- wham::fit_wham(input = test_wham, do.fit = T, do.osa = F, do.retro = F,
-                             save.sdrep = TRUE, do.check = F, MakeADFun.silent = T)
+  for(sim in 1:n_sims) {
     
-    wham_mod[[sim]] <- em_fit
+    # set.seed(123)
+    # Force our inputs into a list - so that it reads into wham
+    basic <- make_input(n_fleets = n_fleets[i], 
+                        n_indices = n_indices[i], 
+                        Catch_CV_Val = Catch_CV_Val[[i]], 
+                        catch_error = FALSE,
+                        n_sims = sim, bias_obs = TRUE, 
+                        bias_process = TRUE,
+                        units_indices = units_indices[[i]], 
+                        units_index_paa = units_index_paa[[i]],
+                        single_fleet = single_fleet[i], 
+                        time_block = time_block[i], 
+                        block_period_sel = block_period_sel[[i]], 
+                        block_period_idx = block_period_sel[[i]], 
+                        noFish_Idx = noFish_Idx[i]) 
+    # When you use noFish Idx, leave the nFleets and nIndices as is
     
-    convergence_check <- check_convergence(em_fit, ret = T) 
+    # Make WHAM inputs here 
+    test_wham <- wham::prepare_wham_input(basic_info = basic, 
+                                          selectivity = selectivity[[i]], 
+                                          recruit_model = 2, M = M, 
+                                          catchability = catchability[[i]],
+                                          NAA_re = NULL)
     
-    results_list[[sim]] <- get_results(em_fit)
-    sdrep_list[[sim]] <- em_fit$sdrep
-    
-    threp <- em_fit$report()
-    sapply(grep("nll",names(threp),value=T), function(x) sum(threp[[x]]))
-    
-    # Get convergence status
-    if(convergence_check$convergence == 0 &  convergence_check$is_sdrep == TRUE & convergence_check$na_sdrep == FALSE) {
-      conv_vec[sim] <- "Converged"
-    } else {
-      conv_vec[sim] <- "Not Converged"
-    }
-} , error = function(error) {cat("ERROR :",conditionMessage(error), "\n")})
- 
-    cat(yellow("### Done with Simulation", sim, "###"))
+    # Fit WHAM here
+    tryCatch( {
+      em_fit <- wham::fit_wham(input = test_wham, do.fit = T, do.osa = F, do.retro = F,
+                               save.sdrep = TRUE, do.check = F, MakeADFun.silent = T)
       
-} # end loop of number of simulations we want to run
-
-sum(conv_vec == "Converged", na.rm = TRUE)
+      wham_mod[[sim]] <- em_fit
+      
+      convergence_check <- check_convergence(em_fit, ret = T) 
+      
+      results_list[[sim]] <- get_results(em_fit)
+      sdrep_list[[sim]] <- em_fit$sdrep
+      
+      # threp <- em_fit$report()
+      # sapply(grep("nll",names(threp),value=T), function(x) sum(threp[[x]]))
+      
+      # Get convergence status
+      if(convergence_check$convergence == 0 &  convergence_check$is_sdrep == TRUE & convergence_check$na_sdrep == FALSE) {
+        conv_vec[sim] <- "Converged"
+      } else {
+        conv_vec[sim] <- "Not Converged"
+        
+      }
+    } , error = function(error) {cat("ERROR :",conditionMessage(error), "\n")})
+    
+    cat(yellow("### Done with Simulation", sim, "###"))
+    
+  } # end loop of number of simulations we want to run
   
-### SSB ---------------------------------------------------------------------
 
-# Do some cleaning up and get RE
-ssb_df <- om_em_results(results_list = results_list,
-                        n_sims = n_sims, 
-                        EM_variable = "SSB", OM_df = SSB,
-                        conv_vec = conv_vec)
+  # Get SSB -----------------------------------------------------------------
 
-# Plot SSB with the trend across simulations
-ssb_df[[1]] %>% 
-  # filter(Sim  %in% c(43:49)) %>%
-  ggplot(aes(x = Year, y = SSB, group = Sim, ymin = lwr, ymax = upr)) +
-  geom_line() + 
-  geom_ribbon(alpha = 0.5) + 
-  geom_line(aes(x = Year, y = Truth), color = "red") +
-  facet_wrap(~Sim, scales = "free") +
-  theme_bw() +
-  labs(x = "Year", y  = "SSB") 
+  # Save simulations into dataframe
+  SSB_df <- compare_results(results_list = results_list, n_sims = n_sims, 
+                  EM_variable = "SSB", OM_df = SSB, conv_vec = conv_vec)
+  
+  # Rename results and bind
+  SSB_df <- SSB_df[[2]] %>%  mutate(Par = names(selectivity)[[i]],
+                                    Converged = sum(conv_vec == "Converged", na.rm = TRUE))
+  
 
-# Plot relative error
-ssb_df[[2]] %>% 
-ggplot(aes(x = Year, y = mean)) +
-  geom_line() +
-  geom_vline(xintercept = 86, color = "blue", lty = 2, size = 1.2) +
-  geom_ribbon(aes(ymin = lwr_95, ymax = up_95), alpha = 0.5) +
-  geom_ribbon(aes(ymin = lwr_50, ymax = up_50), alpha = 0.5) +
-  geom_hline(aes(yintercept = 0), col = "red", lty = 2, size = 1.2) +
-  theme_bw() + 
-  labs(x = "Year", y  ="Relative Error in SSB")  +
-  ylim(-0.5, 0.5)
+  # Get Fs ------------------------------------------------------------------
 
-# 
-# # Selex Comparison --------------------------------------------------------
-# # Store values
-# fish_sel <- data.frame()
-# srv_sel <- data.frame()
-# 
-# for(i in 1:n_sims) {
-#   
-#   # Get truth sel
-#   true_fish1 <- Fish_selex_at_age[1,,1,,i]
-#   true_fish2 <- Fish_selex_at_age[1,,2,,i]
-#   true_srv1 <- Surv_selex_at_age[1,,1,,i]
-#   # true_srv2 <- Surv_selex_at_age[1,,2,,i]
-#   # true_srv3 <- Surv_selex_at_age[1,,3,,i]
-#   
-#   # Get fishery sel
-#   fish_sel_sub <- melt(wham_mod[[i]]$rep$selAA[[1]]) %>%
-#     group_by(Var2) %>%
-#     summarize(sel = mean(value)) %>%
-#     mutate(Sim = i,
-#            Conv = conv_vec[i],
-#            F1 = true_fish1,
-#            F2 = true_fish2,
-#            fsh = "F1") %>%
-#     rename(Age = Var2)
-#   
-#   # fish_sel_sub <- melt(wham_mod[[i]]$rep$selAA[[1]]) %>% 
-#   #   # group_by(Var2) %>% 
-#   #   # summarize(sel = mean(value)) %>% 
-#   #   mutate(Sim = i,
-#   #          Conv = conv_vec[i]) %>% 
-#   #   rename(Age = Var2)
-#   
-#   # Get fishery sel
-#   # fish_sel2_sub <- melt(wham_mod[[i]]$rep$selAA[[2]]) %>%
-#   #   group_by(Var2) %>%
-#   #   summarize(sel = mean(value)) %>%
-#   #   mutate(Sim = i,
-#   #          Conv = conv_vec[i],
-#   #          F1 = true_fish2,
-#   #          fsh = "F2") %>%
-#   #   rename(Age = Var2)
-#   # 
-#   # Get survey sel 1
-#   srv_sel_1sub <- melt(wham_mod[[i]]$rep$selAA[[2]]) %>%
-#     group_by(Var2) %>%
-#     summarize(sel = mean(value)) %>%
-#     mutate(Sim = i,
-#            Conv = conv_vec[i],
-#            Truth = true_srv1,
-#            Srv_Sel = "Srv_1") %>%
-#     rename(Age = Var2)
-#   # 
-#   # # Get survey sel 2
-#   # srv_sel_2sub <- melt(wham_mod[[i]]$rep$selAA[[3]]) %>% 
-#   #   group_by(Var2) %>% 
-#   #   summarize(sel = mean(value)) %>% 
-#   #   mutate(Sim = i,
-#   #          Conv = conv_vec[i],
-#   #          Truth = true_srv2,
-#   #          Srv_Sel = "Srv_2") %>% 
-#   #   rename(Age = Var2)
-#   # 
-#   # # Get survey sel 3
-#   # srv_sel_3sub <- melt(wham_mod[[i]]$rep$selAA[[4]]) %>% 
-#   #   group_by(Var2) %>% 
-#   #   summarize(sel = mean(value)) %>% 
-#   #   mutate(Sim = i,
-#   #          Conv = conv_vec[i],
-#   #          Truth = true_srv3,
-#   #          Srv_Sel = "Srv_3") %>% 
-#   #   rename(Age = Var2)
-#   
-#   fish_sel <- rbind(fish_sel, fish_sel_sub)
-#   srv_sel <- rbind(srv_sel, srv_sel_1sub)
-# }
-# 
-# # Get Selex weighted by fishing mortality
-# # Fmort rates
-# c_prop <- melt(Catch_at_age[(Fish_Start_yr[1]:(n_years-1)),,,1,1]) %>% 
-#   group_by(Var1, Var3) %>% 
-#   summarize(value = sum(value)) %>% 
-#   group_by(Var1) %>% 
-#   mutate(sum_all = sum(value),
-#          prop = value / sum_all )%>% 
-#   select(Var1, Var3, prop)
-# 
-# 
-# # fish_prop <- melt(fish_mort[(Fish_Start_yr[1]:(n_years-1)),,1]) %>% 
-# #   group_by(Var1) %>% 
-# #   mutate(sum = sum(value),
-# #          prop = value / sum) %>% 
-# #   select(Var1, prop, Var2)
-# 
-# # Gte selexe prop
-# fish_sel_prop <- melt(Fish_selex_at_age[(Fish_Start_yr[1]:(n_years-1)),,,1,1]) %>% 
-#   left_join(c_prop, by = c("Var1", "Var3" ))
-# 
-# sel_pr <- fish_sel_prop %>% 
-#   mutate(value = value * prop,
-#          Var2 = parse_number(paste(Var2)),
-#          Var1 = parse_number(paste(Var1))) %>% 
-#   group_by(Var1, Var2) %>% 
-#   summarize(mean = mean(value)) %>% 
-#   group_by(Var1) %>% 
-#   mutate(max = max(mean),
-#          mean = mean/max)
-# 
-# sel_pr %>% 
-#   ggplot(aes(x = Var2, y = mean, color = Var1, group = Var1)) +
-#   geom_line() +
-#   scale_color_viridis_c()
-# 
-# # fish sel
-# ggplot() +
-#   # geom_line(sel_pr, 
-#   #           mapping = aes(x = Var2, y = mean, group = Var1), color = "blue") +
-#   geom_line(fish_sel %>% 
-#               filter(Sim == 1), 
-#             mapping = aes(x = Age, y = sel, group = Sim)) 
-#   # scale_color_viridis_c() +
-#   # facet_wrap(~Var1)
-#   # geom_line(aes(x = Age, y = F1), col = "blue", lty = 2) +
-#   # geom_line(aes(x = Age, y = F2), col = "orange", lty = 2) 
-# 
-# ggplot(fish_sel_sub, aes(x = Age, y = value, group = Var1,
-#                          color = Var1)) +
-#   geom_line() +
-#   scale_color_viridis_c()
-# 
-# # srv sel
-# ggplot(srv_sel, aes(x = Age, y = sel, group = Sim, color = Conv)) +
-#   geom_line() +
-#   geom_line(aes(x = Age, y = Truth), col = "black", lty = 2) +
-#   facet_wrap(~Srv_Sel) +
-#   scale_color_manual(values = c("grey", "red"))
-# 
-# # 
-# # # Parameter checks ------------------------------------------------------
-# # m_vec <- vector()
-# # q1_vec <- vector()
-# # q2_vec <- vector()
-# # q3_vec <- vector()
-# # q4_vec <- vector()
-# # terminal_ssb <- vector()
-# # terminal_F <- vector()
-# # sigma_rec <- vector()
-# # 
-# # for(i in 1:n_sims) {
-# #   
-# #    # Get M
-# #   # m_vec[i] <- (exp(sdrep_list[[i]]$par.fixed[names(sdrep_list[[i]]$par.fixed) == "M_a"]) - Mean_M) / Mean_M
-# #   # Get q estiamtes
-# #   q1 <- sdrep_list[[i]]$par.fixed[names(sdrep_list[[i]]$par.fixed) == "logit_q"][1]
-# #   q2 <- sdrep_list[[i]]$par.fixed[names(sdrep_list[[i]]$par.fixed) == "logit_q"][2]
-# #   # q3 <- sdrep_list[[i]]$par.fixed[names(sdrep_list[[i]]$par.fixed) == "logit_q"][3]
-# #   # q4 <- sdrep_list[[i]]$par.fixed[names(sdrep_list[[i]]$par.fixed) == "logit_q"][4]
-# #   
-# #   # Get terminal ssb
-# #   terminal_ssb[i] <- (ssb_df[[1]]$SSB[ssb_df[[1]]$Year == 90 & ssb_df[[1]]$Sim == i] - 
-# #                         ssb_df[[1]]$Truth[ssb_df[[1]]$Year == 90 & ssb_df[[1]]$Sim == i]) / 
-# #                         ssb_df[[1]]$Truth[ssb_df[[1]]$Year == 90 & ssb_df[[1]]$Sim == i]
-# #   
-# #   # Get terminal F
-# #   terminal_F[i] <- (exp(summary(sdrep_list[[i]])[rownames(summary(sdrep_list[[i]])) == "log_F"][31]) - fish_mort[90,,i])/ ( fish_mort[90,,i])
-# #   
-# #   # Get sigma rec
-# #   # sigma_rec[i] <- (exp(summary(sdrep_list[[i]])[rownames(summary(sdrep_list[[i]])) == "log_NAA_sigma"][2]) - 1.2) / 1.2
-# #   
-# #   # Get catchability estimates
-# #   q1_vec[i] <- ((0 + (1-0)) / (1+exp(-1*q1)) - 0.035) / 0.035
-# #   q2_vec[i] <- ((0 + (1-0)) / (1+exp(-1*q2)) - 0.05) / 0.05
-# #   # q3_vec[i] <- ((0 + (1000-0)) / (1+exp(-1*q3)) - 0.01) / 0.01
-# #   # q4_vec[i] <- ((0 + (1000-0)) / (1+exp(-1*q4)) - 0.035) / 0.035
-# #   
-# # } # end nsims loop
-# # 
-# # data_summary <- function(x) {
-# #   m <- median(x)
-# #   ymin <- m-sd(x)
-# #   ymax <- m+sd(x)
-# #   return(c(y=m,ymin=ymin,ymax=ymax))
-# # }
-# # 
-# # # Put these into a df
-# # par_df <- data.frame( q1 = q1_vec, q2 = q2_vec,
-# #                      Term_SSB = terminal_ssb, Term_F = terminal_F) %>% 
-# #   pivot_longer(names_to = c("par"), values_to = "val", cols = everything()) %>% 
-# #   drop_na() %>% 
-# #   group_by(par) %>% 
-# #   mutate(median_col = abs(median(val)))
-# # 
-# # ggplot(par_df %>% 
-# #          filter(par != "sigma_rec"), aes(x = par, y = val, fill = par)) +
-# #   geom_violin(alpha = 0.5) +
-# #   geom_hline(aes(yintercept = 0), col = "red", lty = 2, size = 1.5) +
-# #   geom_boxplot(width = 0.1, alpha = 0.5) +
-# #   # stat_summary(fun.data = data_summary, size = 0.8, alpha = 0.8) +
-# #   scale_fill_brewer(palette = "Blues")+
-# #   labs(x = "Parameter", y = "Relative Error") +
-# #   theme_minimal() +
-# #   theme(legend.position = "none") +
-# #   ylim(-0.5, 0.5)
+  # Do the same for f
+  F_df <- compare_results(results_list = results_list, n_sims = n_sims, 
+                            EM_variable = "F", OM_df = fish_mort, conv_vec = conv_vec)
+  
+  F_df <- F_df[[2]] %>%  mutate(Par = names(selectivity)[[i]],
+                                Converged = sum(sum(conv_vec == "Converged", na.rm = TRUE)))
+  
+  ssb_results <- rbind(ssb_results, SSB_df)
+  f_results <- rbind(f_results, F_df)
+
+  cat(red("### Done with Scenario", i, "###"))
+  cat(red("### Number of converged models = ", sum(conv_vec == "Converged", na.rm = TRUE)))
+
+# Rudimentary Comparisons -------------------------------------------------
+
+ssb_plot <- ssb_results %>% mutate(Type = "SSB")
+f_plot <- f_results %>% mutate(Type = "F")
+all_res <- rbind(ssb_plot, f_plot)
+
+png(here("figs", "sanity_checks", "diff_F_diff_selex_rapid.png"), width = 1500, height = 800)
+
+# Relevel factors
+all_res <- all_res %>% 
+  mutate(Par = factor(Par, levels = c("Fleet_2", "Fleet_1", "Fleet_1_1TB", "Fleet_1_6TB",
+                                      "Fleet_1_ar1_y", "Fleet_1_2dar1")))
+
+# Plot!
+print(
+  all_res %>% 
+    ggplot(aes(x = Year, y = median)) +
+    geom_label(mapping = aes(x = 72, y = Inf, label = Converged), vjust = 2, size = 5) +
+    annotate("rect", fill = "blue", alpha = 0.2, xmin = 86, xmax = 100, ymin = -Inf, ymax = Inf) +
+    geom_ribbon(aes(ymin = lwr_80, ymax = upr_80, group = Par), alpha = 0.5, fill = "grey4") +
+    geom_ribbon(aes(ymin = lwr_95, ymax = upr_95, group = Par), alpha = 0.3, fill = "grey4") +
+    geom_point(shape = 21, colour = "black", fill = "white", size = 3.8, stroke = 1, alpha = 1) +
+    geom_hline(aes(yintercept = 0), col = "black", lty = 2, size = 1, alpha = 0.85) +
+    theme_bw() + 
+    facet_grid(Type~Par, scales = "free") +
+    labs(x = "Year", y  ="Relative Error")+
+    theme(strip.text = element_text(size = 15),
+          axis.title = element_text(size = 15),
+          axis.text = element_text(size = 13, color = "black")) 
+)
+dev.off()
+
+} # end i loop
+
 
 # Other plots -------------------------------------------------------------
 
@@ -617,7 +480,21 @@ plot_OM(path = here("figs", "Base_OM_Figs"), file_name = "OM_Check.pdf")
 # Create directory to ouptut plots to
 wham_out <- here("figs", "wham_checks")
 # dir.create(wham_out)
-plot_wham_output(wham_mod[[50]], dir.main = wham_out)
+plot_wham_output(wham_mod[[52]], dir.main = wham_out)
 
 
-
+# SSB_df[[1]] %>% 
+#   # filter(Sim %in% c(15:20)) %>% 
+#   ggplot(aes(x = Year, y = SSB, ymin = lwr, ymax = upr)) +
+#   geom_line() +
+#   geom_line(aes(y = Truth), color = "red") +
+#   geom_ribbon(alpha = 0.5) +
+#   facet_wrap(~Sim, scales = "free")
+# 
+# F_df[[1]] %>% 
+#   # filter(Sim %in% c(15:20)) %>% 
+#   ggplot(aes(x = Year, y = F_val, ymin = lwr, ymax = upr)) +
+#   geom_line() +
+#   geom_line(aes(y = Truth), color = "red") +
+#   geom_ribbon(alpha = 0.5) +
+#   facet_wrap(~Sim, scales = "free")

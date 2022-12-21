@@ -87,27 +87,28 @@ get_results <- function(model) {
            lwr = exp(log_F - (1.96*SE)),
            upr = exp(log_F + (1.96*SE)))
 
-# Selectivity -------------------------------------------------------------
+# Selectivity/Mean Age -------------------------------------------------------------
   
-  # Get fishery selectivity
-  fish_sel <- melt(report$selAA[[1]]) %>% 
-    rename(Year = Var1, Age = Var2, Selex = value) %>% 
-    mutate(Type = "Fishery")
-  
-  # Get survey selectivity
-  surv_sel <- melt(report$selAA[[2]]) %>% 
-    rename(Year = Var1, Age = Var2, Selex = value) %>% 
-    mutate(Type = "Survey")
-  
-  selex_rep <- rbind(fish_sel, surv_sel) # bind these together!
+  # # Get fishery selectivity
+  # fish_sel <- melt(report$selAA[[1]]) %>% 
+  #   rename(Year = Var1, Age = Var2, Selex = value) %>% 
+  #   mutate(Type = "Fishery")
+  # 
+  # # Get survey selectivity
+  # surv_sel <- melt(report$selAA[[2]]) %>% 
+  #   rename(Year = Var1, Age = Var2, Selex = value) %>% 
+  #   mutate(Type = "Survey")
+  # 
+  # selex_rep <- rbind(fish_sel, surv_sel) # bind these together!
   
 
 # Get catchability --------------------------------------------------------
   if("q_re" %in% model$input$random) { # taken from WHAM plot_q function
     se <- as.list(model$sdrep, "Std. Error", report=TRUE)$logit_q_mat
   } else {
-    se <- t(matrix(as.list(model$sdrep, "Std. Error")$logit_q, nrow = NCOL(model$rep$logit_q_mat), 
-                     ncol = NROW(model$rep$logit_q_mat)))  
+    se <- t(matrix(as.list(model$sdrep, "Std. Error")$logit_q, 
+                     nrow = NCOL(model$rep$logit_q_mat), 
+                     ncol = nrow(model$rep$logit_q_mat)))  
   } # if else statement as to whether this is a random effect or not
   
   # Get bounds of logit
@@ -117,8 +118,10 @@ get_results <- function(model) {
   # Now, get inverse logit q
   q <- t(model$input$data$q_lower + (model$input$data$q_upper - model$input$data$q_lower)/
                                                       (1+exp(-t(model$rep$logit_q_mat))))
+  
   q_lo <- t(model$input$data$q_lower + (model$input$data$q_upper - model$input$data$q_lower)/
                                                                     (1+exp(-t(logit_q_lo))))
+  
   q_hi <- t(model$input$data$q_lower + (model$input$data$q_upper - model$input$data$q_lower)/
                                                                     (1+exp(-t(logit_q_hi))))
   
@@ -131,7 +134,7 @@ get_results <- function(model) {
                            q_Surv_lwr = q_lo[,1], q_Surv_upr = q_hi[,1])
   
   
-  return(list(SSB = SSB_rep, F = F_rep, Selex = selex_rep, q_Fish = q_rep_Fish,
+  return(list(SSB = SSB_rep, F = F_rep, q_Fish = q_rep_Fish,
               q_Surv = q_rep_Surv))
 }
 
@@ -147,10 +150,40 @@ get_results <- function(model) {
 # Returns a df of unaggregated resutls paired with the OM EM, and 95%, 50% CIs w/ relative error
 # Right now, this function only does F and SSB and q
 
-om_em_results <- function(results_list, n_sims, EM_variable, OM_df,
-                          conv_vec) {
+compare_results <- function(results_list, n_sims, EM_variable, OM_df, conv_vec) {
   
   df <- data.frame() # create empty dataframe to hold values in
+  
+if(EM_variable == "F" ) { # Need to index the OM_df differently b/c of multiple fleets.
+  # Not the best way but it works
+  
+  # Get SSB from EMs and compare to OMs
+  for(sim in 1:n_sims) {
+    
+    # Get ssb here from EM
+    em_df <- results_list[[sim]][[EM_variable]]
+    
+    # Munge the fish mort dataframe 
+    om_df <- melt(OM_df) %>% 
+      rename(Year = Var1, Fleet = Var2, Sim = Var3) %>% 
+      mutate(Year = parse_number(paste(Year)),
+             Sim = parse_number(paste(Sim)), # parse numbers out for filtering
+             Truth = value) %>% 
+      filter(Sim == sim, Year %in% c(em_df$Year)) %>% # filter the approrpaite years
+      group_by(Year) %>% 
+      summarize(Truth = sum(Truth)) %>%  # summarizing among fleets to get total F
+      mutate(Sim = sim, Convergence = conv_vec[sim]) %>% 
+      dplyr::select(-Year)
+    
+    # Now, cbind these together
+    om_em_df <- cbind(em_df, om_df)
+    
+    # And now rbind all of these together
+    df <- rbind(om_em_df, df) # Unaggregated data
+    
+  } # end sim loop
+  
+} else{
   
   # Get SSB from EMs and compare to OMs
   for(sim in 1:n_sims) {
@@ -160,11 +193,10 @@ om_em_results <- function(results_list, n_sims, EM_variable, OM_df,
     
     # Next, get ssb from the corresponding OM simulation
     om_df <- data.frame(OM_df[em_df$Year,sim]) %>% 
-      mutate(Sim = sim,
-             Convergence = conv_vec[sim])
+      mutate(Sim = sim, Convergence = conv_vec[sim])
     
     names(om_df)[1] <- "Truth"
-     
+    
     # Now, cbind these together
     om_em_df <- cbind(em_df, om_df)
     
@@ -172,6 +204,7 @@ om_em_results <- function(results_list, n_sims, EM_variable, OM_df,
     df <- rbind(om_em_df, df) # Unaggregated data
     
   } # end sim loop
+}
   
   # Return aggregated data w/ relative error, 95% and 50% CIs
   if(EM_variable == "SSB") {
@@ -179,11 +212,12 @@ om_em_results <- function(results_list, n_sims, EM_variable, OM_df,
       filter(Convergence != "Not Converged") %>%
       mutate(RE = (SSB - Truth)/Truth) %>% 
       group_by(Year) %>% 
-      summarize(mean = median(RE), sd = sd(RE),  n = n(),
-                lwr_95 = mean - (1.96 * (sd / sqrt(n))),
-                up_95 = mean + (1.96 * (sd / sqrt(n))),
-                lwr_50 = mean - (0.674 * (sd / sqrt(n))),
-                up_50 = mean + (0.674 * (sd / sqrt(n))))
+      summarize(median = median(RE), 
+                lwr_95 = quantile(RE, 0.025),
+                upr_95 = quantile(RE, 0.975),
+                lwr_80 = quantile(RE, 0.1),
+                upr_80 = quantile(RE, 0.9))
+    
   } # end if variable == SSB
   
   if(EM_variable == "F") {
@@ -192,11 +226,11 @@ om_em_results <- function(results_list, n_sims, EM_variable, OM_df,
       filter(Convergence != "Not Converged") %>%
       mutate(RE = (F_val - Truth)/Truth) %>% 
       group_by(Year) %>% 
-      summarize(mean = mean(RE), sd = sd(RE),  n = n(),
-                lwr_95 = mean - (1.96 * (sd / sqrt(n))),
-                up_95 = mean + (1.96 * (sd / sqrt(n))),
-                lwr_50 = mean - (0.674 * (sd / sqrt(n))),
-                up_50 = mean + (0.674 * (sd / sqrt(n))))
+      summarize(median = median(RE), 
+                lwr_95 = quantile(RE, 0.025),
+                upr_95 = quantile(RE, 0.975),
+                lwr_80 = quantile(RE, 0.1),
+                upr_80 = quantile(RE, 0.9))
     
   } # end if variable == fishing mortality
   
@@ -212,11 +246,11 @@ om_em_results <- function(results_list, n_sims, EM_variable, OM_df,
     # Finally, summarize this!
     df_agg <- df_agg %>% 
       group_by(Year) %>% 
-      summarize(mean = mean(RE), sd = sd(RE),  n = n(),
-                lwr_95 = mean - (1.96 * (sd / sqrt(n))),
-                up_95 = mean + (1.96 * (sd / sqrt(n))),
-                lwr_50 = mean - (0.674 * (sd / sqrt(n))),
-                up_50 = mean + (0.674 * (sd / sqrt(n))))
+      summarize(median = median(RE), 
+                lwr_95 = quantile(RE, 0.025),
+                upr_95 = quantile(RE, 0.975),
+                lwr_80 = quantile(RE, 0.1),
+                upr_80 = quantile(RE, 0.9))
     
   } # if this is a catchability variable
   

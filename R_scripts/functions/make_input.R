@@ -18,19 +18,20 @@
 #' @param time_block Whether or not we want to prepare our data such that a time-block is possible.
 #' @param block_period_sel When we want the time block to occur for fleet selex
 #' @param block_period_idx When we want the time block to occur for idx selex
+#' @param noFish_Idx Whether or not we want to use a fishery dependent index of abundance
 
 
 make_input <- function(n_fleets, n_indices, Catch_CV_Val = 0, catch_error = TRUE,
                        n_sims, bias_process = FALSE, bias_obs = FALSE, units_indices, units_index_paa,
                        single_fleet = FALSE, time_block = FALSE, block_period_sel = NULL,
-                       block_period_idx = NULL) {
+                       block_period_idx = NULL, noFish_Idx = FALSE) {
   
   if(n_indices != length(units_indices) & n_indices != length(units_index_paa)) stop("units_indices and units_index_paa vectors need to be the same length as the number of indices")
   if(length(Catch_CV_Val) != n_fleets) stop("Catch CV values are not the same length as the number of fishery fleets specified")
   if(single_fleet == TRUE & n_fleets > 1) stop("Arguments n_fleets and single_fleet contradict each other. Make sure to have n_fleets as 1 if single_fleet = TRUE")
   require(tidyverse)
   
-  # The structure of this is taken from https://timjmiller.github.io/wham/reference/prepare_wham_input.html (basic_info section)
+  # The structure of this is taken from https://timjmiller.github.io/wham/reference/prepare_wham_input.html (input_info section)
   
 # Set up ------------------------------------------------------------------
   
@@ -73,10 +74,6 @@ make_input <- function(n_fleets, n_indices, Catch_CV_Val = 0, catch_error = TRUE
     # Catch effective sample size for catch_paa (comps for fishery) matrix(length(years), n_fleets)
     input$catch_Neff <- fish_Neff[min(Fish_Start_yr):(min(Fish_Start_yr)+n_y-1),,drop = FALSE ] # Effective sample size for catch
   } # if one single fleet = TRUE
-  
-  # Specify whether to use fleet age comps - we will specify 0 as default since we will have
-  # a fishery dependent index of abundance (length(years), n_fleets)
-  input$use_catch_paa <- matrix(0, n_y, input$n_fleets)
   
   # Specify selectivity block pointers for the fishery fleet (length(years), n_fleets) 
   # Still not really sure what this does - presuambly its to make sure stuff is getting indexed properly? (i.e.,
@@ -545,6 +542,21 @@ make_input <- function(n_fleets, n_indices, Catch_CV_Val = 0, catch_error = TRUE
   
   # Now put this into our input list
   input$waa <- waa
+  
+  if(noFish_Idx == TRUE) { # removing the first column for a fishery dependent index
+    input$n_indices <- 1
+    # input$use_catch_paa[] <- 1
+    input$index_cv <-  matrix(input$index_cv[,-1])
+    input$index_Neff <-  matrix(input$index_Neff[,-1])
+    input$units_indices <- input$units_indices[-1]
+    input$units_index_paa <- input$units_index_paa[-1]
+    input$use_index_paa <- matrix(input$use_index_paa[,-1])
+    input$use_indices <- matrix(input$use_indices[,-1])
+    input$selblock_pointer_indices <- matrix( input$selblock_pointer_indices[,-1])
+    input$fracyr_indices <- matrix(input$fracyr_indices[,-1])
+    input$agg_indices <- matrix(input$agg_indices[,-1])
+    input$index_paa <- input$index_paa[-1,,]
+  }
   
   return(input)
   
