@@ -3,6 +3,7 @@
 // Creator: Matthew LH. Cheng (UAF-CFOS)
 
 // TO DO:
+// Incoprorate survey comp information
 // Recruitment options - rec devs and BH
 
 #include<TMB.hpp>
@@ -42,15 +43,18 @@ Type objective_function<Type>::operator() ()
   DATA_ARRAY(WAA); // Weight-at-age array; n_years * n_ages * n_sexes
   DATA_ARRAY(MatAA); // Maturity-at-age array; n_years * n_ages * n_sexes (But only Sex0 used for calcs)
   DATA_VECTOR(Sex_Ratio); // Sex ratio; n_sexes - Females, Males
-
+  DATA_MATRIX(Init_N_at_age); // Fixed values for inital abundance at age
+  
   // Controls on assessment ----------------------------------------------
-  DATA_INTEGER(init_model); // Model for determining initial population, == 0 equilibrium
+  DATA_INTEGER(init_model); // Model for determining initial population, == 0 fixed init (0 parameters), 
+                            // == 1 estimate N1 pars (nages parameters), 
+                            // == 2 estimate N1 at first age, and then use equilibrium assumption (2 parameters)
   DATA_INTEGER(rec_model); // Recruitment model, == 0 Mean Recruitment, == 1 Beverton Holt 
   DATA_ARRAY(F_Slx_model); // Fishery Selectivity Model, == 0 Logistic n_fleets * n_years * n_sexes
   
   // PARAMETER SECTION ----------------------------------------------
-  // PARAMETER(ln_R0); // log R0 for BH
   PARAMETER(ln_MeanRec); // log mean recruitment 
+  PARAMETER_VECTOR(ln_N1); // log numbers at time 1; n_ages
   // PARAMETER(ln_SigmaRec); // log sigma for recruitment
   PARAMETER(ln_M); // log natural mortality
   PARAMETER_MATRIX(ln_F_y); // Annual Fishing Mortality ; n_years * n_fleets
@@ -60,7 +64,6 @@ Type objective_function<Type>::operator() ()
   PARAMETER(ln_k); // k logistic
 
   // Parameter Transformations ----------------------------------------------
-  // Type R0 = exp(ln_R0); // Virgin Recruitment
   Type MeanRec = exp(ln_MeanRec); // Mean Recruitment
   // Type SigmaRec = exp(ln_SigmaRec); // Recruitment Sigma
   Type M = exp(ln_M); // Natural Mortality
@@ -82,26 +85,62 @@ Type objective_function<Type>::operator() ()
   array<Type> F_Slx(n_years, n_ages, n_fleets, n_sexes); // Fishery Selectivities
   array<Type> Total_Fishery_Numbers(n_years, n_fleets, n_sexes); // Store Total Fishery Numbers for Proportions
   // array<Type> S_Slx(n_years, n_ages, n_srv_indices, n_sexes); // Survey Selectivities
-  // S_Slx.setZero(); // Set selex at zero
-  
+
   // Define objects to store negative log-likelihoods
   vector<Type> catch_nLL(n_fleets); 
-  catch_nLL.setZero();
   vector<Type> fish_index_nLL(n_fish_indices); 
-  fish_index_nLL.setZero();
   vector<Type> srv_index_nLL(n_srv_indices); 
-  srv_index_nLL.setZero();
   matrix<Type> fish_comp_nLL(n_fish_comps, n_sexes); 
   matrix<Type> srv_comp_nLL(n_srv_comps, n_sexes);
   Type jnLL = 0; // Joint Negative log Likelihood
   
   // TESTING 
   DATA_ARRAY(S_Slx);
-  DATA_MATRIX(Init_N_at_age);
-  
+
   // MODEL STRUCTURE ----------------------------------------------
   // y = year, a = age, s = sex, f = fishery fleet, sf = survey fleet
   
+  // Initialization ----------------------------------------------
+  
+  if(init_model == 0) { // Fixed Abundance at Age
+    
+    for(int a = 0; a < n_ages; a++)
+      for(int s = 0; s < n_sexes; s++) {
+        NAA(0,a,s) = Init_N_at_age(a,s);
+      }
+  } // if statement for equilibrium initial numbers at age
+  
+  if(init_model == 1) { // Independent parameters
+    
+    for(int s = 0; s < n_sexes; s++) {
+      for(int a = 0; a < n_ages; a++) {
+        NAA(0,a,s)  = exp(ln_N1(a)) * Sex_Ratio(s);
+      } // a loop
+    } // s loop
+  } // independent parameters
+  
+  if(init_model == 2) { // estimate 1 parameter and propagate ages using equilibrium
+    // This is how WHAM determines equilibrium abundance at age
+    for(int s = 0; s < n_sexes; s++) {
+      for(int a = 0; a < n_ages; a++) {
+        
+        if(a == 0) { // First age
+          NAA(0,0,s) = exp(ln_N1(0)) * Sex_Ratio(s); 
+        } else 
+        if(a < n_ages - 1) { // if we are not in the plus group
+          NAA(0,a,s) = NAA(0, a-1, s)* exp(M -  exp(ln_N1(1))) * Sex_Ratio(s);
+        } else{
+          NAA(0,a,s) = (NAA(0, a-1, s)/(1.0 + exp(-M - exp(ln_N1(1)))) ) * Sex_Ratio(s);
+        } // plus group calculation
+
+      } // end a loop
+    } // end sex loop
+    
+  } // equilibrium
+  
+  // Get B0 / SSB at Time 0 
+  for(int a = 0; a < n_ages; a++) SSB(0) += NAA(0,a,0) * MatAA(0,a,0) * WAA(0,a,0);
+
   
   // Selectivity ----------------------------------------------
   
@@ -118,8 +157,7 @@ Type objective_function<Type>::operator() ()
       } // y loop
     } // s loop
   } // f loop
-   
-   
+  
   // Deaths and Removals (Fishing Mortality and Natural Mortality) ---------------------------------
   
   for(int y = 0; y < n_years; y++) {
@@ -136,35 +174,6 @@ Type objective_function<Type>::operator() ()
       } // a loop
     } // s loop
   } // y loop
-  
-  
-  // Initialization ----------------------------------------------
-
-  if(init_model == 0) { // Equilibrium age composition
-    
-    Type rec_0 = 0; // Create variable to hold initial recruitment in
-    if(rec_model == 0) rec_0 = MeanRec; // Use mean recruitment for initial recruitment 
-    // if(rec_model == 1) rec_0 = R0; // Use R0 for initial recruitment
-    
-    for(int s = 0; s < n_sexes; s++) {
-      for(int a = 0; a < n_ages; a++) {
-        if(a < n_ages - 1) { // if we are not in the plus group
-          NAA(0,a,s) = (rec_0 * exp(-( ages(a) ) * M) ) * Sex_Ratio(s); 
-        } else{
-          NAA(0,a,s) = ((rec_0 * exp(-( ages(a) ) * M) ) / (Type(1.0) - exp( -M )))  * Sex_Ratio(s); 
-        } // plus group calculation
-      } // end a loop
-  } // end sex loop
-    
-    // TESTING Manual Input numbers at age
-    for(int a = 0; a < n_ages; a++) 
-      for(int s = 0; s < n_sexes; s++) {
-        NAA(0,a,s) = Init_N_at_age(a,s);
-      }
-    
-    // Get B0 / SSB at Time 0 
-    for(int a = 0; a < n_ages; a++) SSB(0) += NAA(0,a,0) * MatAA(0,a,0) * WAA(0,a,0);
-  } // if statement for equilibrium initial numbers at age
   
   // Project Numbers At Age Forward ----------------------------------------------
   

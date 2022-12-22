@@ -34,8 +34,8 @@ selex_opts <- function(selex_type, bins, par_values) {
     a50 <- as.numeric(par_mat[,1][par_mat[,2] == "a50"])
     # Get k value
     k <- as.numeric(par_mat[,1][par_mat[,2] == "k"])
-    # Compute selex and scale to max of 1
-    selex <- 1 / (1 + exp(-1 * (bins - a50) / k)) / max( 1 / (1 + exp(-1 * (bins - a50) / k)) ) / max(1 / (1 + exp(-1 * (bins - a50) / k)) / max( 1 / (1 + exp(-1 * (bins - a50) / k)) ))
+    # Compute selex 
+    selex <- 1 / (1 + exp(-1 * (bins - a50) / k)) 
     
   } # logistic selectivity
   
@@ -54,8 +54,7 @@ selex_opts <- function(selex_type, bins, par_values) {
     p <- (0.5 * (sqrt(amax^2 + 4*delta^2) - amax)) # Derive power parameter here first
     
     # Now calculate Selex for dome-shaped - scale to a max of 1
-    selex <- (bins/amax) ^ (amax/p) * exp((amax - bins) / p) / 
-                  max( (bins/amax) ^ (amax/p) * exp((amax - bins) / p) )
+    selex <- (bins/amax) ^ (amax/p) * exp((amax - bins) / p) 
     
   } # gamma dome-shaped selectivity
   
@@ -83,7 +82,7 @@ selex_opts <- function(selex_type, bins, par_values) {
     logistic_2 <- 1 - (1/(1 + exp(-slope_2 * (bins - infl_2))))
     
     # multiply the logistic curves and scale to a max of 1
-    selex <- logistic_1 * logistic_2 / max(logistic_1 * logistic_2)
+    selex <- logistic_1 * logistic_2 
     
     # plot(selex)
     
