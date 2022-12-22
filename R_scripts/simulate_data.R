@@ -51,13 +51,13 @@ get_Fs(Start_F = c(0.01),
 # Specify data scenarios here
 fish_surv_data_scenarios(Fish_Start_yr = c(70), 
                          Surv_Start_yr = c(70),
-                         fish_Neff = c(100),
+                         fish_Neff = c(200),
                          srv_Neff = c(200), 
-                         fish_CV = c(0.15), 
-                         srv_CV = c(0.1), 
+                         fish_CV = c(0.3), 
+                         srv_CV = c(0.15), 
                          Neff_Fish_Time = "F_Vary", 
                          fish_mort = fish_mort,
-                         fixed_Neff = 20)
+                         fixed_Neff = 50)
 
 # Specify Natural Mortality
 specify_nat_mort(Mort_Time = "Constant", 
@@ -85,7 +85,7 @@ specify_sex(f_ratio = 1,
 
 check_equil <- FALSE
 rec_type <- "mean_rec"
-sigma_rec <<- 0 # Equlibrium test
+
 # Simulation Loop ---------------------------------------------------------
 
 for(sim in 1:n_sims) {
@@ -129,7 +129,7 @@ for(sim in 1:n_sims) {
           rec_total[y,sim] <- beverton_holt_recruit_new(ssb = SSB[y,sim], h = h, r0 = r0, ssb0 = ssb0) * exp(rec_devs[y,sim] - ((sigma_rec^2)/2)) # Add lognormal correction and recdevs
         } 
         if(rec_type == "mean_rec") {
-          rec_total[y,sim] <- exp(rnorm(1, mean = mu_rec, sd = sigma_rec))
+          rec_total[y,sim] <-  exp(mu_rec + rec_devs[y,sim] - ((sigma_rec^2)/2))
         } # do mean recruitment
         
       }  # end if statement for if we are in the first year of the simulation
@@ -189,7 +189,7 @@ for(sim in 1:n_sims) {
             exp(rec_devs[y,sim] - ((sigma_rec^2)/2))
         }
         if(rec_type == "mean_rec") {
-          rec_total[y,sim] <- exp(rnorm(1, mean = mu_rec, sd = sigma_rec))
+          rec_total[y,sim] <- exp(mu_rec + rec_devs[y,sim] - ((sigma_rec^2)/2))
         } # do mean recruitment
         
   # Generate observations  ---------------------------------------------------
