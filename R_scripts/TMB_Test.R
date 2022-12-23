@@ -11,13 +11,6 @@ library(TMB)
 # Need to set wd in source folder
 setwd(here("src"))
 
-# Compile and run TMB model -----------------------------------------------
-
-compile("EM.cpp") # Compile .cpp file
-dyn.load(dynlib("EM")) # Load in .cpp
-
-
-
 # Load in data ------------------------------------------------------------
 sim <- 1
 
@@ -58,8 +51,7 @@ WAA <- wt_at_age[Fish_Start_yr:(n_years),,1,sim]
 MatAA <- mat_at_age[Fish_Start_yr:(n_years),,1,sim]
 Sex_Ratio <- c(1,0)
 
-catch_cv <- 0.3
-fish_cv <- 0.3
+fish_cv <- 0.15
 srv_cv <- 0.15
 
 # Testing
@@ -83,22 +75,22 @@ data <- list( ages = ages, years = years,
              obs_srv_age_Neff = obs_srv_age_Neff, obs_fish_indices =  obs_fish_indices,
              obs_srv_indices = obs_srv_indices, WAA = array(WAA, dim = c(32, 30, 1)), 
              MatAA = array(MatAA, dim = c(32, 30, 1)),
-             Sex_Ratio = Sex_Ratio, init_model = 1, rec_model = 0, catch_cv = 0.05,
-             fish_cv = fish_cv, srv_cv = srv_cv, F_Slx = array(F_Slx, dim = c(31, 30, 1, 1)),
-             S_Slx = array(S_Slx, dim = c(31, 30, 1, 1)), F_Mort = as.matrix(F_Mort),
+             Sex_Ratio = Sex_Ratio, init_model = 2, rec_model = 0, catch_cv = 0.05,
+             fish_cv = fish_cv, srv_cv = srv_cv,
              Init_N_at_age = as.matrix(Init_N_at_age),
              F_Slx_model = array(0, dim=c(1, 31, 1)), n_fish_comps = 1, n_srv_comps = 1,
              S_Slx_model = array(0, dim=c(1, 31, 1))
              )
 
 # Define parameter inits here
-parameters <- list(ln_R0 = 20, ln_SigmaRec = 0.05, ln_MeanRec = 3,
-                   ln_M = log(0.125),  ln_a50_f = log(6), ln_k_f = log(1), 
-                   ln_a50_s = log(3.5), ln_k_s = log(0.4),
-                   ln_F_y = as.matrix(rnorm(Fish_Start_yr:(n_years - 1), -4, 0.5)),
+parameters <- list(ln_R0 = 20, ln_SigmaRec = 0.7, ln_MeanRec = 3,
+                   ln_M = log(0.125),  ln_a50_f = log(4), ln_k_f = log(0.5), 
+                   ln_a50_s = log(1), ln_k_s = log(0.4),
+                   ln_N1_Devs = rnorm(length(ages)-1,0, 1),
+                   ln_F_y = log(as.matrix(fish_mort[Fish_Start_yr:(n_years - 1),,])),
                    ln_q_fish = as.matrix(log(rep(0.08, n_fish_fleets))), 
                    ln_q_srv = as.matrix(log(rep(0.01, n_srv_fleets))),
-                   ln_RecDevs = rec_devs[Fish_Start_yr:(n_years - 1),])
+                   ln_RecDevs = rec_devs[Fish_Start_yr:(n_years),])
 
 compile("EM.cpp") # Compile .cpp file
 dyn.load(dynlib("EM")) # Load in .cpp
@@ -126,14 +118,32 @@ sd_rep <- TMB::sdreport(my_model)
 
 # Recruitment
 my_model$report()$rec_nLL
-plot(rec_total[Fish_Start_yr:(n_years - 1),sim]) # Truth
-lines(my_model$rep$NAA[-32,1,1]) # Model 
+rec = sd_rep$value[str_detect(names(sd_rep$value), "Total_Rec")]
+sd = sd_rep$sd[str_detect(names(sd_rep$value), "Total_Rec")]
+
+# Years 69 - 99 because we don;t have info for the last year projected SSB yet...
+# Recruitment enters after the fact
+rec_df <- data.frame(year = 69:99, rec = rec, sd = sd,
+                     upr = rec + (1.96 * sd), downr = rec - (1.96 * sd),
+                     t = rec_total[69:(n_years-2),sim])
+
+ggplot(rec_df, aes(x = year, y = rec, ymin = downr, ymax = upr)) +
+  geom_line() +
+  geom_line(aes(y = t), col = "red") +
+  geom_ribbon(alpha = 0.3)
+
+
+# Modelled recruitment is always lagging by a year?
+ccf(rec_total[Fish_Start_yr:(n_years - 1),sim],my_model$rep$NAA[-32,1,1] )
+plot(my_model$rep$NAA[1,,1], type = "l") # Model 
+lines(Init_N_at_age, col = "red")
+ccf(my_model$rep$NAA[1,,1], Init_N_at_age) # Model is ahead by a year
 
 # Check SSB
-ssb_df <- data.frame(year = 1:32, ssb = sd_rep$value[1:32], 
-                     upr = sd_rep$value[1:32] + (1.96 * sd_rep$sd[1:32] ),
-                     downr = sd_rep$value[1:32] - (1.96 * sd_rep$sd[1:32] ),
-                     t = SSB[Fish_Start_yr:n_years,])
+ssb_df <- data.frame(year = 1:31, ssb = sd_rep$value[1:31], 
+                     upr = sd_rep$value[1:31] + (1.96 * sd_rep$sd[1:31] ),
+                     downr = sd_rep$value[1:31] - (1.96 * sd_rep$sd[1:31] ),
+                     t = SSB[Fish_Start_yr:(n_years-1),])
 
 ggplot(ssb_df, aes(x = year, y = ssb, ymin = downr, ymax = upr)) +
   geom_line() +
@@ -143,7 +153,7 @@ ggplot(ssb_df, aes(x = year, y = ssb, ymin = downr, ymax = upr)) +
 # Check F
 f_df <- data.frame(year = 1:31, f = sd_rep$value[33:63], 
                      upr = sd_rep$value[33:63] + (1.96 * sd_rep$sd[33:63] ),
-                     downr = sd_rep$value[33:63] - (1.96 * sd_rep$sd[33:63] ),
+                     downr = sd_rep$value[33:63] - (1.96 * sd_rep$sd[33:63]),
                      t = fish_mort[Fish_Start_yr:(n_years-1),,])
 
 ggplot(f_df, aes(x = year, y = f, ymin = downr, ymax = upr)) +

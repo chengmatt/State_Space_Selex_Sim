@@ -51,11 +51,11 @@ get_Fs(Start_F = c(0.01),
 # Specify data scenarios here
 fish_surv_data_scenarios(Fish_Start_yr = c(70), 
                          Surv_Start_yr = c(70),
-                         fish_Neff = c(200),
-                         srv_Neff = c(200), 
-                         fish_CV = c(0.3), 
+                         fish_Neff = c(100),
+                         srv_Neff = c(150), 
+                         fish_CV = c(0.15), 
                          srv_CV = c(0.15), 
-                         Neff_Fish_Time = "F_Vary", 
+                         Neff_Fish_Time = "Constant", 
                          fish_mort = fish_mort,
                          fixed_Neff = 50)
 
@@ -74,9 +74,9 @@ specify_rec_devs(Rec_Dev_Type = "iid",
 # Specify selectivity parameterizations here
 specify_selex(fish_selex = c("logistic"), srv_selex = c("logistic"), 
 # Fishery parameters
-fish_pars = list(Fleet_1_L = matrix(data = c(6,1), nrow = n_sex, byrow = TRUE)),
+fish_pars = list(Fleet_1_L = matrix(data = c(6,0.5), nrow = n_sex, byrow = TRUE)),
 # Survey parameters
-srv_pars = list(Fleet_3_SL = matrix(data = c(3.5,0.4), nrow = n_sex, byrow = TRUE)), 
+srv_pars = list(Fleet_3_SL = matrix(data = c(4,0.4), nrow = n_sex, byrow = TRUE)), 
 bins = ages)
 
 # Specify sex ratios
@@ -127,7 +127,7 @@ for(sim in 1:n_sims) {
         if(rec_type == "BH") { # do beverton holt recruitment
           # Now, calculate the number of recruits we get - this returns abundance - N at age 2
           rec_total[y,sim] <- beverton_holt_recruit_new(ssb = SSB[y,sim], h = h, r0 = r0, ssb0 = ssb0) * exp(rec_devs[y,sim] - ((sigma_rec^2)/2)) # Add lognormal correction and recdevs
-        } 
+        }
         if(rec_type == "mean_rec") {
           rec_total[y,sim] <-  exp(mu_rec + rec_devs[y,sim] - ((sigma_rec^2)/2))
         } # do mean recruitment
