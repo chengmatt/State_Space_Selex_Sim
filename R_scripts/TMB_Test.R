@@ -75,9 +75,8 @@ data <- list( ages = ages, years = years,
              obs_srv_age_Neff = obs_srv_age_Neff, obs_fish_indices =  obs_fish_indices,
              obs_srv_indices = obs_srv_indices, WAA = array(WAA, dim = c(32, 30, 1)), 
              MatAA = array(MatAA, dim = c(32, 30, 1)),
-             Sex_Ratio = Sex_Ratio, init_model = 2, rec_model = 0, catch_cv = 0.05,
+             Sex_Ratio = Sex_Ratio,  rec_model = 0, catch_cv = 0.05,
              fish_cv = fish_cv, srv_cv = srv_cv,
-             Init_N_at_age = as.matrix(Init_N_at_age),
              F_Slx_model = array(0, dim=c(1, 31, 1)), n_fish_comps = 1, n_srv_comps = 1,
              S_Slx_model = array(0, dim=c(1, 31, 1))
              )

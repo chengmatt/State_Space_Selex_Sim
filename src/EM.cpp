@@ -46,8 +46,6 @@ Type objective_function<Type>::operator() ()
   DATA_MATRIX(Init_N_at_age); // Fixed values for inital abundance at age
 
   // Controls on assessment ----------------------------------------------
-  DATA_INTEGER(init_model); // Model for determining initial population, == 0 fixed init (0 parameters), 
-                            // == 1 estimate N1 pars (nages parameters), 
   DATA_INTEGER(rec_model); // Recruitment model, == 0 Mean Recruitment, == 1 Beverton Holt 
   DATA_ARRAY(F_Slx_model); // Fishery Selectivity Model, == 0 Logistic n_fleets * n_years * n_sexes
   DATA_ARRAY(S_Slx_model); // Survey Selectivity Model, == 0 Logistic n_fleets * n_years * n_sexes
@@ -107,37 +105,7 @@ Type objective_function<Type>::operator() ()
   // y = year, a = age, s = sex, f = fishery fleet, sf = survey fleet
   
   // Initialization ----------------------------------------------
-  
-  if(init_model == 0) { // Fixed Abundance at Age
-    
-    for(int a = 0; a < n_ages; a++)
-      for(int s = 0; s < n_sexes; s++) {
-        NAA(0,a,s) = Init_N_at_age(a,s);
-      }
-  } // if statement for equilibrium initial numbers at age
-  
-  if(init_model == 1) { // mean rec or R0 w/ rec devs to get age composition
-    
-    Type ln_Rec0 = 0; // Create variable to hold mean rec or R0 in
-    if(rec_model == 0) ln_Rec0 = ln_MeanRec; // If we are doing mean recruitment
-      
-    for(int s = 0; s < n_sexes; s++) {
-      for(int a = 0; a < n_ages; a++) {
 
-        if(a == 0) { // First age
-          NAA(0,0,s) = exp(ln_Rec0 + ln_RecDevs(0) - (pow(ln_SigmaRec,2) * 0.5)) * Sex_Ratio(s);
-        } else
-        if(a < n_ages - 1 && a != 0) { // if we are not in the plus group
-          NAA(0,a,s) = NAA(0, a - 1, s)   * exp(-(M )) * Sex_Ratio(s);
-        } else{
-          NAA(0,a,s) = NAA(0, a - 1, s) * (exp(-(M )) / (Type(1) - exp(-(M )))) * Sex_Ratio(s);
-        } // plus group calculation
-      } // end a loop
-    } // end sex loop
-
-  } // equilibrium age
-  
-  if(init_model == 2){ 
     for(int s = 0; s < n_sexes; s++) {
       for(int a = 0; a < n_ages; a++){
         if(a < n_ages - 1) { // not plus group
@@ -147,7 +115,6 @@ Type objective_function<Type>::operator() ()
         } // plus group
       } // a loop
     } // s loop
-  } // determining initial abundance by estimating initial rec devs
 
   // Get B0 / SSB at Time 0 
   for(int a = 0; a < n_ages; a++) SSB(0) += NAA(0,a,0) * MatAA(0,a,0) * WAA(0,a,0);
