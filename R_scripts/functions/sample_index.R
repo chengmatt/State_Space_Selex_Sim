@@ -57,8 +57,8 @@ idx_obs_error <- function(error, true_index, CV) {
 
   if(error == "log_normal") {
 
-    # Convert CV to sd for log normal
-    sd <- log((CV^2) + 1)
+    # Convert CV to sd for log normal - inner fxn = variance
+    sd <- sqrt(log((CV^2) + 1))
 
     # Sample!
     sampled_index <- true_index * exp(rnorm(1, 0, sd))
