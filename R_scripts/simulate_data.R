@@ -51,10 +51,10 @@ get_Fs(Start_F = c(0.01),
 # Specify data scenarios here
 fish_surv_data_scenarios(Fish_Start_yr = c(70), 
                        Surv_Start_yr = c(70),
-                       fish_Neff = c(100),
-                       srv_Neff = c(200), 
-                       fish_CV = c(0.15), 
-                       srv_CV = c(0.15), 
+                       fish_Neff = c(1000),
+                       srv_Neff = c(1000), 
+                       fish_CV = c(0.1), 
+                       srv_CV = c(0.1), 
                        Neff_Fish_Time = "Constant", 
                        fish_mort = fish_mort,
                        fixed_Neff = 50)
@@ -124,17 +124,21 @@ for(y in 1:n_years) {
       # Now, calculate our SSB in the first year (only females matter in this case for calculating SSB)
       SSB[y,sim] <- sum(mat_at_age[y,,1,sim] * Biom_at_age[y,,1,sim], na.rm = TRUE)
       
-      if(rec_type == "BH") { # do beverton holt recruitment
-        # Now, calculate the number of recruits we get - this returns abundance - N at age 2
-        rec_total[y,sim] <- beverton_holt_recruit_new(ssb = SSB[y,sim], h = h, r0 = r0, ssb0 = ssb0) * exp(rec_devs[y,sim] - ((sigma_rec^2)/2)) # Add lognormal correction and recdevs
-      }
-      if(rec_type == "mean_rec") {
-        rec_total[y,sim] <-  exp(mu_rec + rec_devs[y,sim] - ((sigma_rec^2)/2))
-      } # do mean recruitment
+      # Recruitment at first year = 0
+      rec_total[y, sim] <- 0
       
     }  # end if statement for if we are in the first year of the simulation
 
   if(y != 1) { # exiting the first year of the simulation
+    
+    if(rec_type == "BH") { # do beverton holt recruitment
+      # Now generate new recruits with the updated SSB
+      rec_total[y,sim] <- beverton_holt_recruit_new(ssb = SSB[y,sim], h = h, r0 = r0, ssb0 = ssb0) * 
+        exp(rec_devs[y,sim] - ((sigma_rec^2)/2))
+    }
+    if(rec_type == "mean_rec") {
+      rec_total[y,sim] <- exp(mu_rec + rec_devs[y,sim] - ((sigma_rec^2)/2))
+    } # do mean recruitment
     
 # Ages Loop ---------------------------------------------------------------
 
@@ -154,7 +158,7 @@ for(y in 1:n_years) {
         
           if(a == 1) {
             # Now, add in the recruits from previous year, assigned with the sex ratio
-            N_at_age[y,1,s,sim] <- rec_total[y-1,sim] * sex_ratio[y-1,s]
+            N_at_age[y,1,s,sim] <- rec_total[y,sim] * sex_ratio[y-1,s]
           } # add recruits in at age-1 
         
       } # if we are not in the plus group
@@ -183,15 +187,6 @@ for(y in 1:n_years) {
       # Now, update SSB (only females matter so indexing 1 for the sex dimension)
       SSB[y,sim] <- sum(mat_at_age[y,,1,sim] * Biom_at_age[y,,1,sim], na.rm = TRUE)
       
-      if(rec_type == "BH") { # do beverton holt recruitment
-        # Now generate new recruits with the updated SSB
-        rec_total[y,sim] <- beverton_holt_recruit_new(ssb = SSB[y,sim], h = h, r0 = r0, ssb0 = ssb0) * 
-          exp(rec_devs[y,sim] - ((sigma_rec^2)/2))
-      }
-      if(rec_type == "mean_rec") {
-        rec_total[y,sim] <- exp(mu_rec + rec_devs[y,sim] - ((sigma_rec^2)/2))
-      } # do mean recruitment
-      
 # Generate observations  ---------------------------------------------------
       
       if(check_equil == FALSE) { # end sampling if we want to check equilibrium
@@ -213,12 +208,9 @@ for(y in 1:n_years) {
             
             # Calculate instantaneous fishing mortality for a given fleet, sex, and age
             Fish_Fleet_Mort <- (fish_mort[y-1,f,sim] * Fish_selex_at_age[y-1,,f,s,sim])
-            
-            # Calculate our proportion of mortality via fishing
-            Prop_fish_mort <- Fish_Fleet_Mort / Z_s
-            
+
             # Now, get catch at age
-            Catch_at_age[y-1,,f,s,sim] <- Prop_fish_mort * N_at_age[y-1,,s,sim] * (1-exp(-Z_s)) * wt_at_age[y,,s,sim]
+            Catch_at_age[y-1,,f,s,sim] <- Fish_Fleet_Mort * N_at_age[y-1,,s,sim] * (1-exp(-Z_s)) * wt_at_age[y,,s,sim] / Z_s
 
     ### Sample Fishery Index and Comps ------------------------------------------
             
@@ -229,7 +221,7 @@ for(y in 1:n_years) {
               Fishery_Index[y-1,f,s,sim] <- sample_index(Idx_Fleet = "Fishery")
               
               # Probability for fishery age comps
-              Prob_Fish_Comps <- N_at_age[y-1,,s,sim] * Fish_selex_at_age[y-1,,f,s,sim]
+              Prob_Fish_Comps <- Fish_Fleet_Mort * N_at_age[y-1,,s,sim] * (1-exp(-Z_s)) / Z_s
 
               # Generate comps based 
               Fish_Age_Comps[y-1,,f,s,sim] <- sample_comps(Comp_Fleet = "Fishery",
@@ -271,7 +263,7 @@ for(y in 1:n_years) {
               Survey_Age_Comps[y-1,,sf,s,sim] <- sample_comps(Comp_Fleet = "Survey", 
                                                               error = "multinomial",
                                                               N_eff = srv_Neff[y,sf], 
-                                                              prob = Prob_Surv_at_age)
+                                                              prob = Prob_Surv_at_age / sum(Prob_Surv_at_age))
               
             } # Only start sampling if we are at the start of the survey start year
             
@@ -385,7 +377,7 @@ for(i in 1:length(selectivity)) {
     # Fit WHAM here
     tryCatch( {
       em_fit <- wham::fit_wham(input = test_wham, do.fit = T, do.osa = F, do.retro = F,
-                               save.sdrep = TRUE, do.check = F, MakeADFun.silent = F)
+                               save.sdrep = TRUE, do.check = F, MakeADFun.silent = T)
       
       wham_mod[[sim]] <- em_fit
       
@@ -454,8 +446,8 @@ all_res <- all_res %>%
 print(
   all_res %>% 
     ggplot(aes(x = Year, y = median)) +
-    geom_label(mapping = aes(x = 72, y = Inf, label = Converged), vjust = 2, size = 5) +
-    annotate("rect", fill = "blue", alpha = 0.2, xmin = 86, xmax = 100, ymin = -Inf, ymax = Inf) +
+    # geom_label(mapping = aes(x = 72, y = Inf, label = Converged), vjust = 2, size = 5) +
+    # annotate("rect", fill = "blue", alpha = 0.2, xmin = 86, xmax = 100, ymin = -Inf, ymax = Inf) +
     geom_ribbon(aes(ymin = lwr_80, ymax = upr_80, group = Par), alpha = 0.5, fill = "grey4") +
     geom_ribbon(aes(ymin = lwr_95, ymax = upr_95, group = Par), alpha = 0.3, fill = "grey4") +
     geom_point(shape = 21, colour = "black", fill = "white", size = 3.8, stroke = 1, alpha = 1) +
@@ -481,11 +473,11 @@ plot_OM(path = here("figs", "Base_OM_Figs"), file_name = "OM_Check.pdf")
 # Create directory to ouptut plots to
 wham_out <- here("figs", "wham_checks")
 # dir.create(wham_out)
-plot_wham_output(wham_mod[[52]], dir.main = wham_out)
+plot_wham_output(wham_mod[[1]], dir.main = wham_out)
 
 
 SSB_df[[1]] %>%
-  # filter(Sim %in% c(15:20)) %>%
+  # filter(Sim %in% c(5)) %>%
   ggplot(aes(x = Year, y = SSB, ymin = lwr, ymax = upr)) +
   geom_line() +
   geom_line(aes(y = Truth), color = "red") +
@@ -493,7 +485,7 @@ SSB_df[[1]] %>%
   facet_wrap(~Sim, scales = "free")
 
 F_df[[1]] %>%
-  # filter(Sim %in% c(15:20)) %>%
+  # filter(Sim %in% c(5)) %>%
   ggplot(aes(x = Year, y = F_val, ymin = lwr, ymax = upr)) +
   geom_line() +
   geom_line(aes(y = Truth), color = "red") +

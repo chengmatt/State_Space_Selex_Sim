@@ -44,16 +44,6 @@ sample_index <- function(Idx_Fleet) {
 #' @param CV Amount of CV we want to apply onto the index
 
 idx_obs_error <- function(error, true_index, CV) {
-  
-  if(error == "normal") {
-
-    # Convert CV to SD
-    sd <- CV * true_index
-
-    # Sample!
-    sampled_index <- rnorm(n=1, mean=true_index, sd=sd)
-
-  } # if generating via normal
 
   if(error == "log_normal") {
 
@@ -62,10 +52,9 @@ idx_obs_error <- function(error, true_index, CV) {
 
     # Sample!
     sampled_index <- true_index * exp(rnorm(1, 0, sd))
-
+    
   } # if generating via log normal
   
   return(sampled_index)
   
 }
-
