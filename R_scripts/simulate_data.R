@@ -51,11 +51,11 @@ get_Fs(Start_F = c(0.01),
 # Specify data scenarios here
 fish_surv_data_scenarios(Fish_Start_yr = c(70), 
                        Surv_Start_yr = c(70),
-                       fish_Neff = c(1000),
-                       srv_Neff = c(1000), 
+                       fish_Neff = c(150),
+                       srv_Neff = c(150), 
                        fish_CV = c(0.1), 
                        srv_CV = c(0.1), 
-                       Neff_Fish_Time = "Constant", 
+                       Neff_Fish_Time = "F_Vary", 
                        fish_mort = fish_mort,
                        fixed_Neff = 50)
 
@@ -331,7 +331,7 @@ n_fleets <- c(2, rep(1,5))
 n_indices <- c(3, 2, rep(2,4))
 
 # Catch cv
-Catch_CV_Val <- list(c(0.05, 0.05), 0.05, 0.05, 0.05, 0.05, 0.05)
+Catch_CV_Val <- list(c(0.01, 0.01), 0.01, 0.01, 0.01, 0.01, 0.01)
 units_indices <- list(c(1,1,2), c(1,2), c(1,2), c(1,2), c(1,2), c(1,2))
 units_index_paa <- list(c(2,2,2), c(2, 2,2), c(2,2), c(2,2), c(2,2), c(2,2))
 noFish_Idx <- c(FALSE, FALSE, TRUE, TRUE, TRUE, TRUE)
