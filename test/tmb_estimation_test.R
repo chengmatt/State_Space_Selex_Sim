@@ -73,7 +73,7 @@
   
   fish_cv <- 0.1
   srv_cv <- 0.1
-  catch_cv <- 0.01
+  catch_cv <- 0.05
   
   # TMB Section -------------------------------------------------------------
   
@@ -97,7 +97,7 @@
   )
   
   # Define parameter inits here
-  parameters <- list(ln_SigmaRec = 0.8, ln_MeanRec = 2.75,
+  parameters <- list(ln_SigmaRec = 0.6, ln_MeanRec = 2.75,
                      ln_M = log(0.1),  ln_a50_f = log(6), ln_k_f = log(0.8), 
                      ln_a50_s = log(4), ln_k_s = log(0.8),
                      ln_N1_Devs = log(rnorm(length(ages)-2,5, 1)),
@@ -132,7 +132,7 @@
   sd_rep <- TMB::sdreport(my_model)
   
   # Check model convergence
-  convergence_status <- check_model_convergence(mle_optim = mle_optim, 
+  convergence_status <- check_model_convergence(mle_optim = mle_optim, mod_rep = my_model,
                                                 sd_rep = sd_rep, min_grad = 0.01)
   conv[sim] <- convergence_status$Convergence
   max_par[sim] <- convergence_status$Max_Grad_Par
@@ -230,21 +230,21 @@ biom_sum <- biom_all %>%
   
 all <- rbind(rec_sum, ssb_sum, f_sum, biom_sum) 
 
-ggplot(all, aes(x = year, y = median)) +
+ggplot(all,aes(x = year, y = median)) +
   geom_ribbon(aes(ymin = lwr_80, ymax = upr_80), alpha = 0.6, fill = "grey4") +
   geom_ribbon(aes(ymin = lwr_95, ymax = upr_95), alpha = 0.4, fill = "grey4") +
   geom_line( color = "white", size = 1,alpha = 1) +
   geom_point(shape = 21, colour = "black", fill = "white", size = 3.8, stroke = 1, alpha = 1) +
   geom_hline(aes(yintercept = 0), col = "black", lty = 2, size = 1, alpha = 0.85) +
   facet_wrap(~type, scales = "free") +
-  theme_bw() 
+  theme_bw()
 
 # Parameter estimates
 par_all %>% 
-  # filter(!type %in% c("q_fish", "q_surv")) %>% 
-  ggplot(aes(x = mle_val, fill = type)) +
+  mutate(RE = (mle_val - t ) / t) %>% 
+  ggplot(aes(x = RE, fill = type)) +
   geom_density(alpha = 0.5) +
-  geom_vline(aes(xintercept = t), lty = 2, size = 1, col = "blue") +
+  geom_vline(aes(xintercept = 0), lty = 2, size = 1, col = "blue") +
   facet_wrap(~type, scales = "free") +
   ggthemes::scale_fill_colorblind() +
   theme_bw() +

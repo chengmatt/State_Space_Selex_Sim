@@ -46,6 +46,7 @@ add_newton <- function(n.newton, ad_model, mle_optim) {
 #' @param mle_optim MLE optimized object by nlminb or optim
 #' @param sd_rep sd report object from TMB 
 #' @param min_grad Minimum gradient we want to determine convergence
+#' @param mod_rep Model object with report stored in the list
 #'
 #' @return List of objects (dim 1 = Convergence status; dim 2 = maximum gradient of the model,
 #' dim 3 = parameter with the maximum gradient)
@@ -53,7 +54,7 @@ add_newton <- function(n.newton, ad_model, mle_optim) {
 #'
 #' @examples
 
-check_model_convergence <- function(mle_optim, sd_rep, min_grad = 0.001) {
+check_model_convergence <- function(mle_optim, sd_rep, mod_rep, min_grad = 0.001) {
   
   # Maximum gradient of the model
   max_grad_val <- max(abs(sd_rep$gradient.fixed))
@@ -63,7 +64,8 @@ check_model_convergence <- function(mle_optim, sd_rep, min_grad = 0.001) {
   
   if(mle_optim$convergence == 0 &
      sd_rep$pdHess == TRUE & 
-     max_grad_val < min_grad) convergence = "Converged"
+     max_grad_val < min_grad &
+     !is.nan(mod_rep$rep$jnLL)) convergence = "Converged"
   else convergence = "Not Converged"
   
   return(list(Convergence = convergence, 
