@@ -7,6 +7,7 @@
   library(here)
   library(tidyverse)
   library(TMB)
+  library(cowplot)
   
   source(here("R_scripts", "functions", "TMB_Utils.R"))
   
@@ -20,6 +21,9 @@
   biom_all <- data.frame()
   par_all <- data.frame()
   max_par <- vector()
+  fish_mu_age <- data.frame()
+  srv_mu_age <- data.frame()
+  conv <- vector()
   
   ages <- 1:30
   years <- Fish_Start_yr:(n_years - 1)
@@ -181,71 +185,185 @@
   t_biom <- extract_ADREP_vals(sd_rep = sd_rep, par = "Total_Biom") %>% 
     mutate(sim = sim, conv = conv[sim], year = 70:(n_years-1), t =biom_df$Biomass)
   biom_all <- rbind(t_biom, biom_all)
+  
+  # Check survey mean age
+  srv_mean_ages <- extract_mean_age_vals(mod_rep = my_model, comp_name = "pred_srv_age_comps", 
+                        bins = ages, comp_start_yr = Fish_Start_yr, sim = sim, 
+                        n_fish_true_fleets = NULL)
+  srv_mu_age <- rbind(srv_mu_age, srv_mean_ages)
+  
+  # Check fishery mean age
+  fish_mean_ages <- extract_mean_age_vals(mod_rep = my_model, comp_name = "pred_fish_age_comps", 
+                                         bins = ages, comp_start_yr = Fish_Start_yr, sim = sim, 
+                                         n_fish_true_fleets = 1)
+  fish_mu_age <- rbind(fish_mu_age, fish_mean_ages)
 
   print(paste("done w/  sim = ", sim))
   print(conv[sim])
+  
 }
   
+  
+# Summary Checks ----------------------------------------------------------
+
+  
+# ssb_all %>%
+#   filter(sim %in% c(1:15)) %>%
+#   ggplot() +
+#   geom_line(aes(x = year, y = mle_val))+
+#   geom_line(aes(x = year, y = t), col = "red") +
+#   geom_ribbon(aes(x = year, ymin = lwr_95, ymax = upr_95), alpha = 0.3) +
+#   facet_wrap(~sim)
+# 
+# fish_mu_age %>% 
+#   filter(sim == 1) %>% 
+#   ggplot() +
+#   geom_line(aes(x = year, y = pred_mean_age))+
+#   geom_line(aes(x = year, y = true_mean_ages), col = "red") 
+
 # Quick checks
 f_sum <- f_all %>% 
   filter(conv == "Converged") %>%
-  mutate(type = "F",
+  mutate(type = "Total Fishing Mortality",
          RE = (mle_val - t) /  t )%>% 
   group_by(year, type) %>% 
   summarize(median = median(RE), 
+            lwr_100 = quantile(RE, 0),
+            upr_100 = quantile(RE, 1),
             lwr_95 = quantile(RE, 0.025),
             upr_95 = quantile(RE, 0.975),
             lwr_80 = quantile(RE, 0.1),
-            upr_80 = quantile(RE, 0.9))
+            upr_80 = quantile(RE, 0.9),
+            lwr_75 = quantile(RE, 0.125),
+            upr_75 = quantile(RE, 0.875)) 
 
 ssb_sum <- ssb_all %>% 
   filter(conv == "Converged") %>%
-  mutate(type = "ssb", RE = (mle_val - t) /  t) %>% 
+  mutate(type = "Spawning Stock Biomass", RE = (mle_val - t) /  t) %>% 
   group_by(year, type) %>% 
-  summarize(median = median(RE), 
+  summarize(median = mean(RE), 
+            lwr_100 = quantile(RE, 0),
+            upr_100 = quantile(RE, 1),
             lwr_95 = quantile(RE, 0.025),
             upr_95 = quantile(RE, 0.975),
             lwr_80 = quantile(RE, 0.1),
-            upr_80 = quantile(RE, 0.9))
+            upr_80 = quantile(RE, 0.9),
+            lwr_75 = quantile(RE, 0.125),
+            upr_75 = quantile(RE, 0.875)) 
 
 rec_sum <- rec_all %>% 
   filter(conv == "Converged") %>%
-  mutate(type = "rec", RE = (mle_val - t) /  t) %>% 
+  mutate(type = "Total Recruitment", RE = (mle_val - t) /  t) %>% 
   group_by(year, type) %>% 
   summarize(median = median(RE), 
+            lwr_100 = quantile(RE, 0),
+            upr_100 = quantile(RE, 1),
             lwr_95 = quantile(RE, 0.025),
             upr_95 = quantile(RE, 0.975),
             lwr_80 = quantile(RE, 0.1),
-            upr_80 = quantile(RE, 0.9))  
+            upr_80 = quantile(RE, 0.9),
+            lwr_75 = quantile(RE, 0.125),
+            upr_75 = quantile(RE, 0.875)) 
 
 biom_sum <- biom_all %>% 
   filter(conv == "Converged") %>%
-  mutate(type = "biom", RE = (mle_val - t) /  t) %>% 
+  mutate(type = "Total Biomass", RE = (mle_val - t) /  t) %>% 
   group_by(year, type) %>% 
   summarize(median = median(RE), 
+            lwr_100 = quantile(RE, 0),
+            upr_100 = quantile(RE, 1),
             lwr_95 = quantile(RE, 0.025),
             upr_95 = quantile(RE, 0.975),
             lwr_80 = quantile(RE, 0.1),
-            upr_80 = quantile(RE, 0.9)) 
-  
-all <- rbind(rec_sum, ssb_sum, f_sum, biom_sum) 
+            upr_80 = quantile(RE, 0.9),
+            lwr_75 = quantile(RE, 0.125),
+            upr_75 = quantile(RE, 0.875)) 
 
-ggplot(all,aes(x = year, y = median)) +
-  geom_ribbon(aes(ymin = lwr_80, ymax = upr_80), alpha = 0.6, fill = "grey4") +
-  geom_ribbon(aes(ymin = lwr_95, ymax = upr_95), alpha = 0.4, fill = "grey4") +
-  geom_line( color = "white", size = 1,alpha = 1) +
-  geom_point(shape = 21, colour = "black", fill = "white", size = 3.8, stroke = 1, alpha = 1) +
-  geom_hline(aes(yintercept = 0), col = "black", lty = 2, size = 1, alpha = 0.85) +
-  facet_wrap(~type, scales = "free") +
-  theme_bw()
+fish_mu_age_sum <- fish_mu_age %>% 
+  filter(conv == "Converged") %>%
+  mutate(type = "Mean Predicted Fishery Age", RE = (pred_mean_age - true_mean_ages) /  true_mean_ages) %>% 
+  group_by(year, type) %>% 
+  summarize(median = median(RE), 
+            lwr_100 = quantile(RE, 0),
+            upr_100 = quantile(RE, 1),
+            lwr_95 = quantile(RE, 0.025),
+            upr_95 = quantile(RE, 0.975),
+            lwr_80 = quantile(RE, 0.1),
+            upr_80 = quantile(RE, 0.9),
+            lwr_75 = quantile(RE, 0.125),
+            upr_75 = quantile(RE, 0.875)) 
+
+srv_mu_age_sum <- srv_mu_age %>% 
+  filter(conv == "Converged") %>%
+  mutate(type = "Mean Predicted Survey Age", RE = (pred_mean_age - true_mean_ages) /  true_mean_ages) %>% 
+  group_by(year, type) %>% 
+  summarize(median = median(RE), 
+            lwr_100 = quantile(RE, 0),
+            upr_100 = quantile(RE, 1),
+            lwr_95 = quantile(RE, 0.025),
+            upr_95 = quantile(RE, 0.975),
+            lwr_80 = quantile(RE, 0.1),
+            upr_80 = quantile(RE, 0.9),
+            lwr_75 = quantile(RE, 0.125),
+            upr_75 = quantile(RE, 0.875)) 
 
 # Parameter estimates
-par_all %>% 
+par_df <- par_all %>% 
   mutate(RE = (mle_val - t ) / t) %>% 
-  ggplot(aes(x = RE, fill = type)) +
-  geom_density(alpha = 0.5) +
-  geom_vline(aes(xintercept = 0), lty = 2, size = 1, col = "blue") +
+  group_by(type) %>% 
+  mutate(median_RE = median(RE))
+
+# Quick summary stats
+par_sum <- par_df %>% 
+  group_by(type) %>% 
+  summarize(median = median(RE), 
+            lwr_100 = quantile(RE, 0),
+            upr_100 = quantile(RE, 1),
+            lwr_95 = quantile(RE, 0.025),
+            upr_95 = quantile(RE, 0.975),
+            lwr_80 = quantile(RE, 0.1),
+            upr_80 = quantile(RE, 0.9),
+            lwr_75 = quantile(RE, 0.125),
+            upr_75 = quantile(RE, 0.875)) 
+  
+all <- rbind(rec_sum, ssb_sum, f_sum, biom_sum, srv_mu_age_sum, fish_mu_age_sum) 
+
+est_plot <- ggplot(all, aes(x = year, y = median)) +
+  # geom_ribbon(aes(ymin = lwr_75, ymax = upr_75), alpha = 0.7, fill = "grey") +
+  geom_ribbon(aes(ymin = lwr_80, ymax = upr_80), alpha = 0.5, fill = "grey4") +
+  geom_ribbon(aes(ymin = lwr_95, ymax = upr_95), alpha = 0.3, fill = "grey2") +
+  # geom_ribbon(aes(ymin = lwr_100, ymax = upr_100), alpha = 0.4, fill = "grey") +
+  geom_point(shape = 21, colour = "black", fill = "white", size = 5, stroke = 0.8, alpha = 0.85) +
+  # geom_line( color = "white", size = 1,alpha = 1) +
+  geom_hline(aes(yintercept = 0), col = "black", lty = 2, size = 1, alpha = 1) +
   facet_wrap(~type, scales = "free") +
-  ggthemes::scale_fill_colorblind() +
+  coord_cartesian(ylim = c(-0.5, 0.5)) +
+  labs(x = "Year", y = "Relative Error") +
   theme_bw() +
-  theme(legend.position = "none")
+  theme(strip.text = element_text(size = 15),
+        axis.title = element_text(size = 15),
+        axis.text = element_text(size = 13, color = "black"))
+
+par_plot <- ggplot(par_df, aes(x = RE, fill = type)) +
+geom_density(alpha = 0.2) +
+facet_wrap(~type, scales = "free", nrow = 2) +
+geom_errorbarh(inherit.aes = FALSE, data = par_sum, 
+               aes(xmin = lwr_95, xmax = upr_95, y = 0, color = type),
+               height = 0, size = 2.5, alpha = 0.55, linetype = 1) +
+geom_errorbarh(inherit.aes = FALSE, data = par_sum, 
+                 aes(xmin = lwr_75, xmax = upr_75, y = 0, color = type),
+                 height = 0, size = 2.5, alpha = 1, linetype = 1) +
+geom_point(inherit.aes = FALSE, data = par_sum, 
+           aes(x= median, y = 0, color = type), size = 5, alpha = 0.95) +
+  geom_vline(aes(xintercept = 0), linetype = 2,
+             size = 0.85, col = "black", alpha = 1) +
+ggsci::scale_color_jco() +
+ggsci::scale_fill_jco() +
+  labs(x = "Relative Error", y = "Probability Density", linetype = "", color = "") +
+theme_bw() + 
+theme(strip.text = element_text(size = 13),
+      axis.title = element_text(size = 13),
+      axis.text = element_text(size = 12, color = "black"),
+      legend.position = "none", legend.text = element_text(size = 15))
+
+plot_grid()

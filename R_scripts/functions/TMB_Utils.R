@@ -132,3 +132,128 @@ extract_parameter_vals <- function(sd_rep, par, log) {
   return(mle_df)
 }
 
+
+#' Title Extract true and predicted mean age values for a given fleet and composition type
+#'
+#' @param mod_rep Model object created by ADFUN
+#' @param comp_name Composition name within the model_rep$rep object
+#' @param bins Number of age or length bins
+#' @param comp_start_yr When composition data collection begins 
+#' @param sim Simulation number
+#' @param n_fish_true_fleets Number of true fishery fleets within the OM - default = NULL for survey comps
+#'
+#' @return
+#' @export
+#'
+#' @examples
+#' 
+extract_mean_age_vals <- function(mod_rep, comp_name, bins, comp_start_yr,
+                                  sim, n_fish_true_fleets = NULL) {
+  
+  # Extract predicted age comps
+  pred_age_comps <- mod_rep$rep[names(mod_rep$rep) == comp_name]
+  
+  # Munge to get mean age for a given year
+  molten_pred_age <- reshape2::melt(pred_age_comps)
+  colnames(molten_pred_age) <- c("year", "age", "fleet", "sex", "value", "type")
+  
+  # Summarize to get mean age by year, fleet, and sex
+  pred_mean_ages <- molten_pred_age %>% 
+    dplyr::mutate(sim = sim) %>% 
+    dplyr::group_by(year, fleet, sex, sim) %>% 
+    dplyr::summarize(pred_mean_age = sum(value * bins))
+
+  # Create global objects for use in loops
+  n_years <- length(Fish_Start_yr:(Fish_Start_yr + max(pred_mean_ages$year) - 1))
+    
+  # Get number of modelled fleets
+  n_mod_fleets <- length(unique(pred_mean_ages$fleet))
+  
+  # Get number of sexes
+  n_sexes <- length(unique(pred_mean_ages$sex))
+  
+  # Create a matrix to store values in
+  true_ages <- array(NA, dim = c(n_years, n_mod_fleets, n_sexes))
+  
+  # Get true mean ages if sampling without error
+  # If the composition type = survey comps
+  if(comp_name == "pred_srv_age_comps") { 
+    
+    for(i in 1:n_years) {
+      for(f in 1:n_mod_fleets) {
+        for(s in 1:n_sexes) {
+          # Get true age proportions
+          prop_ages <- N_at_age[(Fish_Start_yr - 1 + i),,,sim] * 
+            Surv_selex_at_age[(Fish_Start_yr - 1 + i),,f,s,sim]
+          # Get true mean age
+          true_ages[i, f, s] <- sum((prop_ages / sum(prop_ages)) * 1:30)
+        } # s loop
+      } # f loop
+    } # i loop
+    
+  } else{   # If the composition type = fishery comps
+    
+    if(is.null(n_fish_true_fleets)) stop("Please specify the true number of fishery fleets")
+    
+    # Single Fleet OM and EM
+    if(n_mod_fleets == 1 & n_fish_true_fleets == 1) { 
+      for(i in 1:n_years) {
+        for(s in 1:n_sexes) {
+          # Get true age proportions - sum across fleets
+          prop_ages <- Catch_at_age[(Fish_Start_yr - 1 + i),,1,s,sim] / wt_at_age[(Fish_Start_yr - 1 + i),,s,sim]
+          # Get true mean age
+          true_ages[i, 1, s] <- sum((prop_ages / sum(prop_ages)) * 1:30)
+        } # s loop
+      } # i loop
+    } # end if this is a single fleet
+    
+    # Single Fleet in EM, but multi fleet in OM
+    if(n_mod_fleets == 1 & n_fish_true_fleets > 1) { 
+      for(i in 1:n_years) {
+        for(s in 1:n_sexes) {
+          # Get true age proportions - sum across fleets
+          prop_ages <- rowSums(Catch_at_age[(Fish_Start_yr - 1 + i),,,s,sim] / wt_at_age[(Fish_Start_yr - 1 + i),,s,sim])
+          # Get true mean age
+          true_ages[i, 1, s] <- sum((prop_ages / sum(prop_ages)) * 1:30)
+        } # s loop
+      } # i loop
+    } # end if this is modeled as a single fleet when there are > 1 fleet
+    
+    
+    # Multi fleet in OM and EM
+    if(n_mod_fleets > 1 & n_fish_true_fleets > 1) {
+      
+      if(n_mod_fleets != n_fish_true_fleets) {
+        stop("Number of modelled fleets != number of true fleets specified")
+      } # warning stop
+      
+      # if there are separate fleets in the true OM and the EM
+      for(i in 1:n_years) {
+        for(f in 1:n_fish_true_fleets) {
+          for(s in 1:n_sexes) {
+            # Get true age proportions - sum across fleets
+            prop_ages <- Catch_at_age[(Fish_Start_yr - 1 + i),,f,s,sim] / wt_at_age[(Fish_Start_yr - 1 + i),,s,sim]
+            # Get true mean age
+            true_ages[i, f, s] <- sum((prop_ages / sum(prop_ages)) * 1:30)
+          } # s loop
+        } # f loop 
+      } # i loop
+      
+    } # if statement
+    
+} # else statement
+  
+  # Rename and bind to the predicted dataframe
+  molten_true_ages <- reshape2::melt(true_ages)
+  colnames(molten_true_ages) <- c("year", "fleet", "sex", 'true_mean_ages')
+  
+  # Left join to complete dataframe
+  mean_ages_df <- pred_mean_ages %>% 
+    dplyr::left_join(molten_true_ages, by  = c("year", "fleet", "sex"))
+  
+  return(mean_ages_df)
+  
+} # end function
+
+
+

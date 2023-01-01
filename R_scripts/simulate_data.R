@@ -57,7 +57,7 @@ fish_surv_data_scenarios(Fish_Start_yr = c(70),
                        srv_CV = c(0.1), 
                        Neff_Fish_Time = "F_Vary", 
                        fish_mort = fish_mort,
-                       fixed_Neff = 50)
+                       fixed_Neff = 30)
 
 # Specify Natural Mortality
 specify_nat_mort(Mort_Time = "Constant", 

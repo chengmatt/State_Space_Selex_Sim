@@ -396,7 +396,7 @@ Type objective_function<Type>::operator() ()
     for(int fc = 0; fc < n_fish_comps; fc++) {
       for(int s = 0; s < n_sexes; s++) { 
         // Pull out observed age vector and multiply by the effective sample size
-        obs_fish_age_vec = (obs_fish_age_comps.col(s).col(fc).transpose().col(y) + c) * obs_fish_age_Neff(y, fc);
+        obs_fish_age_vec = obs_fish_age_comps.col(s).col(fc).transpose().col(y) * obs_fish_age_Neff(y, fc);
         // Pull out predicted age vector
         pred_fish_age_vec = (pred_fish_age_comps.col(s).col(fc).transpose().col(y) + c);
         // Evaluate log-likelihood
@@ -412,7 +412,7 @@ Type objective_function<Type>::operator() ()
     for(int sc = 0; sc < n_srv_comps; sc++) {
       for(int s = 0; s < n_sexes; s++) {
         // Pull out observed age vector and multiply by the effective sample size
-        obs_srv_age_vec = (obs_srv_age_comps.col(s).col(sc).transpose().col(y) + c ) * obs_srv_age_Neff(y, sc);
+        obs_srv_age_vec = obs_srv_age_comps.col(s).col(sc).transpose().col(y) * obs_srv_age_Neff(y, sc);
         // Pull out predicted age vector
         pred_srv_age_vec = (pred_srv_age_comps.col(s).col(sc).transpose().col(y) + c);
         // Evaluate log-likelihood
