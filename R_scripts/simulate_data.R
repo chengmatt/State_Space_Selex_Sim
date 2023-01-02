@@ -26,7 +26,7 @@ source(here("R_scripts", "functions", "specify_rec_devs.R")) # Specify recruitme
 source(here("R_scripts", "functions", "specify_sex.R")) # Specify recruitment deviates here
 source(here("R_scripts", "functions", "sample_index.R")) # Generate index data
 source(here("R_scripts", "functions", "sample_comps.R")) # Generate comps data
-source(here("R_scripts", "functions", "make_input.R")) # Put stuff into WHAM format
+source(here("R_scripts", "functions", "make_wham_input.R")) # Put stuff into WHAM format
 source(here("R_scripts", "functions", "get_results.R")) # Get WHAM data from model
 
 # Path to general input biological parameters
@@ -72,9 +72,9 @@ specify_rec_devs(Rec_Dev_Type = "iid",
                rho_rec = NA) 
 
 # Specify selectivity parameterizations here
-specify_selex(fish_selex = c("logistic"), srv_selex = c("logistic"), 
+specify_selex(fish_selex = c("gamma"), srv_selex = c("logistic"), 
 # Fishery parameters
-fish_pars = list(Fleet_1_L = matrix(data = c(6,0.8), nrow = n_sex, byrow = TRUE)),
+fish_pars = list(Fleet_1_L = matrix(data = c(6,3), nrow = n_sex, byrow = TRUE)),
 # Survey parameters
 srv_pars = list(Fleet_3_SL = matrix(data = c(4,0.8), nrow = n_sex, byrow = TRUE)), 
 bins = ages)
@@ -352,7 +352,7 @@ for(i in 1:length(selectivity)) {
     
     # set.seed(123)
     # Force our inputs into a list - so that it reads into wham
-    basic <- make_input(n_fleets = n_fleets[i], 
+    basic <- make_wham_input(n_fleets = n_fleets[i], 
                         n_indices = n_indices[i], 
                         Catch_CV_Val = Catch_CV_Val[[i]], 
                         catch_error = FALSE,

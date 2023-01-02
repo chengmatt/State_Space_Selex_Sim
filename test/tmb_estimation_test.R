@@ -1,7 +1,4 @@
-  
-  # mean recruitment is positviely biased..
-  # M may be causing pos bias in mean rec
-  # rec devs are also causing positive bias in ssb
+
   # Set up ------------------------------------------------------------------
   
   library(here)
@@ -9,7 +6,7 @@
   library(TMB)
   library(cowplot)
   
-  source(here("R_scripts", "functions", "TMB_Utils.R"))
+  source(here("R_scripts", "functions", "Utility_fxns.R"))
   
   compile_tmb(wd = here("src"), cpp = "EM.cpp")
   
@@ -43,6 +40,7 @@
            Sim = parse_number(as.character(Sim))) %>%  # Parse number for year and simulation
     filter(Year >= Fish_Start_yr[1],
            Sim == sim)
+  
   obs_catches <- matrix(with(obs_catches, tapply(Catch, list(Year), FUN = sum)))
 
   # Observed fishery age comps
@@ -79,6 +77,9 @@
   srv_cv <- 0.1
   catch_cv <- 0.05
   
+  F_Slx_Blocks <- matrix(c(0), nrow = length(years), ncol = n_fleets)
+  S_Slx_Blocks <- matrix(c(0), nrow = length(years), ncol = n_srv_fleets)
+  
   # TMB Section -------------------------------------------------------------
   
   
@@ -92,18 +93,20 @@
                 obs_srv_age_comps = array(obs_srv_age_comps, dim = c(31, 30, 1, 1)),
                 obs_srv_age_Neff = obs_srv_age_Neff, obs_fish_indices =  obs_fish_indices,
                 obs_srv_indices = obs_srv_indices, WAA = array(WAA, dim = c(32, 30, 1)), 
-                MatAA = array(MatAA, dim = c(32, 30, 1)),
+                MatAA = array(MatAA, dim = c(32, 30, 1)), F_Slx_Blocks = F_Slx_Blocks,
+                S_Slx_Blocks = S_Slx_Blocks,
                 Sex_Ratio = as.vector(c(1)),  rec_model = 0, 
                 fish_cv = fish_cv, srv_cv = srv_cv, catch_cv = catch_cv,
                 Init_N = as.vector(N_at_age[(Fish_Start_yr),,,sim]),
-                F_Slx_model = array(0, dim=c(1, 31, 1)), n_fish_comps = 1, n_srv_comps = 1,
-                S_Slx_model = array(0, dim=c(1, 31, 1))
+                F_Slx_model = as.vector(1), n_fish_comps = 1, n_srv_comps = 1,
+                S_Slx_model = as.vector(0)
   )
   
   # Define parameter inits here
   parameters <- list(ln_SigmaRec = 0.6, ln_MeanRec = 2.75,
-                     ln_M = log(0.1),  ln_a50_f = log(6), ln_k_f = log(0.8), 
-                     ln_a50_s = log(4), ln_k_s = log(0.8),
+                     ln_M = log(0.1),  
+                     ln_fish_selpars = log(array(c(3,6), dim = c(1, 1, 1, 2))),
+                     ln_srv_selpars = array(5, dim = c(1, 1, 1, 2)),
                      ln_N1_Devs = log(rnorm(length(ages)-2,5, 1)),
                      ln_Fy = log(as.matrix(fish_mort[Fish_Start_yr:((n_years) -1),,sim])),
                      ln_q_fish = as.matrix(rep(log(0.08), n_fish_fleets)), 
@@ -112,11 +115,10 @@
   
   
   map <- list(ln_SigmaRec = factor(NA))
+              # ln_fish_selpars = factor(rep(NA, 2)))
               # ln_M = factor(NA),
               # ln_MeanF = factor(NA)
               # ln_MeanRec = factor(NA),
-              # ln_a50_s = factor(NA), ln_k_s = factor(NA),
-              # ln_a50_f = factor(NA), ln_k_f = factor(NA),
               # ln_q_fish = factor(NA),
               # ln_q_srv = factor(NA),
               # ln_Fy = factor(rep(NA, 31)))
@@ -126,7 +128,7 @@
   
   # Make ADFun
   my_model <- MakeADFun(data, parameters, map, DLL="EM", silent = T)
-  mle_optim <- stats::nlminb(my_model$par, my_model$fn, my_model$gr, upper = 15, lower = -15,
+  mle_optim <- stats::nlminb(my_model$par, my_model$fn, my_model$gr,
                              control = list(iter.max = 1e5, eval.max = 1e5))
   
   # Additional newton steps to take
@@ -183,19 +185,19 @@
   
   # Check total biomass
   t_biom <- extract_ADREP_vals(sd_rep = sd_rep, par = "Total_Biom") %>% 
-    mutate(sim = sim, conv = conv[sim], year = 70:(n_years-1), t =biom_df$Biomass)
+    mutate(sim = sim, conv = conv[sim], year = 70:(n_years-1), t = biom_df$Biomass)
   biom_all <- rbind(t_biom, biom_all)
   
   # Check survey mean age
   srv_mean_ages <- extract_mean_age_vals(mod_rep = my_model, comp_name = "pred_srv_age_comps", 
                         bins = ages, comp_start_yr = Fish_Start_yr, sim = sim, 
-                        n_fish_true_fleets = NULL)
+                        n_fish_true_fleets = NULL) %>% mutate(conv = conv[sim])
   srv_mu_age <- rbind(srv_mu_age, srv_mean_ages)
   
   # Check fishery mean age
   fish_mean_ages <- extract_mean_age_vals(mod_rep = my_model, comp_name = "pred_fish_age_comps", 
                                          bins = ages, comp_start_yr = Fish_Start_yr, sim = sim, 
-                                         n_fish_true_fleets = 1)
+                                         n_fish_true_fleets = 1) %>% mutate(conv = conv[sim])
   fish_mu_age <- rbind(fish_mu_age, fish_mean_ages)
 
   print(paste("done w/  sim = ", sim))
@@ -206,129 +208,42 @@
   
 # Summary Checks ----------------------------------------------------------
 
+# Get percentiles
+f_sum <- get_RE_precentiles(df = f_all %>% filter(conv == "Converged"), 
+                     est_val_col = 1, true_val_col = 5, 
+                     par_name = "Total Fishing Mortality", year)
   
-# ssb_all %>%
-#   filter(sim %in% c(1:15)) %>%
-#   ggplot() +
-#   geom_line(aes(x = year, y = mle_val))+
-#   geom_line(aes(x = year, y = t), col = "red") +
-#   geom_ribbon(aes(x = year, ymin = lwr_95, ymax = upr_95), alpha = 0.3) +
-#   facet_wrap(~sim)
-# 
-# fish_mu_age %>% 
-#   filter(sim == 1) %>% 
-#   ggplot() +
-#   geom_line(aes(x = year, y = pred_mean_age))+
-#   geom_line(aes(x = year, y = true_mean_ages), col = "red") 
+ssb_sum <- get_RE_precentiles(df = ssb_all %>% filter(conv == "Converged"), 
+                              est_val_col = 1, true_val_col = 5, 
+                              par_name = "Spawning Stock Biomass", year)
 
-# Quick checks
-f_sum <- f_all %>% 
-  filter(conv == "Converged") %>%
-  mutate(type = "Total Fishing Mortality",
-         RE = (mle_val - t) /  t )%>% 
-  group_by(year, type) %>% 
-  summarize(median = median(RE), 
-            lwr_100 = quantile(RE, 0),
-            upr_100 = quantile(RE, 1),
-            lwr_95 = quantile(RE, 0.025),
-            upr_95 = quantile(RE, 0.975),
-            lwr_80 = quantile(RE, 0.1),
-            upr_80 = quantile(RE, 0.9),
-            lwr_75 = quantile(RE, 0.125),
-            upr_75 = quantile(RE, 0.875)) 
+rec_sum <- get_RE_precentiles(df = rec_all %>% filter(conv == "Converged"), 
+                              est_val_col = 1, true_val_col = 5, 
+                              par_name = "Total Recruitment", year)
 
-ssb_sum <- ssb_all %>% 
-  filter(conv == "Converged") %>%
-  mutate(type = "Spawning Stock Biomass", RE = (mle_val - t) /  t) %>% 
-  group_by(year, type) %>% 
-  summarize(median = mean(RE), 
-            lwr_100 = quantile(RE, 0),
-            upr_100 = quantile(RE, 1),
-            lwr_95 = quantile(RE, 0.025),
-            upr_95 = quantile(RE, 0.975),
-            lwr_80 = quantile(RE, 0.1),
-            upr_80 = quantile(RE, 0.9),
-            lwr_75 = quantile(RE, 0.125),
-            upr_75 = quantile(RE, 0.875)) 
+biom_sum <- get_RE_precentiles(df = biom_all %>% filter(conv == "Converged"), 
+                               est_val_col = 1, true_val_col = 8, 
+                               par_name = "Total Biomass", year)
 
-rec_sum <- rec_all %>% 
-  filter(conv == "Converged") %>%
-  mutate(type = "Total Recruitment", RE = (mle_val - t) /  t) %>% 
-  group_by(year, type) %>% 
-  summarize(median = median(RE), 
-            lwr_100 = quantile(RE, 0),
-            upr_100 = quantile(RE, 1),
-            lwr_95 = quantile(RE, 0.025),
-            upr_95 = quantile(RE, 0.975),
-            lwr_80 = quantile(RE, 0.1),
-            upr_80 = quantile(RE, 0.9),
-            lwr_75 = quantile(RE, 0.125),
-            upr_75 = quantile(RE, 0.875)) 
+fish_mu_age_sum <- get_RE_precentiles(df = fish_mu_age %>% filter(conv == "Converged"), 
+                                      est_val_col = 5, true_val_col = 6, 
+                                      par_name = "Mean Predicted Fishery Age", year)
 
-biom_sum <- biom_all %>% 
-  filter(conv == "Converged") %>%
-  mutate(type = "Total Biomass", RE = (mle_val - t) /  t) %>% 
-  group_by(year, type) %>% 
-  summarize(median = median(RE), 
-            lwr_100 = quantile(RE, 0),
-            upr_100 = quantile(RE, 1),
-            lwr_95 = quantile(RE, 0.025),
-            upr_95 = quantile(RE, 0.975),
-            lwr_80 = quantile(RE, 0.1),
-            upr_80 = quantile(RE, 0.9),
-            lwr_75 = quantile(RE, 0.125),
-            upr_75 = quantile(RE, 0.875)) 
+srv_mu_age_sum <- get_RE_precentiles(df = srv_mu_age %>% filter(conv == "Converged"), 
+                                     est_val_col = 5, true_val_col = 6, 
+                                     par_name = "Mean Predicted Survey Age", year)
 
-fish_mu_age_sum <- fish_mu_age %>% 
-  filter(conv == "Converged") %>%
-  mutate(type = "Mean Predicted Fishery Age", RE = (pred_mean_age - true_mean_ages) /  true_mean_ages) %>% 
-  group_by(year, type) %>% 
-  summarize(median = median(RE), 
-            lwr_100 = quantile(RE, 0),
-            upr_100 = quantile(RE, 1),
-            lwr_95 = quantile(RE, 0.025),
-            upr_95 = quantile(RE, 0.975),
-            lwr_80 = quantile(RE, 0.1),
-            upr_80 = quantile(RE, 0.9),
-            lwr_75 = quantile(RE, 0.125),
-            upr_75 = quantile(RE, 0.875)) 
-
-srv_mu_age_sum <- srv_mu_age %>% 
-  filter(conv == "Converged") %>%
-  mutate(type = "Mean Predicted Survey Age", RE = (pred_mean_age - true_mean_ages) /  true_mean_ages) %>% 
-  group_by(year, type) %>% 
-  summarize(median = median(RE), 
-            lwr_100 = quantile(RE, 0),
-            upr_100 = quantile(RE, 1),
-            lwr_95 = quantile(RE, 0.025),
-            upr_95 = quantile(RE, 0.975),
-            lwr_80 = quantile(RE, 0.1),
-            upr_80 = quantile(RE, 0.9),
-            lwr_75 = quantile(RE, 0.125),
-            upr_75 = quantile(RE, 0.875)) 
-
-# Parameter estimates
-par_df <- par_all %>% 
-  mutate(RE = (mle_val - t ) / t) %>% 
-  group_by(type) %>% 
-  mutate(median_RE = median(RE))
-
-# Quick summary stats
-par_sum <- par_df %>% 
-  group_by(type) %>% 
-  summarize(median = median(RE), 
-            lwr_100 = quantile(RE, 0),
-            upr_100 = quantile(RE, 1),
-            lwr_95 = quantile(RE, 0.025),
-            upr_95 = quantile(RE, 0.975),
-            lwr_80 = quantile(RE, 0.1),
-            upr_80 = quantile(RE, 0.9),
-            lwr_75 = quantile(RE, 0.125),
-            upr_75 = quantile(RE, 0.875)) 
-  
 all <- rbind(rec_sum, ssb_sum, f_sum, biom_sum, srv_mu_age_sum, fish_mu_age_sum) 
 
-est_plot <- ggplot(all, aes(x = year, y = median)) +
+# Parameter estimates
+par_df <- par_all %>% mutate(RE = (mle_val - t ) / t) 
+
+# Quick summary stats
+par_sum <- get_RE_precentiles(df = par_all %>% filter(conv == "Converged"), 
+                              est_val_col = 2, true_val_col = 7, 
+                              par_name = NULL, type)
+  
+(est_plot <- ggplot(all, aes(x = year, y = median)) +
   # geom_ribbon(aes(ymin = lwr_75, ymax = upr_75), alpha = 0.7, fill = "grey") +
   geom_ribbon(aes(ymin = lwr_80, ymax = upr_80), alpha = 0.5, fill = "grey4") +
   geom_ribbon(aes(ymin = lwr_95, ymax = upr_95), alpha = 0.3, fill = "grey2") +
@@ -336,15 +251,15 @@ est_plot <- ggplot(all, aes(x = year, y = median)) +
   geom_point(shape = 21, colour = "black", fill = "white", size = 5, stroke = 0.8, alpha = 0.85) +
   # geom_line( color = "white", size = 1,alpha = 1) +
   geom_hline(aes(yintercept = 0), col = "black", lty = 2, size = 1, alpha = 1) +
-  facet_wrap(~type, scales = "free") +
-  coord_cartesian(ylim = c(-0.5, 0.5)) +
+  facet_wrap(~par_name, scales = "free") +
+  # coord_cartesian(ylim = c(-0.5, 0.5)) +
   labs(x = "Year", y = "Relative Error") +
   theme_bw() +
   theme(strip.text = element_text(size = 15),
         axis.title = element_text(size = 15),
-        axis.text = element_text(size = 13, color = "black"))
+        axis.text = element_text(size = 13, color = "black")))
 
-par_plot <- ggplot(par_df, aes(x = RE, fill = type)) +
+(par_plot <- ggplot(par_df, aes(x = RE, fill = type)) +
 geom_density(alpha = 0.2) +
 facet_wrap(~type, scales = "free", nrow = 2) +
 geom_errorbarh(inherit.aes = FALSE, data = par_sum, 
@@ -362,8 +277,10 @@ ggsci::scale_fill_jco() +
   labs(x = "Relative Error", y = "Probability Density", linetype = "", color = "") +
 theme_bw() + 
 theme(strip.text = element_text(size = 13),
-      axis.title = element_text(size = 13),
-      axis.text = element_text(size = 12, color = "black"),
-      legend.position = "none", legend.text = element_text(size = 15))
+      axis.title = element_text(size = 15),
+      axis.text = element_text(size = 13, color = "black"),
+      legend.position = "none", legend.text = element_text(size = 15)))
 
-plot_grid()
+plot_grid(par_plot, est_plot, ncol = 1, align = "hv", axis = "bl",
+          rel_heights = c(1, 0.85))
+

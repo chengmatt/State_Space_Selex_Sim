@@ -7,6 +7,8 @@
 // Set Selectivities
 
 #include<TMB.hpp>
+#include "Get_Selex.hpp"
+
 template<class Type>
 
 Type objective_function<Type>::operator() ()
@@ -46,23 +48,29 @@ Type objective_function<Type>::operator() ()
   
   // Controls on assessment ----------------------------------------------
   DATA_INTEGER(rec_model); // Recruitment model, == 0 Mean Recruitment, == 1 Beverton Holt 
-  DATA_ARRAY(F_Slx_model); // Fishery Selectivity Model, == 0 Logistic n_fleets * n_years * n_sexes
-  DATA_ARRAY(S_Slx_model); // Survey Selectivity Model, == 0 Logistic n_fleets * n_years * n_sexes
-
+  DATA_IVECTOR(F_Slx_model); // Fishery Selectivity Model, == 0 Logistic n_fleets
+  DATA_IMATRIX(F_Slx_Blocks); // Fishery Selectivity Time Blocks, n_years * n_fish_fleets; 
+  // this is set up such that the selectivity within a fleet and across sexes is constant 
+  DATA_IVECTOR(S_Slx_model); // Survey Selectivity Model, == 0 Logistic n_fleets 
+  DATA_IMATRIX(S_Slx_Blocks); // Survey Selectivity Time Blocks, n_years * n_srv_fleets; 
+  
   // PARAMETER SECTION ----------------------------------------------
-  PARAMETER_VECTOR(ln_N1_Devs); // log deviations for initial abundance
+ 
+  // Biological parameters
+  PARAMETER(ln_M); // log natural mortality
   PARAMETER(ln_MeanRec); // log mean recruitment 
   PARAMETER(ln_SigmaRec); // log sigma for recruitment
+  PARAMETER_VECTOR(ln_N1_Devs); // log deviations for initial abundance
   PARAMETER_VECTOR(ln_RecDevs); // log recruitment deviations
-  PARAMETER(ln_M); // log natural mortality
-  // PARAMETER_VECTOR(ln_MeanF);
-  PARAMETER_MATRIX(ln_Fy); // Annual Fishing Mortality ; n_years * n_fleets
+  
+  // Indices of abundance
   PARAMETER_VECTOR(ln_q_fish); // log catchability for fishery; n_fish_indices 
   PARAMETER_VECTOR(ln_q_srv); // log catchability for survey; n_srv_indices 
-  PARAMETER(ln_a50_f); // a50 logistic fishery
-  PARAMETER(ln_k_f); // k logistic fishery
-  PARAMETER(ln_a50_s); // a50 logistic survey
-  PARAMETER(ln_k_s); // k logistic survey
+  
+  // Fishery and selectivity parameters
+  PARAMETER_MATRIX(ln_Fy); // Annual Fishing Mortality ; n_years * n_fleets
+  PARAMETER_ARRAY(ln_fish_selpars); // Fishery Selectivity Parameters, n_comps * n_sexes * n_blocks * n_pars
+  PARAMETER_ARRAY(ln_srv_selpars); // Survey Selectivity Parameters, n_comps * n_sexes * n_blocks * n_pars
   
   // Parameter Transformations ----------------------------------------------
   Type M = exp(ln_M); // Natural Mortality
@@ -90,10 +98,10 @@ Type objective_function<Type>::operator() ()
   vector<Type> SSB(n_years); // Spawning stock biomass; n_years + 1 (forward projection)
 
   // Selectivities
-  array<Type> F_Slx(n_years, n_ages, n_fleets, n_sexes); // Fishery Selectivities
-  array<Type> Total_Fishery_Numbers(n_years, n_fleets, n_sexes); // Store Total Fishery Numbers for Proportions
-  array<Type> S_Slx(n_years, n_ages, n_srv_indices, n_sexes); // Survey Selectivities
-  array<Type> Total_Survey_Numbers(n_years, n_fleets, n_sexes); // Store Total Survey Numbers for Proportions
+  array<Type> F_Slx(n_years, n_ages, n_fish_comps, n_sexes); // Fishery Selectivities
+  array<Type> Total_Fishery_Numbers(n_years, n_fish_comps, n_sexes); // Store Total Fishery Numbers for Proportions
+  array<Type> S_Slx(n_years, n_ages, n_srv_comps, n_sexes); // Survey Selectivities
+  array<Type> Total_Survey_Numbers(n_years, n_srv_comps, n_sexes); // Store Total Survey Numbers for Proportions
 
   // Define objects to store negative log-likelihoods
   vector<Type> catch_nLL(n_fleets); 
@@ -115,34 +123,42 @@ Type objective_function<Type>::operator() ()
   // Selectivity ----------------------------------------------
   
   // Fishery
-  for(int f = 0; f < n_fleets; f++) {
-    for(int s = 0; s < n_sexes; s++) {
-      for(int y = 0; y < n_years; y++) {
+  for(int y = 0; y < n_years; y++) {
+    for(int f = 0; f < n_fish_comps; f++) {
+
+      // Index fishery blocks here
+      int b = F_Slx_Blocks(y, f);
+
+      for(int s = 0; s < n_sexes; s++) {
         for(int a = 0; a < n_ages; a++) {
           
-          if(F_Slx_model(f, y, s) == 0) { // time invariant logistic
-            F_Slx(y, a, f, s) = Type(1.0) / (Type(1.0) + exp(-(ages(a) - exp(ln_a50_f) ) /exp(ln_k_f) ));
-          } // time invariant logistic
+          // a + 1 because TMB indexes starting at 0
+          F_Slx(y,a,f,s) = Get_Selex(a + 1, F_Slx_model(f), 
+                ln_fish_selpars.transpose().col(f).col(s).col(b).vec()); 
           
         } // a loop
-      } // y loop
-    } // s loop
-  } // f loop
+      } // s loop
+    } // f loop
+  } // y loop
   
-  // Survey
-  for(int si = 0; si < n_srv_indices; si++) {
-    for(int s = 0; s < n_sexes; s++) {
-      for(int y = 0; y < n_years; y++) {
+  for(int y = 0; y < n_years; y++) {
+    for(int f = 0; f < n_srv_comps; f++) {
+      
+      // Index fishery blocks here
+      int b = S_Slx_Blocks(y, f);
+      
+      for(int s = 0; s < n_sexes; s++) {
         for(int a = 0; a < n_ages; a++) {
           
-          if(S_Slx_model(si, y, s) == 0) { // time invariant logistic
-            S_Slx(y, a, si, s) = Type(1.0) / (Type(1.0) + exp(-(ages(a) - exp(ln_a50_s) ) / exp(ln_k_s) ));
-          } // time invariant logistic
+          // a + 1 because TMB indexes starting at 0
+          S_Slx(y,a,f,s) = Get_Selex(a + 1, S_Slx_model(f), 
+                ln_srv_selpars.transpose().col(f).col(s).col(b).vec()); 
+          // transposing selectivity array to coerce to vector
           
-        } // a loop
-      } // y loop
-    } // s loop
-  } // f loop
+        } // a loop       
+      } // s loop
+    } // f loop
+  } // y loop
 
   // Deaths and Removals (Fishing Mortality and Natural Mortality) --------------------------------
   
@@ -211,10 +227,6 @@ Type objective_function<Type>::operator() ()
   
   for(int y = 0; y < n_years; y++) {
     for(int s = 0; s < n_sexes; s++) {
-      
-      // Calculate total recruitment here
-      Total_Rec(y) += NAA(y, 0, s);
-      
       for(int a = 0; a < n_ages; a++) {
         
         // Project ages and years forward
@@ -232,6 +244,9 @@ Type objective_function<Type>::operator() ()
         // Increment Numbers at age to get total biomass
         Total_Biom(y) += NAA(y, a, s) * WAA(y, a, 0);
       } // end ages loop
+      
+      // Increment total recruitment here
+      Total_Rec(y) += NAA(y, 0, s);
       
     } // end sex loop
   } // end year loop
@@ -261,7 +276,7 @@ Type objective_function<Type>::operator() ()
         for(int a = 0; a < n_ages; a++) {
           pred_fish_indices(y, fi) += NAA(y, a, s) * WAA(y, a, s) * F_Slx(y, a, fi, s);
         } // a loop
-      } // s loop
+      } // s loop    
       pred_fish_indices(y, fi) = exp(ln_q_fish(fi)) * pred_fish_indices(y, fi);
     } // fi loop
   } // y loop
@@ -276,7 +291,7 @@ Type objective_function<Type>::operator() ()
       } // s loop
       pred_srv_indices(y, si) = exp(ln_q_srv(si)) * pred_srv_indices(y, si);
     } // si loop
-  } // y loop
+  } // y loop  
   
   // Compositions ----------------------------------------------  
   
@@ -386,7 +401,7 @@ Type objective_function<Type>::operator() ()
   
   // Composition likelihoods (Multinomial likelihood) ----------------------------------------------
   
-  Type c = 1e-15; // Constant to add to multinomial
+  Type c = 1e-10; // Constant to add to multinomial
   
   // Fishery Compositions
   vector<Type> obs_fish_age_vec(n_ages); // Obs fishery vector to hold and pass values to nLL
