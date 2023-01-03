@@ -120,7 +120,6 @@ get_Fs <- function(Start_F, Fish_Start_yr, F_type, n_years, max_rel_F_M, desc_re
      n_fish_fleets != length(desc_rel_F_M)
      ) stop("Vector length of Start_F, Fish_Start_yr, F_type, max_rel_F_M, desc_rel_F_M does not equal the number of fleets specified.")
   
-  
   # Loop through fleets to specify Fs
   for(f in 1:n_fish_fleets) {
     

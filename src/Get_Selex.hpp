@@ -26,7 +26,6 @@ Type Get_Selex(int age, int sel_model, vector<Type> ln_selpars) {
     selex = pow( (age / amax), (amax/p)  ) * exp( (amax - age) / p ); 
     
   }
-  
-  
+
   return selex;
 } // end function

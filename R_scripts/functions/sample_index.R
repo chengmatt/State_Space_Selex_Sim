@@ -7,33 +7,33 @@
 
 # Sample Index ------------------------------------------------------------
 
-#' @param Idx_Fleet Type of fleet we are sampling for: options are Fishery or Survey
-
-sample_index <- function(Idx_Fleet) {
-  
-  if(Idx_Fleet == "Fishery") {
-    
-    # Calculate selected individuals in numbers
-    true_N <- sum(N_at_age[y-1,,s,sim] * wt_at_age[y-1,,s,sim] * Fish_selex_at_age[y-1,,f,s,sim])
-
-    # Now, calculate the true index
-    true_index <- true_N * q_Fish[y-1,f,sim] 
-
-  } # if we are sampling from the fishery
-  
-  if(Idx_Fleet == "Survey") {
-    
-    # Calculate selected individuals in biomass
-    true_N <- sum(N_at_age[y-1,,s,sim] * Surv_selex_at_age[y-1,,sf,s,sim])
-    
-    # Now, calculate the true index
-    true_index <- true_N * q_Surv[y-1,sf,sim] 
-    
-  } # if we are sampling from the survey
-
-  return(true_index) # output this out
-
-} # end function
+#' #' @param Idx_Fleet Type of fleet we are sampling for: options are Fishery or Survey
+#' 
+#' sample_index <- function(Idx_Fleet) {
+#'   
+#'   if(Idx_Fleet == "Fishery") {
+#'     
+#'     # Calculate selected individuals in numbers
+#'     true_N <- sum(N_at_age[y-1,,s,sim] * wt_at_age[y-1,,s,sim] * Fish_selex_at_age[y-1,,f,s,sim])
+#' 
+#'     # Now, calculate the true index
+#'     true_index <- true_N * q_Fish[y-1,f,sim] 
+#' 
+#'   } # if we are sampling from the fishery
+#'   
+#'   if(Idx_Fleet == "Survey") {
+#'     
+#'     # Calculate selected individuals in biomass
+#'     true_N <- sum(N_at_age[y-1,,s,sim] * Surv_selex_at_age[y-1,,sf,s,sim])
+#'     
+#'     # Now, calculate the true index
+#'     true_index <- true_N * q_Surv[y-1,sf,sim] 
+#'     
+#'   } # if we are sampling from the survey
+#' 
+#'   return(true_index) # output this out
+#' 
+#' } # end function
 
 
 

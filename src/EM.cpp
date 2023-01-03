@@ -96,6 +96,7 @@ Type objective_function<Type>::operator() ()
   vector<Type> Total_Rec(n_years); // Total Recruitment
   vector<Type> Total_Biom(n_years); // Total Biomass
   vector<Type> SSB(n_years); // Spawning stock biomass; n_years + 1 (forward projection)
+  vector<Type> Depletion(n_years); // Depletion SSB / SSB(0)
 
   // Selectivities
   array<Type> F_Slx(n_years, n_ages, n_fish_comps, n_sexes); // Fishery Selectivities
@@ -249,6 +250,10 @@ Type objective_function<Type>::operator() ()
       Total_Rec(y) += NAA(y, 0, s);
       
     } // end sex loop
+    
+    // Calculate depletion rates once we are done 
+    Depletion(y) = SSB(y) / SSB(0); 
+    
   } // end year loop
   
   // Catch ----------------------------------------------
@@ -477,6 +482,7 @@ Type objective_function<Type>::operator() ()
   
   // ADREPORT 
   ADREPORT(SSB);
+  ADREPORT(Depletion); 
   ADREPORT(Total_Fy);
   ADREPORT(Total_Rec);
   ADREPORT(Total_Biom);

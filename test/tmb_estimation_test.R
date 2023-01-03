@@ -1,4 +1,4 @@
-
+# Purpose: To test TMB EM biases and to debug + troubleshoot
   # Set up ------------------------------------------------------------------
   
   library(here)
@@ -6,10 +6,34 @@
   library(TMB)
   library(cowplot)
   
+  # Load in all functions into the environment
+  fxn_path <- here("R_scripts", "functions")
+  source(here(fxn_path, "simulate_data.R"))
   source(here("R_scripts", "functions", "Utility_fxns.R"))
   
   compile_tmb(wd = here("src"), cpp = "EM.cpp")
   
+  # Path to general input biological parameters
+  spreadsheet_path <- here("input", "Sablefish_Inputs.xlsx")
+  
+  # simulate data
+  simulate_data(fxn_path = fxn_path, spreadsheet_path = spreadsheet_path, 
+                check_equil = FALSE, rec_type = "mean_rec",
+                n_years = 101, Start_F = c(0.01), 
+                Fish_Start_yr = c(70), Surv_Start_yr = c(70), 
+                max_rel_F_M = c(1.5), desc_rel_F_M = c(0.15), 
+                F_type = c("Contrast"), yr_chng = c(86), 
+                fish_Neff = c(150), srv_Neff = c(150), fish_CV = c(0.1),
+                srv_CV = c(0.1), Neff_Fish_Time = "F_Vary", fixed_Neff = 30,
+                Mort_Time = "Constant", q_Mean_Fish = 0.08, q_Mean_Surv = 0.01, 
+                Rec_Dev_Type = "iid", rho_rec = NA, 
+                fish_selex = c("gamma"), srv_selex = c("logistic"), 
+                fish_pars = list(Fleet_1_L = matrix(data = c(6,3), nrow = 1, byrow = TRUE)),
+                srv_pars = list(Fleet_3_SL = matrix(data = c(4,0.8), nrow = 1, byrow = TRUE)), 
+                f_ratio = 1, m_ratio = 0)
+  
+  plot_OM(path = here("figs", "Base_OM_Figs"), file_name = "OM_Check.pdf")
+
   # Load in data ------------------------------------------------------------
   
   ssb_all <- data.frame()
@@ -21,6 +45,7 @@
   fish_mu_age <- data.frame()
   srv_mu_age <- data.frame()
   conv <- vector()
+  depletion_all <- data.frame()
   
   ages <- 1:30
   years <- Fish_Start_yr:(n_years - 1)
@@ -150,20 +175,15 @@
     mutate(t = mean(q_Fish), type = "q_fish", sim = sim, conv = conv[sim])
   q_srv_df <- extract_parameter_vals(sd_rep = sd_rep, par = "ln_q_srv", log = TRUE) %>% 
     mutate(t = mean(q_Surv), type = "q_surv", sim = sim, conv = conv[sim])
-  a50_fish_df <- extract_parameter_vals(sd_rep = sd_rep, par = "ln_a50_f", log = TRUE) %>% 
-    mutate(t = 6, type = "a50_fish", sim = sim, conv = conv[sim])
-  a50_srv_df <- extract_parameter_vals(sd_rep = sd_rep, par = "ln_a50_s", log = TRUE) %>% 
-    mutate(t = 4, type = "a50_srv", sim = sim, conv = conv[sim])
-  k_fish_df <- extract_parameter_vals(sd_rep = sd_rep, par = "ln_k_f", log = TRUE) %>% 
-    mutate(t = 0.8, type = "k_fish", sim = sim, conv = conv[sim])
-  k_srv_df <- extract_parameter_vals(sd_rep = sd_rep, par = "ln_k_s", log = TRUE) %>% 
-    mutate(t = 0.8, type = "k_srv", sim = sim, conv = conv[sim])
+  fish_sel_df <- extract_parameter_vals(sd_rep = sd_rep, par = "ln_fish_selpars", log = TRUE) %>% 
+    mutate(t = c(3, 6), type = c("delta_fish", "amax_fish"), sim = sim, conv = conv[sim])
+  srv_sel_df <- extract_parameter_vals(sd_rep = sd_rep, par = "ln_srv_selpars", log = TRUE) %>% 
+    mutate(t = c(4, 0.8), type = c("a50_srv", "k_srv"), sim = sim, conv = conv[sim])
   meanrec_df <- extract_parameter_vals(sd_rep = sd_rep, par = "ln_MeanRec", log = TRUE) %>% 
     mutate(t = exp(2.75), type = "meanrec", sim = sim, conv = conv[sim])
   
   # Bind parameter estimates
-  par_all <- rbind(M_df, q_fish_df, q_srv_df, a50_fish_df, a50_srv_df,
-                   k_fish_df, k_srv_df, meanrec_df, par_all)
+  par_all <- rbind(M_df, q_fish_df, q_srv_df, fish_sel_df, srv_sel_df, meanrec_df, par_all)
 
   # Recruitment
   rec_df <- extract_ADREP_vals(sd_rep = sd_rep, par = "Total_Rec") %>% 
@@ -187,6 +207,12 @@
   t_biom <- extract_ADREP_vals(sd_rep = sd_rep, par = "Total_Biom") %>% 
     mutate(sim = sim, conv = conv[sim], year = 70:(n_years-1), t = biom_df$Biomass)
   biom_all <- rbind(t_biom, biom_all)
+  
+  # Check depletion rates
+  depletion_df <- extract_ADREP_vals(sd_rep = sd_rep, par = "Depletion") %>% 
+    mutate(t = (SSB[Fish_Start_yr:(n_years-1),sim]/SSB[Fish_Start_yr,sim]), 
+           sim = sim, conv = conv[sim], year = 70:(n_years-1))
+  depletion_all <- rbind(depletion_df, depletion_all)
   
   # Check survey mean age
   srv_mean_ages <- extract_mean_age_vals(mod_rep = my_model, comp_name = "pred_srv_age_comps", 
@@ -233,7 +259,11 @@ srv_mu_age_sum <- get_RE_precentiles(df = srv_mu_age %>% filter(conv == "Converg
                                      est_val_col = 5, true_val_col = 6, 
                                      par_name = "Mean Predicted Survey Age", year)
 
-all <- rbind(rec_sum, ssb_sum, f_sum, biom_sum, srv_mu_age_sum, fish_mu_age_sum) 
+depletion_sum <-  get_RE_precentiles(df = depletion_all %>% filter(conv == "Converged"), 
+                                     est_val_col = 1, true_val_col = 5, 
+                                     par_name = "Depletion (SSB / SSB0)", year)
+
+all <- rbind(rec_sum, ssb_sum, f_sum, biom_sum, depletion_sum, srv_mu_age_sum, fish_mu_age_sum) 
 
 # Parameter estimates
 par_df <- par_all %>% mutate(RE = (mle_val - t ) / t) 
@@ -243,7 +273,7 @@ par_sum <- get_RE_precentiles(df = par_all %>% filter(conv == "Converged"),
                               est_val_col = 2, true_val_col = 7, 
                               par_name = NULL, type)
   
-(est_plot <- ggplot(all, aes(x = year, y = median)) +
+(est_plot <- ggplot(all %>% filter(par_name != "Depletion (SSB / SSB0)"), aes(x = year, y = median)) +
   # geom_ribbon(aes(ymin = lwr_75, ymax = upr_75), alpha = 0.7, fill = "grey") +
   geom_ribbon(aes(ymin = lwr_80, ymax = upr_80), alpha = 0.5, fill = "grey4") +
   geom_ribbon(aes(ymin = lwr_95, ymax = upr_95), alpha = 0.3, fill = "grey2") +
@@ -252,7 +282,7 @@ par_sum <- get_RE_precentiles(df = par_all %>% filter(conv == "Converged"),
   # geom_line( color = "white", size = 1,alpha = 1) +
   geom_hline(aes(yintercept = 0), col = "black", lty = 2, size = 1, alpha = 1) +
   facet_wrap(~par_name, scales = "free") +
-  # coord_cartesian(ylim = c(-0.5, 0.5)) +
+  coord_cartesian(ylim = c(-0.5, 0.5)) +
   labs(x = "Year", y = "Relative Error") +
   theme_bw() +
   theme(strip.text = element_text(size = 15),
@@ -282,5 +312,5 @@ theme(strip.text = element_text(size = 13),
       legend.position = "none", legend.text = element_text(size = 15)))
 
 plot_grid(par_plot, est_plot, ncol = 1, align = "hv", axis = "bl",
-          rel_heights = c(1, 0.85))
+          rel_heights = c(0.75, 1))
 
