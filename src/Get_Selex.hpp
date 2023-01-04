@@ -34,8 +34,12 @@ Type Get_Selex(int age, int sel_model, vector<Type> ln_selpars) {
     Type infl_1 = exp(ln_selpars(2)); // Inflection point of ascending limb
     Type infl_2 = exp(ln_selpars(3)); // Inflection point of descending limb
     
+    // Calculate logistic curve 1
+    Type logist_1 = 1/(1 + exp(-slope_1 * (age - infl_1)));
+    // Calculate logistic curve 2
+    Type logist_2 = 1 - (1/(1 + exp(-slope_2 * (age - infl_2))));
     // Return selectivity - product of two logistic selectivity curves
-    selex = (1 / (1 + exp(-slope_1 * (age - infl_1)) )) * (1 / (1 + exp(-slope_2 * (age - infl_2)) )); 
+    selex = logist_1 * logist_2;
 
   }
 

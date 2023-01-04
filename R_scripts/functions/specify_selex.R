@@ -65,7 +65,7 @@ selex_opts <- function(selex_type, bins, par_values) {
     # slope_2 <- 0.2 # descending limb
     # infl_1 <- 5 # inflection point for ascending limb
     # infl_2 <- 20 # inflection point for descending limb
-    
+
     # Get slope1 value
     slope_1 <- as.numeric(par_mat[,1][par_mat[,2] == "slope_1"])
     # Get slope2 value

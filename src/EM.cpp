@@ -155,7 +155,7 @@ Type objective_function<Type>::operator() ()
           S_Slx(y,a,f,s) = Get_Selex(a + 1, S_Slx_model(f), 
                 ln_srv_selpars.transpose().col(f).col(s).col(b).vec()); 
           // transposing selectivity array to coerce to vector
-          
+             
         } // a loop       
       } // s loop
     } // f loop

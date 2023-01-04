@@ -23,7 +23,7 @@
                 Fish_Start_yr = c(70), Surv_Start_yr = c(70), 
                 max_rel_F_M = c(1.5), desc_rel_F_M = c(0.15), 
                 F_type = c("Contrast"), yr_chng = c(86), 
-                fish_Neff = c(50), srv_Neff = c(50), fish_CV = c(0.1),
+                fish_Neff = c(150), srv_Neff = c(150), fish_CV = c(0.1),
                 srv_CV = c(0.1), Neff_Fish_Time = "F_Vary", fixed_Neff = 30,
                 Mort_Time = "Constant", q_Mean_Fish = 0.08, q_Mean_Surv = 0.01, 
                 Rec_Dev_Type = "iid", rho_rec = NA, 
@@ -130,7 +130,7 @@
   # Define parameter inits here
   parameters <- list(ln_SigmaRec = 0.6, ln_MeanRec = 2.75,
                      ln_M = log(0.1),  
-                     ln_fish_selpars = log(array(3, dim = c(1, 1, 1, 4))),
+                     ln_fish_selpars = log(array(c(0.3, 0.5, 0.5, 16 ), dim = c(1, 1, 1, 4))),
                      ln_srv_selpars = array(5, dim = c(1, 1, 1, 2)),
                      ln_N1_Devs = log(rnorm(length(ages)-2,5, 1)),
                      ln_Fy = log(as.matrix(fish_mort[Fish_Start_yr:((n_years) -1),,sim])),
@@ -140,7 +140,7 @@
   
   
   map <- list(ln_SigmaRec = factor(NA))
-              # ln_fish_selpars = factor(rep(NA, 2)))
+              # ln_fish_selpars = factor(rep(NA, 4)))
               # ln_M = factor(NA),
               # ln_MeanF = factor(NA)
               # ln_MeanRec = factor(NA),
@@ -183,7 +183,7 @@
     mutate(t = exp(2.75), type = "meanrec", sim = sim, conv = conv[sim])
   
   # Bind parameter estimates
-  par_all <- rbind(M_df, q_fish_df, q_srv_df, fish_sel_df, srv_sel_df, meanrec_df, par_all)
+  par_all <- rbind(M_df, q_fish_df, q_srv_df, srv_sel_df, meanrec_df, par_all)
 
   # Recruitment
   rec_df <- extract_ADREP_vals(sd_rep = sd_rep, par = "Total_Rec") %>% 
