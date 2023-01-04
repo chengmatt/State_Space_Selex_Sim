@@ -26,6 +26,18 @@ Type Get_Selex(int age, int sel_model, vector<Type> ln_selpars) {
     selex = pow( (age / amax), (amax/p)  ) * exp( (amax - age) / p ); 
     
   }
+  
+  if(sel_model == 2) { // double logistic selectivity
+    // Extract out and exponentiate the parameters here
+    Type slope_1 = exp(ln_selpars(0)); // Slope of ascending limb
+    Type slope_2 = exp(ln_selpars(1)); // Slope of descending limb
+    Type infl_1 = exp(ln_selpars(2)); // Inflection point of ascending limb
+    Type infl_2 = exp(ln_selpars(3)); // Inflection point of descending limb
+    
+    // Return selectivity - product of two logistic selectivity curves
+    selex = (1 / (1 + exp(-slope_1 * (age - infl_1)) )) * (1 / (1 + exp(-slope_2 * (age - infl_2)) )); 
+
+  }
 
   return selex;
 } // end function

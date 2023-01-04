@@ -23,12 +23,12 @@
                 Fish_Start_yr = c(70), Surv_Start_yr = c(70), 
                 max_rel_F_M = c(1.5), desc_rel_F_M = c(0.15), 
                 F_type = c("Contrast"), yr_chng = c(86), 
-                fish_Neff = c(150), srv_Neff = c(150), fish_CV = c(0.1),
+                fish_Neff = c(50), srv_Neff = c(50), fish_CV = c(0.1),
                 srv_CV = c(0.1), Neff_Fish_Time = "F_Vary", fixed_Neff = 30,
                 Mort_Time = "Constant", q_Mean_Fish = 0.08, q_Mean_Surv = 0.01, 
                 Rec_Dev_Type = "iid", rho_rec = NA, 
-                fish_selex = c("gamma"), srv_selex = c("logistic"), 
-                fish_pars = list(Fleet_1_L = matrix(data = c(6,3), nrow = 1, byrow = TRUE)),
+                fish_selex = c("double_logistic"), srv_selex = c("logistic"), 
+                fish_pars = list(Fleet_1_L = matrix(data = c(0.3, 0.5, 0.5, 16 ), nrow = 1, byrow = TRUE)),
                 srv_pars = list(Fleet_3_SL = matrix(data = c(4,0.8), nrow = 1, byrow = TRUE)), 
                 f_ratio = 1, m_ratio = 0)
   
@@ -123,14 +123,14 @@
                 Sex_Ratio = as.vector(c(1)),  rec_model = 0, 
                 fish_cv = fish_cv, srv_cv = srv_cv, catch_cv = catch_cv,
                 Init_N = as.vector(N_at_age[(Fish_Start_yr),,,sim]),
-                F_Slx_model = as.vector(1), n_fish_comps = 1, n_srv_comps = 1,
+                F_Slx_model = as.vector(2), n_fish_comps = 1, n_srv_comps = 1,
                 S_Slx_model = as.vector(0)
   )
   
   # Define parameter inits here
   parameters <- list(ln_SigmaRec = 0.6, ln_MeanRec = 2.75,
                      ln_M = log(0.1),  
-                     ln_fish_selpars = log(array(c(3,6), dim = c(1, 1, 1, 2))),
+                     ln_fish_selpars = log(array(3, dim = c(1, 1, 1, 4))),
                      ln_srv_selpars = array(5, dim = c(1, 1, 1, 2)),
                      ln_N1_Devs = log(rnorm(length(ages)-2,5, 1)),
                      ln_Fy = log(as.matrix(fish_mort[Fish_Start_yr:((n_years) -1),,sim])),
@@ -175,8 +175,8 @@
     mutate(t = mean(q_Fish), type = "q_fish", sim = sim, conv = conv[sim])
   q_srv_df <- extract_parameter_vals(sd_rep = sd_rep, par = "ln_q_srv", log = TRUE) %>% 
     mutate(t = mean(q_Surv), type = "q_surv", sim = sim, conv = conv[sim])
-  fish_sel_df <- extract_parameter_vals(sd_rep = sd_rep, par = "ln_fish_selpars", log = TRUE) %>% 
-    mutate(t = c(3, 6), type = c("delta_fish", "amax_fish"), sim = sim, conv = conv[sim])
+  # fish_sel_df <- extract_parameter_vals(sd_rep = sd_rep, par = "ln_fish_selpars", log = TRUE) %>%
+    # mutate(t = c(4, 6), type = c("delta_fish", "amax_fish"), sim = sim, conv = conv[sim])
   srv_sel_df <- extract_parameter_vals(sd_rep = sd_rep, par = "ln_srv_selpars", log = TRUE) %>% 
     mutate(t = c(4, 0.8), type = c("a50_srv", "k_srv"), sim = sim, conv = conv[sim])
   meanrec_df <- extract_parameter_vals(sd_rep = sd_rep, par = "ln_MeanRec", log = TRUE) %>% 
@@ -302,6 +302,7 @@ geom_point(inherit.aes = FALSE, data = par_sum,
            aes(x= median, y = 0, color = type), size = 5, alpha = 0.95) +
   geom_vline(aes(xintercept = 0), linetype = 2,
              size = 0.85, col = "black", alpha = 1) +
+    # coord_cartesian(xlim = c(-1, 1)) +
 ggsci::scale_color_jco() +
 ggsci::scale_fill_jco() +
   labs(x = "Relative Error", y = "Probability Density", linetype = "", color = "") +

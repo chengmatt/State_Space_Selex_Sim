@@ -301,4 +301,10 @@ simulate_data <- function(fxn_path,
   Survey_Age_Comps <<- Survey_Age_Comps
   Survey_Index_Agg <<- Survey_Index_Agg
   
+  om_list <- list(N_at_age = N_at_age, Biom_at_age = Biom_at_age,
+                  SSB = SSB, rec_total = rec_total, Catch_at_age = Catch_at_age,
+                  Fishery_Index = Fishery_Index, Fish_Age_Comps = Fish_Age_Comps,
+                  Fishery_Index_Agg = Fishery_Index_Agg, Survey_Index = Survey_Index,
+                  Survey_Age_Comps = Survey_Age_Comps, Survey_Index_Agg = Survey_Index_Agg)
+  
 } # end function

@@ -20,11 +20,11 @@ fish_surv_data_scenarios <- function(Fish_Start_yr, Surv_Start_yr, fish_Neff_max
   
   # Warning/Error Messages
   if(n_fish_fleets != length(Fish_Start_yr) & 
-     n_fish_fleets != length(fish_Neff) &
+     n_fish_fleets != length(fish_Neff_max) &
      n_fish_fleets != length(fish_CV) ) stop("Vector lengths of fishery start years, Neff, or CV are not the same as the number of fishery fleets specified")
   
   if(n_srv_fleets != length(Surv_Start_yr) &
-     n_srv_fleets != length(srv_Neff) &
+     n_srv_fleets != length(srv_Neff_max) &
      n_srv_fleets != length(srv_CV) ) stop("Vector lengths of survey start years, Neff, or CV are not the same as the number of fishery fleets specified")
   
   if(!Neff_Fish_Time %in% c("Constant", "F_Vary")) stop("Neff_Fish_Time is not specified correctly")

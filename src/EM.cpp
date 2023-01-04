@@ -412,7 +412,7 @@ Type objective_function<Type>::operator() ()
   vector<Type> obs_fish_age_vec(n_ages); // Obs fishery vector to hold and pass values to nLL
   vector<Type> pred_fish_age_vec(n_ages); // Pred fishery vector to hold and pass values to nLL
   
-  for(int y = 0; y < n_years; y++) {
+  for(int y = 0 ; y < n_years; y++) {
     for(int fc = 0; fc < n_fish_comps; fc++) {
       for(int s = 0; s < n_sexes; s++) { 
         // Pull out observed age vector and multiply by the effective sample size
