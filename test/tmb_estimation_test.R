@@ -9,7 +9,8 @@
   # Load in all functions into the environment
   fxn_path <- here("R_scripts", "functions")
   source(here(fxn_path, "simulate_data.R"))
-  source(here("R_scripts", "functions", "Utility_fxns.R"))
+  source(here(fxn_path, "Utility_fxns.R"))
+  source(here(fxn_path, "prepare_EM_input.R"))
   
   compile_tmb(wd = here("src"), cpp = "EM.cpp")
   
@@ -110,16 +111,32 @@
   
   # set up indicators for whether or not we want to use certain data sources
   use_catch <- matrix(1, nrow = n_years, ncol = n_fish_fleets)
-  use_fish_index <- matrix(1, nrow = n_years, ncol = n_fish_indices)
+  use_fish_index <- matrix(0, nrow = n_years, ncol = n_fish_indices)
   use_srv_index <- matrix(1, nrow = n_years, ncol = n_srv_indices)
   use_fish_comps <- array(1, dim = c(n_years, n_fish_comps, n_sex))
   use_srv_comps <- array(1, dim = c(n_years, n_srv_comps, n_sex))
   
   # TMB Section -------------------------------------------------------------
   
+  data <- prepare_EM_input(ages = ages, years = Fish_Start_yr[1]:(n_years - 1),
+                   n_sexes = n_sexes,
+                   n_fleets = 2, n_fish_comps = 2, n_srv_comps = 1,
+                   n_fish_indices = 2, n_srv_indices = 1,
+                   Fish_Start_yr = Fish_Start_yr, catch_cv = c(0.01, 0.01),
+                   F_Slx_Blocks = matrix(c(0), nrow = length(years), ncol = n_fleets),
+                   S_Slx_Blocks = matrix(c(0), nrow = length(years), ncol = n_srv_fleets),
+                   use_catch = matrix(1, nrow = n_years, ncol = n_fish_fleets),
+                   use_fish_index = matrix(0, nrow = n_years, ncol = n_fish_indices),
+                   use_srv_index = matrix(1, nrow = n_years, ncol = n_srv_indices),
+                   use_fish_comps = array(1, dim = c(n_years, n_fish_comps, n_sex)),
+                   use_srv_comps = array(1, dim = c(n_years, n_srv_comps, n_sex)),
+                   rec_model = 0, F_Slx_model = as.vector(c(0, 0)),
+                   S_Slx_model = as.vector(0), sim = sim
+                   )
+  
   
   # Fill in list for data
-  data <- list( ages = ages, years = years,
+  data1 <- list( ages = ages, years = years,
                 n_sexes = n_sexes, n_fleets = 2,
                 n_fish_indices = n_fish_indices, n_srv_indices = n_srv_indices,
                 obs_catches = obs_catches, 
@@ -127,10 +144,9 @@
                 obs_fish_age_Neff = obs_fish_age_Neff, 
                 obs_srv_age_comps = array(obs_srv_age_comps, dim = c(31, 30, 1, 1)),
                 obs_srv_age_Neff = obs_srv_age_Neff, obs_fish_indices =  obs_fish_indices,
-                obs_srv_indices = obs_srv_indices, WAA = array(WAA, dim = c(32, 30, 1)), 
-                MatAA = array(MatAA, dim = c(32, 30, 1)), F_Slx_Blocks = F_Slx_Blocks,
+                obs_srv_indices = obs_srv_indices, WAA = array(WAA, dim = c(31, 30, 1)), 
+                MatAA = array(MatAA, dim = c(31, 30, 1)), F_Slx_Blocks = F_Slx_Blocks,
                 S_Slx_Blocks = S_Slx_Blocks, 
-                # Init_N = as.vector(N_at_age[70,,,sim]),
                 Sex_Ratio = as.vector(c(1)),  rec_model = 0, 
                 fish_cv = fish_cv, srv_cv = srv_cv, catch_cv = catch_cv,
                 F_Slx_model = as.vector(c(0, 0)), n_fish_comps = 2, n_srv_comps = 1,
@@ -151,12 +167,12 @@
                      ln_q_srv = as.matrix(rep(log(0.01), n_srv_fleets)),
                      ln_RecDevs = rec_devs[Fish_Start_yr[1]:((n_years) -1),sim])
   
-  map <- list(ln_SigmaRec = factor(NA))
+  map <- list(ln_SigmaRec = factor(NA),
               # ln_fish_selpars = factor(rep(NA, 4)),
               # ln_M = factor(NA),
               # ln_N1_Devs = factor(rep(NA, length(ages)-2)),
               # ln_MeanRec = factor(NA),
-              # ln_q_fish = factor(rep(NA, 2)),
+              ln_q_fish = factor(rep(NA, 2)))
               # ln_q_srv = factor(NA),
               # ln_Fy = factor(rep(NA, 62)),
               # ln_RecDevs = factor(rep(NA, 31)))
@@ -195,7 +211,7 @@
                              control = list(iter.max = 1e5, eval.max = 1e5))
   
   # Additional newton steps to take
-  add_newton(n.newton = 5, ad_model = my_model, mle_optim = mle_optim)
+  add_newton(n.newton = 3, ad_model = my_model, mle_optim = mle_optim)
   
   my_model$rep <- my_model$report(par = mle_optim$par)
   sd_rep <- TMB::sdreport(my_model)
@@ -226,8 +242,8 @@
   # Get parameter estimates
   M_df <- extract_parameter_vals(sd_rep = sd_rep, par = "ln_M", log = TRUE) %>% 
     mutate(t = mean(Mort_at_age), type = "mortality", sim = sim, conv = conv[sim])
-  q_fish_df <- extract_parameter_vals(sd_rep = sd_rep, par = "ln_q_fish", log = TRUE) %>%
-    mutate(t = q_Fish[1,,sim], type = "q_fish", sim = sim, conv = conv[sim])
+  # q_fish_df <- extract_parameter_vals(sd_rep = sd_rep, par = "ln_q_fish", log = TRUE) %>%
+    # mutate(t = q_Fish[1,,sim], type = "q_fish", sim = sim, conv = conv[sim])
   q_srv_df <- extract_parameter_vals(sd_rep = sd_rep, par = "ln_q_srv", log = TRUE) %>% 
     mutate(t = mean(q_Surv), type = "q_surv", sim = sim, conv = conv[sim])
   fish_sel_df <- extract_parameter_vals(sd_rep = sd_rep, par = "ln_fish_selpars", log = TRUE) %>%
@@ -235,7 +251,7 @@
   srv_sel_df <- extract_parameter_vals(sd_rep = sd_rep, par = "ln_srv_selpars", log = TRUE) %>% 
     mutate(t = c(4, 0.8), type = c("a50_srv", "k_srv"), sim = sim, conv = conv[sim])
   meanrec_df <- extract_parameter_vals(sd_rep = sd_rep, par = "ln_MeanRec", log = TRUE) %>% 
-    mutate(t = exp(2.70), type = "meanrec", sim = sim, conv = conv[sim])
+    mutate(t = exp(2.75), type = "meanrec", sim = sim, conv = conv[sim])
   
   # Bind parameter estimates
   par_all <- rbind(M_df, q_srv_df, srv_sel_df, meanrec_df, par_all)
