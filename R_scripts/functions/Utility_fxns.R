@@ -70,7 +70,8 @@ check_model_convergence <- function(mle_optim, sd_rep, mod_rep, min_grad = 0.001
   
   return(list(Convergence = convergence, 
               Max_Grad = max_grad_val, 
-              Max_Grad_Par = max_grad_par))
+              Max_Grad_Par = max_grad_par,
+              jnLL = mod_rep$rep$jnLL))
 }
 
 #' Title Extract MLE estimates and standard errors from sd_rep object for derived variables
@@ -292,5 +293,4 @@ get_RE_precentiles <- function(df, est_val_col = 1, true_val_col = 5, par_name =
   
   return(df)
 }
-
 

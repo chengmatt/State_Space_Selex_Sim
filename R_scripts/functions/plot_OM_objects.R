@@ -163,32 +163,17 @@ print(
 
   
 
-# Catch at age ------------------------------------------------------------
+# Catch aggregated ------------------------------------------------------------
 
-  catch_df <- melt(Catch_at_age)
-  names(catch_df) <- c("Year", "Age", "Fleet", "Sex", "Sim", "Catch")
+  catch_df <- melt(Catch_agg)
+  names(catch_df) <- c("Year", "Fleet","Sim", "Catch")
   
 print(
   catch_df %>% 
-    group_by(Year, Fleet, Sex, Sim) %>% # Aggregated catch
-    summarize(Catch  = sum(Catch, na.rm = T)) %>% 
     ggplot(aes(x = as.numeric(Year), y = Catch, group = Sim)) +
     geom_line(size = 1.5, color = "grey", alpha = 0.75) +
-    facet_grid(Sex~Fleet, scales = "free") +
     theme_bw() +
-    theme(legend.position = "none") +
-    labs(x = "Age",y = "Catch") +
-    xlim(Fish_Start_yr[1], n_years-1)
-)
-
-print(
-  catch_df %>% 
-    group_by(Year, Sex, Sim) %>% # Aggregated catch
-    summarize(Catch  = sum(Catch, na.rm = T)) %>% 
-    ggplot(aes(x = as.numeric(Year), y = Catch, group = Sim)) +
-    geom_line(size = 1.5, color = "grey", alpha = 0.75) +
-    facet_grid(~Sex, scales = "free") +
-    theme_bw() +
+    facet_wrap(~Fleet) +
     theme(legend.position = "none") +
     labs(x = "Age",y = "Catch") +
     xlim(Fish_Start_yr[1], n_years-1)

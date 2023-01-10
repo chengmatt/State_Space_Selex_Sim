@@ -54,15 +54,15 @@ selex_opts <- function(selex_type, bins, par_values) {
     p <- (0.5 * (sqrt(amax^2 + 4*delta^2) - amax)) # Derive power parameter here first
     
     # Now calculate Selex for dome-shaped - scale to a max of 1
-    selex <- (bins/amax) ^ (amax/p) * exp((amax - bins) / p) 
+    selex <- (bins/amax) ^ (amax/p) * exp((amax - bins) / p)  
     
   } # gamma dome-shaped selectivity
   
   if(selex_type == "double_logistic") { # 4 parameters
     
     # TESTING 
-    # slope_1 <- 3 # ascending limb
-    # slope_2 <- 0.2 # descending limb
+    # slope_1 <- 5 # ascending limb
+    # slope_2 <- 3 # descending limb
     # infl_1 <- 5 # inflection point for ascending limb
     # infl_2 <- 20 # inflection point for descending limb
 
@@ -76,13 +76,13 @@ selex_opts <- function(selex_type, bins, par_values) {
     infl_2 <- as.numeric(par_mat[,1][par_mat[,2] == "infl_2"])
     
     # Calculate logistic curve 1 - mediates the ascending limb
-    logistic_1 <- 1/(1 + exp(-slope_1 * (bins - infl_1))) 
+    logistic_1 <- 1/(1 + exp(-(bins - infl_1)/slope_1)) 
     
     # Calculate logistic curve 2 - mediates the descending limb
-    logistic_2 <- 1 - (1/(1 + exp(-slope_2 * (bins - infl_2))))
+    logistic_2 <- 1/(1 + exp((bins - infl_2)/slope_2))
     
     # multiply the logistic curves and scale to a max of 1
-    selex <- logistic_1 * logistic_2 
+    selex <- logistic_1 * logistic_2
     
     # plot(selex)
     
@@ -132,9 +132,12 @@ selex_opts <- function(selex_type, bins, par_values) {
     # Now, get selectivity values - scale to a max of 1
     selex <- alpha * (1 - j1) + (j1 * ( (1-j2) + j2 * beta)) 
     
-    plot(selex)
+    # plot(selex)
     
   } # double normal selectivity
+  
+  # Scale selex to a max of 1
+  # selex <- selex / max(selex)
   
   return(selex)
   

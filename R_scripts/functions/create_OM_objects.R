@@ -59,7 +59,14 @@ create_OM_objects <<- function(n_years, ages, n_fish_fleets, n_sex, n_sims) {
                           c(paste("Sim",1:n_sims)) # Simulation 
                         ))
   
-
+  # Aggregated catch across sexes and ages
+  Catch_agg <<- array(dim = c(n_years, n_fish_fleets, n_sims), 
+                          dimnames = list( # Set up dimensions names
+                            c(paste("Year", 1:n_years, sep = "_")), # Years 
+                            c(paste("Fish_Fleet", 1:n_fish_fleets, sep  = "_")), # Number of fishery fleets
+                            c(paste("Sim",1:n_sims)) # Simulation 
+                          ))
+  
 # Observation model -------------------------------------------------------
 
   # Fishery Age Comps across ages and years
