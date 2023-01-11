@@ -252,23 +252,23 @@ Type objective_function<Type>::operator() ()
         } // plus group calculation
         // Increment Numbers at age to get total biomass
         Total_Biom(y) += NAA(y, a, s) * WAA(y, a, s);
-        
-        if(s == 0) { // Calculate SSB if sex = 0 (females)
-          // Get SSB here
-          SSB(y) += NAA(y, a, 0) * WAA(y, a, 0) * MatAA(y, a, 0); 
-        } // end if statement for SSB
-        
       } // end ages loop
       
       // Increment total recruitment here
       Total_Rec(y) += NAA(y, 0, s);
       
     } // end sex loop
-    
-       // Calculate depletion rates here
-       Depletion(y) = SSB(y) / SSB(0); 
-    
   } // end year loop
+  
+  for(int y = 0; y < n_years; y++) {
+    for(int a = 0; a < n_ages; a++) {
+        // Get SSB here
+        SSB(y) += NAA(y, a, 0) * WAA(y, a, 0) * MatAA(y, a, 0); 
+    } // a loop
+    // Get depletion here
+    // Calculate depletion rates here
+    Depletion(y) = SSB(y) / SSB(0); 
+  }
   
   // Catch ----------------------------------------------
   pred_catches.setZero(); // set zero

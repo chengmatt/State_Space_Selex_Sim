@@ -59,12 +59,13 @@ fish_surv_data_scenarios <- function(Fish_Start_yr, Surv_Start_yr, fish_Neff_max
           # because these will remain constant across simulations
           fish_Neff_mat[y,f] <- round(fish_Neff_max[f] * F_scalar[f] * fish_mort[y,f,1])
 
-      } # end fleet loop
+      } # end year loop
       
-    } # end year loop
-    
-    # Fix Neff at a specified value for those that are < said specified value
-    fish_Neff_mat[fish_Neff_mat < fixed_Neff & fish_Neff_mat != 0] <- fixed_Neff
+      # Fix Neff at a specified value for those that are < said specified value
+      if(fish_Neff_mat[y,f] < fixed_Neff[f] &
+         fish_Neff_mat[y,f] != 0) fish_Neff_mat[y,f] <- fixed_Neff[f]
+      
+    } # end fleet loop
     
   } # effective sample sizes vary as a function of fishery specific Fs
   

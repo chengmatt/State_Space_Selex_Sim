@@ -50,6 +50,7 @@ prepare_EM_input <- function(ages,
                           use_srv_index, 
                           use_fish_comps,
                           use_srv_comps,
+                          Sex_Ratio,
                           F_Slx_model,
                           S_Slx_model = 0,
                           rec_model = 0,
@@ -62,7 +63,7 @@ prepare_EM_input <- function(ages,
 # Catch -------------------------------------------------------------------
 
   if(n_fleets == 1) { # if single fleet - sum across or leave as is
-    obs_catches <- apply( as.matrix(Catch_agg[(Fish_Start_yr[1]:(n_years-1)),,sim]), 1, FUN = sum)
+    obs_catches <- as.matrix( apply( Catch_agg[(Fish_Start_yr[1]:(n_years-1)),,sim], 1, FUN = sum))
   } else{ # multi fleet - leave as is
     obs_catches <- matrix(Catch_agg[(Fish_Start_yr[1]:(n_years-1)),,sim], nrow = length(years), ncol = n_fleets)
   } # end else
@@ -140,14 +141,14 @@ prepare_EM_input <- function(ages,
 
   # Weight at age
   WAA <- array(wt_at_age[Fish_Start_yr[1]:(n_years),,1,sim], 
-               dim = c(length(years), length(ages), n_sexes))
+               dim = c(length(Fish_Start_yr[1]:(n_years)), length(ages), n_sexes))
   
   # Maturity at age
   MatAA <- array(mat_at_age[Fish_Start_yr[1]:(n_years),,1,sim]  ,
-                 dim = c(length(years), length(ages), n_sexes))
+                 dim = c(length(Fish_Start_yr[1]:(n_years)), length(ages), n_sexes))
   
   # Sex Ratios
-  Sex_Ratio <- as.vector(Sex_Ratio[1:n_sexes])
+  Sex_Ratio <- Sex_Ratio
   
 
 # CV inputs ---------------------------------------------------------------
