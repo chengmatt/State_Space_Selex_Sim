@@ -30,7 +30,7 @@
                 Rec_Dev_Type = "iid", rho_rec = NA, 
                 fish_selex = c("logistic", "logistic"), srv_selex = c("logistic"), 
                 fish_pars = list(Fleet_1_L = matrix(data = c(6, 0.8), nrow = 1, byrow = TRUE),
-                                 Fleet_1_L = matrix(data = c(6, 0.8), nrow = 1, byrow = TRUE)),
+                                 Fleet_1_L = matrix(data = c(9, 0.8), nrow = 1, byrow = TRUE)),
                 srv_pars = list(Fleet_3_SL = matrix(data = c(4,0.8), nrow = 1, byrow = TRUE)), 
                 f_ratio = 1, m_ratio = 0)
   
@@ -58,116 +58,35 @@
   
   for(sim in 1:n_sims){
   
-    # Get observed catches
-    obs_catches <- matrix(Catch_agg[(Fish_Start_yr[1]:(n_years-1)),,sim], nrow = length(years), ncol = n_fish_fleets)
-    
-    # Observed fishery age comps
-    obs_fish_age_comps <- array(data = NA, dim = c(length(years), length(ages), n_fleets))
-    
-    for(f in 1:n_fish_fleets) { # needs to loop thorugh transpose and apply for ez retnetion of array dimensions
-      obs_fish_age_comps[,,f] <- t(
-        apply(Fish_Age_Comps[Fish_Start_yr[1]:(n_years - 1),,f,,sim], MARGIN = 1, 
-              FUN=function(x) { x/sum(x) })
-      )
-    }
-    
-    obs_fish_age_Neff <- matrix(fish_Neff[Fish_Start_yr[1]:(n_years - 1),], nrow = length(years), ncol = n_fish_fleets)
-    
-    # Observed survey age comps
-    obs_srv_age_comps <- t(apply(Survey_Age_Comps[Fish_Start_yr[1]:(n_years - 1),,,,sim], MARGIN = 1, 
-                                 FUN=function(x) { x/sum(x) }))
-    
-    obs_srv_age_Neff <- matrix(srv_Neff[Fish_Start_yr[1]:(n_years - 1),], nrow = length(years), ncol = n_srv_fleets)
-    
-    # Observed fishery indices
-    obs_fish_indices <-as.matrix( Fishery_Index_Agg[Fish_Start_yr[1]:(n_years - 1),,sim], nrow = length(years), ncol = n_fish_fleets)
-    obs_srv_indices <- as.matrix(Survey_Index_Agg[Fish_Start_yr[1]:(n_years - 1),,sim], nrow = length(years), ncol = n_srv_fleets)
-    
-    WAA <- wt_at_age[Fish_Start_yr[1]:(n_years),,1,sim]
-    MatAA <- mat_at_age[Fish_Start_yr[1]:(n_years),,1,sim]
-    Sex_Ratio <- c(1,0)
-    
-    biom_df <- melt(Biom_at_age)
-    names(biom_df) <- c("Year", "Age", "Sex", "Sim", "Biomass")
-    
-    # Biomass aggregated
-    biom_df <- biom_df %>% 
-      mutate(Year = parse_number(as.character(Year)),
-             Sim = parse_number(as.character(Sim))) %>% 
-      filter(Sim == sim,
-             Year >= Fish_Start_yr[1] & Year < 101) %>% 
-      group_by(Year) %>% 
-      summarize(Biomass = sum(Biomass, na.rm = TRUE))
-    
-    fish_cv <- c(0.1, 0.1)
-    srv_cv <- 0.1
-    catch_cv <- c(0.01, 0.01)
-    
-    n_fish_comps = 2
-    n_srv_comps = 1
-    
-    F_Slx_Blocks <- matrix(c(0), nrow = length(years), ncol = n_fleets)
-    S_Slx_Blocks <- matrix(c(0), nrow = length(years), ncol = n_srv_fleets)
-    
-    # set up indicators for whether or not we want to use certain data sources
-    use_catch <- matrix(1, nrow = n_years, ncol = n_fish_fleets)
-    use_fish_index <- matrix(0, nrow = length(years), ncol = n_fish_indices)
-    use_srv_index <- matrix(1, nrow = length(years), ncol = n_srv_indices)
-    use_fish_comps <- array(1, dim = c(length(years), n_fish_comps, n_sex))
-    use_srv_comps <- array(1, dim = c(length(years), n_srv_comps, n_sex))
-  
-  # TMB Section -------------------------------------------------------------
-  
+    # Prepare data here
   data <- prepare_EM_input(ages = ages, years = Fish_Start_yr[1]:(n_years - 1),
                    n_sexes = n_sexes,
                    n_fleets = 2, n_fish_comps = 2, n_srv_comps = 1,
                    n_fish_indices = 2, n_srv_indices = 1,
                    Fish_Start_yr = Fish_Start_yr, catch_cv = c(0.03, 0.03),
-                   F_Slx_Blocks = matrix(c(0), nrow = length(years), ncol = n_fleets),
+                   F_Slx_Blocks = matrix(c(0), nrow = length(years), ncol = 2),
                    S_Slx_Blocks = matrix(c(0), nrow = length(years), ncol = n_srv_fleets),
-                   use_catch = matrix(1, nrow = n_years, ncol = n_fleets),
+                   use_catch = matrix(1, nrow = n_years, ncol = 2),
                    use_fish_index = matrix(0, nrow = n_years, ncol = n_fish_indices),
                    use_srv_index = matrix(1, nrow = n_years, ncol = n_srv_indices),
-                   use_fish_comps = array(1, dim = c(n_years, n_fish_comps, n_sex)),
-                   use_srv_comps = array(1, dim = c(n_years, n_srv_comps, n_sex)),
-                   rec_model = 0, F_Slx_model = as.vector(c(0, 0)),
+                   use_fish_comps = array(1, dim = c(n_years, 2, n_sex)),
+                   use_srv_comps = array(1, dim = c(n_years, 1, n_sex)),
+                   rec_model = 0, F_Slx_model = as.vector(c(0,0)),
                    S_Slx_model = as.vector(0), sim = sim, Sex_Ratio = as.vector(1)
                    )
-  
-  
-    # Fill in list for data
-    # data <- list( ages = ages, years = years,
-    #               n_sexes = n_sexes, n_fleets = 2,
-    #               n_fish_indices = n_fish_indices, n_srv_indices = n_srv_indices,
-    #               obs_catches = obs_catches, 
-    #               obs_fish_age_comps = array(obs_fish_age_comps, dim = c(31, 30, 2, 1)),
-    #               obs_fish_age_Neff = obs_fish_age_Neff, 
-    #               obs_srv_age_comps = array(obs_srv_age_comps, dim = c(31, 30, 1, 1)),
-    #               obs_srv_age_Neff = obs_srv_age_Neff, obs_fish_indices =  obs_fish_indices,
-    #               obs_srv_indices = obs_srv_indices, WAA = array(WAA, dim = c(32, 30, 1)), 
-    #               MatAA = array(MatAA, dim = c(32, 30, 1)), F_Slx_Blocks = F_Slx_Blocks,
-    #               S_Slx_Blocks = S_Slx_Blocks, 
-    #               # Init_N = as.vector(N_at_age[70,,,sim]),
-    #               Sex_Ratio = as.vector(c(1)),  rec_model = 0, 
-    #               fish_cv = fish_cv, srv_cv = srv_cv, catch_cv = catch_cv,
-    #               F_Slx_model = as.vector(c(0, 0)), n_fish_comps = 2, n_srv_comps = 1,
-    #               S_Slx_model = as.vector(0),
-    #               use_catch = use_catch, use_fish_index= use_fish_index,
-    #               use_srv_index= use_srv_index, use_fish_comps = use_fish_comps,
-    #               use_srv_comps = use_srv_comps
-    # )
     
     # Define parameter inits here
     parameters <- list(ln_SigmaRec = 0.6, ln_MeanRec = 2.75,
                        ln_M = log(0.1),  
-                       ln_fish_selpars = log(array(c(6, 6, 0.8, 0.8), dim = c(2, 1, 1, 2))),
+                       ln_fish_selpars = log(array(c(6, 8, 0.8, 0.8), dim = c(2, 1, 1, 2))),
                        ln_srv_selpars = array(5, dim = c(1, 1, 1, 2)),
                        ln_N1_Devs = log(rnorm(length(ages)-2,5, 1)),
                        ln_Fy = log(as.matrix(fish_mort[Fish_Start_yr[1]:((n_years) -1),,sim])),
-                       ln_q_fish = as.matrix(rep(log(0.1), n_fish_fleets)), 
+                       ln_q_fish = as.matrix(rep(log(0.1), 2)), 
                        ln_q_srv = as.matrix(rep(log(0.01), n_srv_fleets)),
                        ln_RecDevs = rec_devs[Fish_Start_yr[1]:((n_years) -1),sim])
     
+    # Map to fix parameters
     map <- list(ln_SigmaRec = factor(NA),
     # ln_fish_selpars = factor(c(rep(1, 4), NA, 1, NA, 1)),
     # ln_M = factor(NA),
@@ -183,7 +102,7 @@
   # Make ADFun
   my_model <- MakeADFun(data, parameters, map, DLL="EM", silent = T)
   mle_optim <- stats::nlminb(my_model$par, my_model$fn, my_model$gr, 
-                             control = list(iter.max = 3e5, eval.max = 3e5))
+                             control = list(iter.max = 1e5, eval.max = 1e5))
   
   # Additional newton steps to take
   add_newton(n.newton = 3, ad_model = my_model, mle_optim = mle_optim)
@@ -205,7 +124,7 @@
   q_srv_df <- extract_parameter_vals(sd_rep = sd_rep, par = "ln_q_srv", log = TRUE) %>% 
     mutate(t = mean(q_Surv), type = "q_surv", sim = sim, conv = conv[sim])
   fish_sel_df <- extract_parameter_vals(sd_rep = sd_rep, par = "ln_fish_selpars", log = TRUE) %>%
-    mutate(t = c(6,9,0.8,5), type = c("a50_f1", "d_f2", "d1", "amax_f2"), sim = sim, conv = conv[sim])
+    mutate(t = c(6,9,0.8,0.8), type = c("a50_f1", "a50_f2", "d1", "d2"), sim = sim, conv = conv[sim])
   srv_sel_df <- extract_parameter_vals(sd_rep = sd_rep, par = "ln_srv_selpars", log = TRUE) %>% 
     mutate(t = c(4, 0.8), type = c("a50_srv", "k_srv"), sim = sim, conv = conv[sim])
   meanrec_df <- extract_parameter_vals(sd_rep = sd_rep, par = "ln_MeanRec", log = TRUE) %>% 
@@ -240,11 +159,6 @@
            year = 70:(n_years-1))
   f_all <- rbind(f_all, f_df)
   
-  # Check total biomass
-  t_biom <- extract_ADREP_vals(sd_rep = sd_rep, par = "Total_Biom") %>% 
-    mutate(sim = sim, conv = conv[sim], year = 70:(n_years-1), t = biom_df$Biomass)
-  biom_all <- rbind(t_biom, biom_all)
-  
   # Check depletion rates
   depletion_df <- extract_ADREP_vals(sd_rep = sd_rep, par = "Depletion") %>%
     mutate(t = (SSB[Fish_Start_yr[1]:(n_years-1),sim]/SSB[Fish_Start_yr[1],sim]),
@@ -276,33 +190,35 @@
 # Get percentiles
 f_sum <- get_RE_precentiles(df = f_all %>% filter(conv == "Converged"), 
                      est_val_col = 1, true_val_col = 5, 
-                     par_name = "Total Fishing Mortality", year)
+                     par_name = "Total Fishing Mortality", group_vars = "year")
   
 ssb_sum <- get_RE_precentiles(df = ssb_all %>% filter(conv == "Converged"), 
                               est_val_col = 1, true_val_col = 5, 
-                              par_name = "Spawning Stock Biomass", year)
+                              par_name = "Spawning Stock Biomass", group_vars = "year")
 
 rec_sum <- get_RE_precentiles(df = rec_all %>% filter(conv == "Converged"), 
                               est_val_col = 1, true_val_col = 5, 
-                              par_name = "Total Recruitment", year)
+                              par_name = "Total Recruitment", group_vars = "year")
 
-biom_sum <- get_RE_precentiles(df = biom_all %>% filter(conv == "Converged"), 
-                               est_val_col = 1, true_val_col = 8, 
-                               par_name = "Total Biomass", year)
+# biom_sum <- get_RE_precentiles(df = biom_all %>% filter(conv == "Converged"), 
+#                                est_val_col = 1, true_val_col = 8, 
+#                                par_name = "Total Biomass", group_vars = "year")
 
 fish_mu_age_sum <- get_RE_precentiles(df = fish_mu_age %>% filter(conv == "Converged"),
-                                      est_val_col = 5, true_val_col = 6,
-                                      par_name = "Mean Predicted Fishery Age", year)
+                                      est_val_col = 4, true_val_col = 6,
+                                      par_name = "Mean Predicted Fishery Age", 
+                                      group_vars = c("year","fleet", "sex"))
 
 srv_mu_age_sum <- get_RE_precentiles(df = srv_mu_age %>% filter(conv == "Converged"),
-                                     est_val_col = 5, true_val_col = 6,
-                                     par_name = "Mean Predicted Survey Age", year)
+                                     est_val_col = 4, true_val_col = 6,
+                                     par_name = "Mean Predicted Survey Age", 
+                                     group_vars = c("year","fleet", "sex"))
 
 depletion_sum <-  get_RE_precentiles(df = depletion_all %>% filter(conv == "Converged"), 
                                      est_val_col = 1, true_val_col = 5, 
-                                     par_name = "Depletion (SSB / SSB0)", year)
+                                     par_name = "Depletion (SSB / SSB0)", group_vars = "year")
 
-all <- rbind(rec_sum, ssb_sum, f_sum, biom_sum, depletion_sum) 
+all <- rbind(rec_sum, ssb_sum, f_sum, depletion_sum, srv_mu_age_sum) 
 
 # Parameter estimates
 par_df <- par_all %>% mutate(RE = (mle_val - t ) / t) 
@@ -310,7 +226,7 @@ par_df <- par_all %>% mutate(RE = (mle_val - t ) / t)
 # Quick summary stats
 par_sum <- get_RE_precentiles(df = par_all %>% filter(conv == "Converged"), 
                               est_val_col = 2, true_val_col = 7, 
-                              par_name = NULL, type)
+                              par_name = "", group_vars = "type")
   
 (est_plot <- ggplot(all, aes(x = year, y = median)) +
   # geom_ribbon(aes(ymin = lwr_70, ymax = upr_70), alpha = 0.7, fill = "grey") +
@@ -320,7 +236,7 @@ par_sum <- get_RE_precentiles(df = par_all %>% filter(conv == "Converged"),
   geom_point(shape = 21, colour = "black", fill = "white", size = 5, stroke = 0.8, alpha = 0.85) +
   # geom_line( color = "white", size = 1,alpha = 1) +
   geom_hline(aes(yintercept = 0), col = "black", lty = 2, size = 1, alpha = 1) +
-  facet_wrap(~par_name, scales = "free") +
+  facet_wrap(~par_name, scales = "free", ncol = 2) +
   coord_cartesian(ylim = c(-0.4, 0.4)) +
   labs(x = "Year", y = "Relative Error") +
   theme_bw() +

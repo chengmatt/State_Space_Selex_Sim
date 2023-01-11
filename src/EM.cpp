@@ -297,25 +297,25 @@ Type objective_function<Type>::operator() ()
   
   // Fishery Index of Abundance
   for(int fi = 0; fi < n_fish_indices; fi++) {
-    for(int y = 0; y < n_years; y++) {
-      for(int s = 0; s < n_sexes; s++) {
-        for(int a = 0; a < n_ages; a++) {
-          pred_fish_indices(y, fi) += NAA(y, a, s) * WAA(y, a, s) * F_Slx(y, a, fi, s);
-        } // a loop
-      } // s loop
-      pred_fish_indices(y, fi) = exp(ln_q_fish(fi)) * pred_fish_indices(y, fi);
+    for(int y = 0; y < n_years; y++) { 
+        for(int s = 0; s < n_sexes; s++) {
+          for(int a = 0; a < n_ages; a++) {
+            pred_fish_indices(y, fi) += NAA(y, a, s) * WAA(y, a, s) * F_Slx(y, a, fi, s);
+          } // a loop
+        } // s loop
+        pred_fish_indices(y, fi) = exp(ln_q_fish(fi)) * pred_fish_indices(y, fi);
     } // y loop
   } // fi loop
   
   // Survey Index of Abundance
   for(int si = 0; si < n_srv_indices; si++) {
     for(int y = 0; y < n_years; y++) {
-      for(int s = 0; s < n_sexes; s++) {
-        for(int a = 0; a < n_ages; a++) {
-          pred_srv_indices(y, si) += NAA(y, a, s) * S_Slx(y, a, si, s);
-        } // a loop
-      } // s loop
-      pred_srv_indices(y, si) = exp(ln_q_srv(si)) * pred_srv_indices(y, si);
+        for(int s = 0; s < n_sexes; s++) {
+          for(int a = 0; a < n_ages; a++) {
+            pred_srv_indices(y, si) += NAA(y, a, s) * S_Slx(y, a, si, s);
+          } // a loop
+        } // s loop
+        pred_srv_indices(y, si) = exp(ln_q_srv(si)) * pred_srv_indices(y, si);
     } // y loop
   } // si loop  
   

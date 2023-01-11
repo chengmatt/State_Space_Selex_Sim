@@ -87,7 +87,7 @@ prepare_EM_input <- function(ages,
     
     # Now, apply the proportion function over a single fleet
     obs_fish_age_comps <- array(t(apply(obs_fish_age_comps, MARGIN = 1, FUN=function(x) { x/sum(x) })),
-                                dim = c(n_years, n_fleets, n_sexes))
+                                dim = c(length(years), length(ages), n_fleets, n_sexes))
     
     # Effective Sample Sizes
     obs_fish_age_Neff <- as.matrix(apply(fish_Neff[Fish_Start_yr[1]:(n_years - 1),], MARGIN = 1, FUN = sum), 
@@ -129,8 +129,20 @@ prepare_EM_input <- function(ages,
 # Abundance Indices -------------------------------------------------------
 
   # Fishery index
-  obs_fish_indices <-as.matrix( Fishery_Index_Agg[Fish_Start_yr[1]:(n_years - 1),,sim], 
-                                nrow = length(years), ncol = n_fish_indices)
+  if(n_fish_indices == 1) { # if single fleet index, we need to do some munging
+    # basically, we are going to take the average of the two fleets, if there are multiple 
+    # fleets, but this can be genearlizable to a single fleet index, where it just retains
+    # the original matrix structure
+    obs_fish_indices <- matrix(nrow = length(years), ncol = 1)
+    
+    # Loop through matrix to average across rows
+    for(i in 1:length(years))
+      obs_fish_indices[i, 1] <- mean(Fishery_Index_Agg[(Fish_Start_yr[1]-1) + i,,sim])
+
+  } else{
+    obs_fish_indices <-as.matrix( Fishery_Index_Agg[Fish_Start_yr[1]:(n_years - 1),,sim], 
+                                  nrow = length(years), ncol = n_fish_indices)
+  } # multi fleet index = leave as is
   
   # Survey index
   obs_srv_indices <- as.matrix(Survey_Index_Agg[Fish_Start_yr[1]:(n_years - 1),,sim], 

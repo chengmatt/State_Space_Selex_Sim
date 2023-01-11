@@ -201,7 +201,7 @@ extract_mean_age_vals <- function(mod_rep, comp_name, bins, comp_start_yr,
       for(i in 1:n_years) {
         for(s in 1:n_sexes) {
           # Get true age proportions - sum across fleets
-          prop_ages <- Catch_at_age[(Fish_Start_yr[1] - 1 + i),,1,s,sim] / wt_at_age[(Fish_Start_yr[1]  - 1 + i),,s,sim]
+          prop_ages <- Catch_at_age[(Fish_Start_yr[1] - 1 + i),,1,s,sim]
           # Get true mean age
           true_ages[i, 1, s] <- sum((prop_ages / sum(prop_ages)) * 1:30)
         } # s loop
@@ -212,8 +212,8 @@ extract_mean_age_vals <- function(mod_rep, comp_name, bins, comp_start_yr,
     if(n_mod_fleets == 1 & n_fish_true_fleets > 1) { 
       for(i in 1:n_years) {
         for(s in 1:n_sexes) {
-          # Get true age proportions - sum across fleets
-          prop_ages <- rowSums(Catch_at_age[(Fish_Start_yr[1]  - 1 + i),,,s,sim] / wt_at_age[(Fish_Start_yr[1]  - 1 + i),,s,sim])
+          # Get true age proportions - sum across fleets for catcha t age
+          prop_ages <- rowSums(Catch_at_age[(Fish_Start_yr[1]  - 1 + i),,,s,sim])
           # Get true mean age
           true_ages[i, 1, s] <- sum((prop_ages / sum(prop_ages)) * 1:30)
         } # s loop
@@ -233,7 +233,7 @@ extract_mean_age_vals <- function(mod_rep, comp_name, bins, comp_start_yr,
         for(f in 1:n_fish_true_fleets) {
           for(s in 1:n_sexes) {
             # Get true age proportions - sum across fleets
-            prop_ages <- Catch_at_age[(Fish_Start_yr[f]  - 1 + i),,f,s,sim] / wt_at_age[(Fish_Start_yr[f]  - 1 + i),,s,sim]
+            prop_ages <- Catch_at_age[(Fish_Start_yr[f]  - 1 + i),,f,s,sim] 
             # Get true mean age
             true_ages[i, f, s] <- sum((prop_ages / sum(prop_ages)) * 1:30)
           } # s loop
@@ -263,14 +263,14 @@ extract_mean_age_vals <- function(mod_rep, comp_name, bins, comp_start_yr,
 #' @param est_val_col column number of estimated mle values
 #' @param true_val_col column number of true values
 #' @param par_name character name that we want to input into the returned dataframe
-#' @param ... group_by variable name
+#' @param group_vars group_by variable names as strings
 #'
 #' @return dataframe of a range of different percentiles
 #' @export
 #'
 #' @examples
 get_RE_precentiles <- function(df, est_val_col = 1, true_val_col = 5, par_name = NULL,
-                               ...) {
+                               group_vars) {
   
   # Get relative error based on indexed columns
   RE <- (df[,est_val_col] - df[,true_val_col]) / df[,true_val_col]
@@ -278,7 +278,7 @@ get_RE_precentiles <- function(df, est_val_col = 1, true_val_col = 5, par_name =
   names(df)[ncol(df)] <- "RE" # Rename variable
   
   df <- df %>% 
-    group_by(...) %>% 
+    group_by(!!! syms(group_vars)) %>% 
     summarize(median = median(RE), 
               lwr_100 = quantile(RE, 0),
               upr_100 = quantile(RE, 1),
@@ -289,8 +289,16 @@ get_RE_precentiles <- function(df, est_val_col = 1, true_val_col = 5, par_name =
               lwr_75 = quantile(RE, 0.125),
               upr_75 = quantile(RE, 0.875)) %>% 
     mutate(par_name = par_name) 
-    
   
+  if(str_detect(par_name, "Age")) { # if this is an age variable
+    
+    # Make par_name different such that we can facet wrap later on
+    df$par_name <- paste(df$par_name, "Fleet", df$fleet, "Sex", df$sex)
+    
+    # Drop grouped columns (2nd and 3rd column - fleet and sex)
+    df <- df[,-c(2:3)]
+  }
+    
   return(df)
 }
 
