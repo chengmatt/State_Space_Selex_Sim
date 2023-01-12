@@ -49,7 +49,7 @@ Type objective_function<Type>::operator() ()
   // Controls on assessment ----------------------------------------------
   DATA_INTEGER(rec_model); // Recruitment model, == 0 Mean Recruitment, == 1 Beverton Holt 
   DATA_IVECTOR(F_Slx_model); // Fishery Selectivity Model, == 0 Logistic n_fleets
-  DATA_IMATRIX(F_Slx_Blocks); // Fishery Selectivity Time Blocks, n_years * n_fish_fleets; 
+  DATA_IMATRIX(F_Slx_Blocks); // Fishery Selectivity Time Blocks, n_years * n_fleets; 
   // this is set up such that the selectivity within a fleet and across sexes is constant 
   DATA_IVECTOR(S_Slx_model); // Survey Selectivity Model, == 0 Logistic n_fleets 
   DATA_IMATRIX(S_Slx_Blocks); // Survey Selectivity Time Blocks, n_years * n_srv_fleets; 
@@ -140,40 +140,52 @@ Type objective_function<Type>::operator() ()
   
   // Fishery
   for(int y = 0; y < n_years; y++) {
-    for(int f = 0; f < n_fish_comps; f++) {
-
+      for(int f = 0; f < n_fish_comps; f++) {  
       // Index fishery blocks here
       int b = F_Slx_Blocks(y, f);
-
       for(int s = 0; s < n_sexes; s++) {
-        for(int a = 0; a < n_ages; a++) {
+          for(int a = 0; a < n_ages; a++) {
           
           // a + 1 because TMB indexes starting at 0
-          F_Slx(y,a,f,s) = Get_Selex(a + 1, F_Slx_model(f), 
-                ln_fish_selpars.transpose().col(f).col(s).col(b).vec()); 
-          
-        } // a loop
+          F_Slx(y,a,f,s) = Get_Selex(a + 1, F_Slx_model(f),
+                  ln_fish_selpars.transpose().col(f).col(s).col(b).vec());
+            
+            // if(F_Slx_model(f) == 2) {
+            //   if(a == n_ages - 1) { // scale to max of 1 when done w/ a loop
+            //     Type max_F_sel = max(F_Slx.col(s).col(f).transpose().col(y).vec());
+            //     for(int a = 0; a < n_ages; a++) F_Slx(y,a,f,s) /= max_F_sel;
+            //   } // scale to a max of 1 here
+            // } // only scale to max of 1 if double-logistic
+            // 
+          } // a loop
       } // s loop
-    } // f loop
+      } // f loop
   } // y loop
   
   for(int y = 0; y < n_years; y++) {
-    for(int f = 0; f < n_srv_comps; f++) {
+      for(int f = 0; f < n_srv_comps; f++) {
       
       // Index fishery blocks here
       int b = S_Slx_Blocks(y, f);
       
       for(int s = 0; s < n_sexes; s++) {
-        for(int a = 0; a < n_ages; a++) {
+          for(int a = 0; a < n_ages; a++) {
           
           // a + 1 because TMB indexes starting at 0
-          S_Slx(y,a,f,s) = Get_Selex(a + 1, S_Slx_model(f), 
-                ln_srv_selpars.transpose().col(f).col(s).col(b).vec()); 
+          S_Slx(y,a,f,s) = Get_Selex(a + 1, S_Slx_model(f),
+                  ln_srv_selpars.transpose().col(f).col(s).col(b).vec());
           // transposing selectivity array to coerce to vector
-
-        } // a loop       
+          
+          // if(S_Slx_model(f) == 2) {
+          //   if(a == n_ages - 1) { // scale to max of 1 when done w/ a loop
+          //     Type max_S_sel = max(S_Slx.col(s).col(f).transpose().col(y).vec());
+          //     for(int a = 0; a < n_ages; a++) S_Slx(y,a,f,s) /= max_S_sel;
+          //   } // scale to a max of 1 here
+          // } // only scale to max of 1 if this is a double-logistic
+          
+          } // a loop
       } // s loop
-    } // f loop
+      } // f loop
   } // y loop
 
   // Deaths and Removals (Fishing Mortality and Natural Mortality) --------------------------------

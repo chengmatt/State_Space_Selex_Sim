@@ -4,62 +4,57 @@
 
 #' Title Prepares data inputs for the EM 
 #'
-#' @param ages vector of ages
 #' @param years vector of years
-#' @param n_sexes integer of sexes
-#' @param n_fleets integer of fleets
-#' @param n_fish_comps integer for fishery comps (needs to match number of fleets)
-#' @param n_srv_comps integer for survey comps (needs to match number of surveys)
-#' @param n_fish_indices integer for number of fishery indices fit
-#' @param n_srv_indices integer for number of survey indices fit
-#' @param Fish_Start_yr vector of fishery start years
 #' @param catch_cv vector of catch CVs
-#' @param F_Slx_Blocks matrix of selectivity blocks, where it is encoded as:
-#' matrix(c(0), nrow = length(years), ncol = n_fleets), with unique numbers representing unique time-blocks
-#' @param S_Slx_Blocks same as above
-#' @param use_catch matrix of whether or not to use catch data 0 = don't use, 1 = use, where it is encoded as:
-#' use_catch <- matrix(1, nrow = n_years, ncol = n_fish_fleets)
+#' @param F_Slx_Blocks_Input matrix of when you want to block
+#' @param S_Slx_Blocks_Input same as above
+#' @param use_catch Boolean (TRUE OR FALSE) TRUE = Use, FALSE = don't use
 #' @param use_fish_index same as above
 #' @param use_srv_index same as above
-#' @param use_fish_comps array of whether or not to use comp data 0 = don't use, 1 = use, where it is encoded as:
-#' use_fish_comps <- array(1, dim = c(n_years, n_fish_comps, n_sex))
-#' @param use_srv_comps same as abovce
+#' @param use_fish_comps Boolean (TRUE OR FALSE) TRUE = USE, FALSE = don't use
+#' @param use_srv_comps same above abovce
 #' @param rec_model recruitment model == 0 (mean recruitment)
-#' @param F_Slx_model Fishery selex model ==0, logistic, == 1 gamma, ==2 double logistic
-#' @param S_Slx_model same as above
+#' @param F_Slx_Model_Input Fishery selectivity model character (logistic, gamma, double_logistic)
+#' @param S_Slx_Model_Input same as above
 #' @param sim simulation indexing
 #'
 #' @return
 #' @export
 #'
 #' @examples
-prepare_EM_input <- function(ages, 
-                          years,
-                          n_sexes, 
+#' Note that n_years here refers to the all the rows of the array
+prepare_EM_input <- function(years,
                           n_fleets, 
-                          n_fish_comps,
-                          n_srv_comps,
-                          n_fish_indices, 
-                          n_srv_indices, 
-                          Fish_Start_yr,
                           catch_cv,
-                          F_Slx_Blocks,
-                          S_Slx_Blocks,
+                          F_Slx_Blocks_Input,
+                          S_Slx_Blocks_Input,
                           use_catch,
                           use_fish_index,
                           use_srv_index, 
                           use_fish_comps,
                           use_srv_comps,
                           Sex_Ratio,
-                          F_Slx_model,
-                          S_Slx_model = 0,
+                          F_Slx_Model_Input,
+                          S_Slx_Model_Input,
                           rec_model = 0,
                           sim) {
   
-  # Make input into a list 
-  input <- list()
+  # Make data into a list 
+  data <- list()
+  # Make parameters into a list
+  pars <- list()
   
-
+  # Specify dimensions 
+  ages <- ages # ages
+  Fish_Start_yr <- Fish_Start_yr # Fishery start year
+  n_sexes <- n_sex # sexes
+  n_years <- nrow(Catch_agg) # number of years
+  n_fleets <- n_fleets # number of fleets
+  n_fish_comps <- n_fleets # number of fleets = number of fish comps
+  n_fish_indices <- n_fleets # number of fish indices = number of fleets
+  n_srv_comps <- dim(Surv_selex_at_age)[3] # 3rd dimension of this array = number of survey fleets
+  n_srv_indices <- dim(Survey_Index_Agg)[2] # 2nd dimension of this array = number of survey fleets
+  
 # Catch -------------------------------------------------------------------
 
   if(n_fleets == 1) { # if single fleet - sum across or leave as is
@@ -162,7 +157,6 @@ prepare_EM_input <- function(ages,
   # Sex Ratios
   Sex_Ratio <- Sex_Ratio
   
-
 # CV inputs ---------------------------------------------------------------
   
   # Fishery, survey, and catch CV
@@ -170,51 +164,143 @@ prepare_EM_input <- function(ages,
   srv_cv <- as.vector(srv_CV)
   catch_cv <- as.vector(catch_cv)
 
-# Selectivity blocks ------------------------------------------------------
-
-  F_Slx_Blocks <- F_Slx_Blocks # fishery blocks
-  S_Slx_Blocks <- S_Slx_Blocks # survey blocks
+# Selectivity options ------------------------------------------------------
+  
+  F_Slx_model <- vector()
+  S_Slx_model <- vector()
+  
+  # Fishery selex model input
+  for(i in 1:n_fleets) {
+    if(F_Slx_Model_Input[i] == "logistic") F_Slx_model[i] <- 0
+    if(F_Slx_Model_Input[i] == "gamma") F_Slx_model[i] <- 1
+    if(F_Slx_Model_Input[i] == "double_logistic") F_Slx_model[i] <- 2
+  } # end loop for selectivity model input for fishery
+  
+  # Survey selex model input
+  for(i in 1:n_srv_comps) {
+    if(S_Slx_Model_Input[i] == "logistic") S_Slx_model[i] <- 0
+    if(S_Slx_Model_Input[i] == "gamma") S_Slx_model[i] <- 1
+    if(S_Slx_Model_Input[i] == "double_logistic") S_Slx_model[i] <- 2
+  } # end loop for selectivity model input for survey
+  
+  # Specify selectivity blocks here
+  F_Slx_Blocks <- F_Slx_Blocks_Input # fishery blocks
+  S_Slx_Blocks <- S_Slx_Blocks_Input # survey blocks
 
 # Data Indicators ---------------------------------------------------------
-
-  use_fish_index <- use_fish_index # fishery index
-  use_srv_index <- use_srv_index # survey index
-  use_fish_comps <- use_fish_comps # fishery comps
-  use_srv_comps <- use_srv_comps  # survey comps
+  
+  # Catch data
+  if(use_catch == TRUE) {
+    use_catch <- matrix(1, nrow = length(years), ncol = n_fleets)
+  } else{
+    use_catch <- matrix(0, nrow = length(years), ncol = n_fleets)
+  }
+  
+  # Fishery index of abundance
+  if(use_fish_index == TRUE) {
+    use_fish_index <- matrix(1, nrow = length(years), ncol = n_fish_indices)
+  } else{
+    use_fish_index <- matrix(0, nrow = length(years), ncol = n_fish_indices)
+  }
+  
+  # Survey index of abundance
+  if(use_srv_index == TRUE) {
+    use_srv_index <- matrix(1, nrow = length(years), ncol = n_srv_indices)
+  } else{
+    use_srv_index <- matrix(0, nrow = length(years), ncol = n_srv_indices)
+  }
+  
+  # Fishery comps
+  if(use_fish_comps == TRUE) {
+    use_fish_comps <- array(1, dim = c(length(years), n_fish_comps, n_sexes))
+  } else{
+    use_fish_comps <- array(0, dim = c(length(years), n_fish_comps, n_sexes))
+  }
+  
+  # Survey comps
+  if(use_srv_comps == TRUE) {
+    use_srv_comps <- array(1, dim = c(length(years), n_srv_comps, n_sexes))
+  } else{
+    use_srv_comps <- array(0, dim = c(length(years), n_srv_comps, n_sexes))
+  }
 
   # Input these data into a list object
-  input$ages <- ages
-  input$years <- years
-  input$n_sexes <- n_sexes
-  input$n_fleets = n_fleets
-  input$n_fish_comps = n_fish_comps
-  input$n_srv_comps = n_srv_comps
-  input$n_fish_indices = n_fish_indices
-  input$n_srv_indices = n_srv_indices
-  input$obs_catches <- obs_catches
-  input$obs_fish_age_comps <- obs_fish_age_comps
-  input$obs_fish_age_Neff <- obs_fish_age_Neff
-  input$obs_srv_age_comps <- obs_srv_age_comps
-  input$obs_srv_age_Neff <- obs_srv_age_Neff
-  input$obs_fish_indices <- obs_fish_indices
-  input$obs_srv_indices <- obs_srv_indices
-  input$WAA <- WAA
-  input$MatAA <- MatAA
-  input$Sex_Ratio <- Sex_Ratio
-  input$fish_cv <- fish_cv
-  input$srv_cv <- srv_cv
-  input$catch_cv <- catch_cv
-  input$F_Slx_Blocks <- F_Slx_Blocks
-  input$S_Slx_Blocks <- S_Slx_Blocks
-  input$use_catch <- use_catch
-  input$use_fish_index <- use_fish_index
-  input$use_srv_index  <- use_srv_index 
-  input$use_fish_comps <- use_fish_comps
-  input$use_srv_comps  <- use_srv_comps 
-  input$rec_model <- rec_model
-  input$S_Slx_model <- S_Slx_model
-  input$F_Slx_model <- F_Slx_model
+  data$ages <- ages
+  data$years <- years
+  data$n_sexes <- n_sexes
+  data$n_fleets = n_fleets
+  data$n_fish_comps = n_fish_comps
+  data$n_srv_comps = n_srv_comps
+  data$n_fish_indices = n_fish_indices
+  data$n_srv_indices = n_srv_indices
+  data$obs_catches <- obs_catches
+  data$obs_fish_age_comps <- obs_fish_age_comps
+  data$obs_fish_age_Neff <- obs_fish_age_Neff
+  data$obs_srv_age_comps <- obs_srv_age_comps
+  data$obs_srv_age_Neff <- obs_srv_age_Neff
+  data$obs_fish_indices <- obs_fish_indices
+  data$obs_srv_indices <- obs_srv_indices
+  data$WAA <- WAA
+  data$MatAA <- MatAA
+  data$Sex_Ratio <- Sex_Ratio
+  data$fish_cv <- fish_cv
+  data$srv_cv <- srv_cv
+  data$catch_cv <- catch_cv
+  data$F_Slx_Blocks <- F_Slx_Blocks
+  data$S_Slx_Blocks <- S_Slx_Blocks
+  data$use_catch <- use_catch
+  data$use_fish_index <- use_fish_index
+  data$use_srv_index  <- use_srv_index 
+  data$use_fish_comps <- use_fish_comps
+  data$use_srv_comps  <- use_srv_comps 
+  data$rec_model <- rec_model
+  data$S_Slx_model <- S_Slx_model
+  data$F_Slx_model <- F_Slx_model
   
-  return(input)
+
+# Parameter specifications ------------------------------------------------
+
+  # Set up parameters
+  pars$ln_SigmaRec <- sigma_rec # recruitment variability
+  pars$ln_RecDevs <- rnorm(length(years), -1, 0.05) # rec devs
+  pars$ln_MeanRec <- rnorm(1, 3, 0.1)  # recruitment
+  pars$ln_N1_Devs <- rnorm(length(ages)-2, -1, 0.05) # intial recruitment deviaates
+  pars$ln_M <- rnorm(1, 0, 0.1) # natural mortality
+  pars$ln_Fy <- matrix(rnorm(n_fleets * length(years), -3, 0.05), 
+                          ncol = n_fleets, nrow = length(years)) # fishing mortality
+  pars$ln_q_fish <- rnorm(n_fish_indices, -1, 0.05) # catchability for fishery
+  pars$ln_q_srv <- rnorm(n_srv_indices, -1, 0.05) # catchability for survey
+  
+  # Selectivity parameters
+  
+  # Survey
+  n_srv_blocks <- length(unique(as.vector(S_Slx_Blocks_Input))) # unique numbers (max surv blocks)
+  
+  # Now, figure out how many parameters we need to dimension the array
+  # Create a vector to hold number of parameter values, and then take the max of that vector
+  # to set up our array
+  n_srv_pars <- vector()
+  for(i in 1:length(S_Slx_Model_Input)) {
+    if(S_Slx_Model_Input[i] == "logistic") n_srv_pars[i] <- 2
+    if(S_Slx_Model_Input[i] == "gamma") n_srv_pars[i] <- 2
+    if(S_Slx_Model_Input[i] == "double_logistic") n_srv_pars[i] <- 4
+  } # end i loop
+  # Put array into our list
+  pars$ln_srv_selpars <- array(rnorm(1, 0, 1), dim = c(n_srv_comps, n_sexes, n_srv_blocks, max(n_srv_pars)))
+  
+  # Do the same, but for the fishery
+  n_fish_blocks <- length(unique(as.vector(F_Slx_Blocks_Input))) # unique numbers (max fish blocks)
+  # Loop through to figure out how to dimension the last element of the array
+  n_fish_pars <- vector()
+  for(i in 1:length(F_Slx_Model_Input)) {
+    if(F_Slx_Model_Input[i] == "logistic") n_fish_pars[i] <- 2
+    if(F_Slx_Model_Input[i] == "gamma") n_fish_pars[i] <- 2
+    if(F_Slx_Model_Input[i] == "double_logistic") n_fish_pars[i] <- 4
+  } # end i loop
+  
+  # put array into our parameter list
+  pars$ln_fish_selpars <- array(rnorm(1, 0, 1), dim = c(n_fish_comps, n_sexes, n_fish_blocks, max(n_fish_pars)))
+  
+  return(list(data = data, parameters = pars))
   
 }

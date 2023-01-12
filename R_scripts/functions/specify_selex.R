@@ -98,13 +98,13 @@ selex_opts <- function(selex_type, bins, par_values) {
     # p6 = if set at 1 - asymptotic (where the right half of the curve limb ends, should also be in inv logit space)
     
     # TESTING
-    bins <- 2:30
-    p1 <- 5
-    p2 <- 0.01
-    p3 <- 3
-    p4 <- 10
-    p5 <- 0.2
-    p6 <- 0.1
+    # bins <- 2:30
+    # p1 <- 3
+    # p2 <- 0.4
+    # p3 <- 3
+    # p4 <- 5
+    # p5 <- 0.5
+    # p6 <- 0.2
     
     # Get input parameter values
     p1 <- as.numeric(par_mat[,1][par_mat[,2] == "p1"]) # p1
