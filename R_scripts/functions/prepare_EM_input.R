@@ -58,7 +58,8 @@ prepare_EM_input <- function(years,
 # Catch -------------------------------------------------------------------
 
   if(n_fleets == 1) { # if single fleet - sum across or leave as is
-    obs_catches <- as.matrix( apply( Catch_agg[(Fish_Start_yr[1]:(n_years-1)),,sim], 1, FUN = sum))
+    obs_catches <- as.matrix(apply( as.matrix(Catch_agg[(Fish_Start_yr[1]:(n_years-1)),,sim]), 1, FUN = sum),
+                             ncol = 1)
   } else{ # multi fleet - leave as is
     obs_catches <- matrix(Catch_agg[(Fish_Start_yr[1]:(n_years-1)),,sim], nrow = length(years), ncol = n_fleets)
   } # end else
@@ -85,7 +86,7 @@ prepare_EM_input <- function(years,
                                 dim = c(length(years), length(ages), n_fleets, n_sexes))
     
     # Effective Sample Sizes
-    obs_fish_age_Neff <- as.matrix(apply(fish_Neff[Fish_Start_yr[1]:(n_years - 1),], MARGIN = 1, FUN = sum), 
+    obs_fish_age_Neff <- as.matrix(apply(as.matrix(fish_Neff[Fish_Start_yr[1]:(n_years - 1),]), MARGIN = 1, FUN = sum), 
                                    nrow = length(years), ncol = n_fleets)
     
   } else{ # more than one fleet here
