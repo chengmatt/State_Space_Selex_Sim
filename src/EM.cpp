@@ -51,10 +51,13 @@ Type objective_function<Type>::operator() ()
   DATA_IVECTOR(F_Slx_model); // Fishery Selectivity Model, == 0 Logistic n_fleets
   DATA_IMATRIX(F_Slx_Blocks); // Fishery Selectivity Time Blocks, n_years * n_fish_comps; 
   // this is set up such that the selectivity within a fleet and across sexes is constant
-  DATA_IMATRIX(F_Slx_re_model); // Fishery Selectivity Random Effects Model, 
-  // n_fish_comps * n_sexes, == 0 AR(1y) == 1 2DAR(1)
   DATA_IVECTOR(S_Slx_model); // Survey Selectivity Model, == 0 Logistic n_fleets 
   DATA_IMATRIX(S_Slx_Blocks); // Survey Selectivity Time Blocks, n_years * n_srv_fleets; 
+  
+  // Random Effects on Fishery Selectivity Controls ------------------------------
+  DATA_IMATRIX(F_Slx_re_model); // Fishery Selectivity Random Effects Model, 
+  // n_fish_comps * n_sexes, == 0 AR(1y) == 1 2DAR(1)
+  DATA_IMATRIX(F_Slx_2DAR1_Blocks); // 2D AR1 Blocks, n_ages, n_fleets (Age blocks)
   
   // Indicators for fitting to data ----------------------------------------------
   // Indicator 0 == not fitting, 1 == fit
@@ -84,7 +87,7 @@ Type objective_function<Type>::operator() ()
 
   // Random effects for fishery selectivity
   PARAMETER_ARRAY(ln_fish_selpars_re); // Fishery Selectivity Parameters, n_years * n_ages * n_fish_comps * n_sexes
-  PARAMETER_ARRAY(sel_re_fish); // Correlations and sigma random effects
+  PARAMETER_ARRAY(fixed_sel_re_fish); // Correlations and sigma random effects
   // n_fixed_re_pars * n_fish_comps * n_sexes
 
   // Parameter Transformations ----------------------------------------------
@@ -150,62 +153,70 @@ Type objective_function<Type>::operator() ()
   
   // Fishery selectivity random effects  ----------------------------------------------
   
+  // Specify dimensions of random effects array
+  vector<int> fishsel_re_dim = ln_fish_selpars_re.dim; // Get dimensions of random effects array
+  int n_re_years = fishsel_re_dim(0); // Number of random effect years
+  int n_re_pars = fishsel_re_dim(1); // Number of fixed effect parameters to which random effects are applied to
+
   for(int f = 0; f < n_fish_comps; f++) {
     for(int s = 0; s < n_sexes; s++) {
-      
-      if(F_Slx_re_model(f,s) == 0) { // 1DAR1 by year
+    
+      if(F_Slx_re_model(f, s) == 0) { // random walk on parameters constrained by a variance term
         
-        // Empty array to fill in
-        array<Type> tmp_F_selpars_re(n_years);
+        // Create container to fill in with empty array 
+        array<Type> tmp_F_selpars_re(n_re_years, n_re_pars); 
+        
+        // Independent sigmas for each random effect deivation parameter
+        vector<Type> sigma_fish(n_re_pars); 
+
+        for(int p = 0; p < n_re_pars; p++) {
+          // Fill in sigma for each selectivity parameter
+          sigma_fish(p) = fixed_sel_re_fish(p, f, s); 
+          for(int y = 0; y < n_re_years; y++) { 
+            // fill in array to make sure indexing correctly
+            tmp_F_selpars_re(y, p) = ln_fish_selpars_re(y, p, f, s);
+            // penalize deviations
+            fish_sel_re_nLL -= dnorm(tmp_F_selpars_re(y, p), Type(0.0), sigma_fish(f, s), true);
+          } // y loop
+        } // p loop
+        
+      } // end random walk if statement
+      
+      if(F_Slx_re_model(f, s) == 1) { // AR1 process by year (shared AR1 term for all parameters in a fleet)
+        
+        // Create container to fill in with empty array 
+        array<Type> tmp_F_selpars_re(n_re_years); 
         
         for(int y = 0; y < n_years; y++) { // loop through to fill in array
           tmp_F_selpars_re(y) = ln_fish_selpars_re(y, 0, f, s); // par index fixed at 0
         } // looping through to make sure it gets indexed correctly
-
-        Type sigma_fish = exp( sel_re_fish(0, f, s) ); // sigma for determining variance
-        // Bound correlation between -1 and 1
-        Type rho_y = Type(2)/(Type(1) + exp(-Type(2) * sel_re_fish(1, f, s) )) - Type(1); // corr by selex year
-        Type sigma_sel =  pow(pow(sigma_fish,2) / (1-pow(rho_y,2)),0.5); // Variance of the AR process
-        fish_sel_re_nLL += SCALE(AR1(rho_y), sigma_sel)(tmp_F_selpars_re);
         
+          Type sigma_fish = exp( fixed_sel_re_fish(0, f, s) ); // sigma for determining variance
+          // Bound correlation between -1 and 1
+          Type rho_y = Type(2)/(Type(1) + exp(-Type(2) * fixed_sel_re_fish(1, f, s) )) - Type(1); // corr by selex year
+          Type sigma_sel =  pow(pow(sigma_fish,2) / (1-pow(rho_y,2)),0.5); // Variance of the AR process
+          fish_sel_re_nLL += SCALE(AR1(rho_y), sigma_sel)(tmp_F_selpars_re);
       }
       
-      // 
-      if(F_Slx_re_model(f,s) == 1) { // 1DAR1 by age
-        
-        // Empty array to fill in 
-        array<Type> tmp_F_selpars_re(n_ages);
-        
-        for(int a = 0; a < tmp_F_selpars_re.size(); a++) {
-          tmp_F_selpars_re(a) = ln_fish_selpars_re(0, a, f, s);
-        } // looping through to make sure it gets index correctly
-        
-        Type sigma_fish = exp(sel_re_fish(0, f, s)); // sigma for variance
-        // Bound correlation between -1 and 1
-        Type rho_age = Type(2)/(Type(1) + exp(-Type(2) * sel_re_fish(1, f, s) )) - Type(1); // corr by selex age
-        Type sigma_sel =  pow(pow(sigma_fish,2) / (1-pow(rho_age,2)),0.5); // Variance of the AR process
-        fish_sel_re_nLL += SCALE(AR1(rho_age), sigma_sel)(tmp_F_selpars_re);
-        
-      }
-
       if(F_Slx_re_model(f,s) == 2) { // 2DAR1
-        
+
         // Empty container array to fill in
-        array<Type> tmp_F_selpars_re(n_years, n_ages); 
-        
+        array<Type> tmp_F_selpars_re(n_years, n_ages);
+
         for(int y = 0; y < n_years; y++) { // fill in loop to make sure stuff is getting indexed correctly
-          for(int a = 0; a < n_ages; a++) {
-            tmp_F_selpars_re(y, a) = ln_fish_selpars_re(y, a, f, s);
+
+          for(int a = 0; a < n_re_pars; a++) { // loop through number of age blocks/unique re parameters
+            tmp_F_selpars_re(y, a) = ln_fish_selpars_re(y, a, f, s); 
           } // a loop
-        } // y loop 
-        
-        Type sigma_fish = exp(sel_re_fish(0, f, s)); // sigma for variance
+        } // y loop
+
+        Type sigma_fish = exp(fixed_sel_re_fish(0, f, s)); // sigma for variance
         // Bound correlation between -1 and 1
-        Type rho_y = Type(2)/(Type(1) + exp(-Type(2) * sel_re_fish(1, f, s) )) - Type(1); // corr by year
-        Type rho_age = Type(2)/(Type(1) + exp(-Type(2) * sel_re_fish(2, f, s) )) - Type(1); // corr by selex age
+        Type rho_y = Type(2)/(Type(1) + exp(-Type(2) * fixed_sel_re_fish(1, f, s) )) - Type(1); // corr by year
+        Type rho_age = Type(2)/(Type(1) + exp(-Type(2) * fixed_sel_re_fish(2, f, s) )) - Type(1); // corr by selex age
         Type sigma_sel = pow(pow(sigma_fish,2) / ((1-pow(rho_y,2)) * (1-pow(rho_age,2))),0.5); // Variance of the AR process
         fish_sel_re_nLL += SCALE(SEPARABLE(AR1(rho_y), AR1(rho_age)), sigma_sel)(tmp_F_selpars_re);
-      } 
+      }
       
     } // s loop
   } // f loop
@@ -219,28 +230,59 @@ Type objective_function<Type>::operator() ()
       
     for(int s = 0; s < n_sexes; s++) {
       
-      // Define selectivity parameters to feed into our Get_Selex function (our mean selex parameters)
-      vector<Type> ln_selpars = ln_fish_selpars.transpose().col(f).col(s).col(b).vec();
-      
+      // Define selectivity parameters to feed into our Get_Selex function (our fixed selex parameters)
+      vector<Type> tmp_ln_selpars = ln_fish_selpars.transpose().col(f).col(s).col(b).vec();
+
       // if we are estimating random effects
-      if(F_Slx_re_model(f, s) == 0 || F_Slx_re_model(f, s) == 1 || F_Slx_re_model(f, s) == 2) {
+      if(F_Slx_re_model(f, s) == 0 || F_Slx_re_model(f, s) == 1) {
+        
+        
+        if(F_Slx_re_model(f, s) == 0) {  // random walk on parameters here
+          
+          // Container object to store random walk objects deviations
+          array<Type> tmp_sel_vec(n_years, n_re_pars); 
+          
+          for(int p = 0; p < n_re_pars; p++) { // only loop through random effects for specified parameters
+            if(y == 0) { // ln_selpars is estimated for time t1
+              tmp_sel_vec(y, p) = tmp_ln_selpars(p); 
+            } else{
+              tmp_sel_vec(y, p) = tmp_sel_vec(y - 1, p) + ln_fish_selpars_re(y - 1, p, f, s);
+            } // else = adding in random walk deviations
+            
+            // re-exchange/recycle variables to the lnselpar container to be consistent w/ Get_Selex function
+            tmp_ln_selpars(p) = tmp_sel_vec(y, p); 
+            
+          } // end parameter (p) loop
+          
+        } // end if statement for random walk
+        
+        if(F_Slx_re_model(f, s) == 1) { // AR1 process by year 
+          
+          // Get number of fixed selectivity parameters we want to loop through
+         int n_fixed_pars = tmp_ln_selpars.size();
+          
+         // Add a shared global AR1 process to all parameters for a given fleet and sex
+         for(int p = 0; p < n_fixed_pars; p++) tmp_ln_selpars(p) += ln_fish_selpars_re(y, 0, f, s);
 
-        for(int p = 0; p < 1; p ++) {
-            // Adding parameter random effects here
-            ln_selpars(p) = ln_selpars(p) + ln_fish_selpars_re(y, 0, f, s);
-        } // end p (parameter) loop
-
+        } // end if statement for AR1_y
+        
       } // if statement for random effects
       
       for(int a = 0; a < n_ages; a++) {
-        
         // a + 1 because TMB indexes starting at 0
-        F_Slx(y,a,f,s) = Get_Selex(a + 1, F_Slx_model(f), ln_selpars);
+        F_Slx(y,a,f,s) = Get_Selex(a + 1, F_Slx_model(f), tmp_ln_selpars);
         
-        // If these are random effects, then multiply deviations to the selex array
-        // if(F_Slx_re_model(f,s) == 0) F_Slx(y,a,f,s) *= exp(ln_fish_selpars_re(y, 0, f, s)); // AR1_y
-        // if(F_Slx_re_model(f,s) == 1) F_Slx(y,a,f,s) *= exp(ln_fish_selpars_re(0, a, f, s)); // AR1_a
-        // if(F_Slx_re_model(f,s) == 2) F_Slx(y,a,f,s) *= exp(ln_fish_selpars_re(y, a, f, s)); // 2DAR1_ay
+        // 2DAR1_ay (devs on selex vals)
+        if(F_Slx_re_model(f,s) == 2) {
+          
+          // Create temporary variable that indicates the age block and loop through
+          // random effects with specified age blocks (as in Xu et al. 2019)
+          int age_blk = F_Slx_2DAR1_Blocks(a, f);
+          
+          // Now, allow deviations to occur by multiplying selex by the exponent
+          F_Slx(y,a,f,s) *= exp(ln_fish_selpars_re(y, age_blk, f, s));
+
+        } // if statement for 2DAR1
         
         } // a loop
       } // s loop
@@ -583,8 +625,7 @@ Type objective_function<Type>::operator() ()
   
   // Add to joint nLL
   jnLL = sum(rec_nLL) + sum(srv_comp_nLL)+ sum(fish_comp_nLL) + 
-  sum(srv_index_nLL) + sum(fish_index_nLL) + sum(catch_nLL) +
-  fish_sel_re_nLL;
+  sum(srv_index_nLL) + sum(fish_index_nLL) + sum(catch_nLL) + fish_sel_re_nLL;
   
   // REPORT SECTION ----------------------------------------------
   REPORT(NAA); // Numbers at age
@@ -598,8 +639,6 @@ Type objective_function<Type>::operator() ()
   REPORT(S_Slx); // Survey Selectivity
   REPORT(pred_fish_age_comps); // Predicted fishery age comps
   REPORT(pred_srv_age_comps); // Predicted survey age comps
-  REPORT(ln_q_fish); // catchability for fishery
-  REPORT(ln_q_srv); // catchability for survey
   REPORT(ln_fish_selpars_re); // Selectivity random effects
     
   //  Likelihoods
@@ -609,6 +648,7 @@ Type objective_function<Type>::operator() ()
   REPORT(fish_comp_nLL);
   REPORT(srv_comp_nLL);
   REPORT(rec_nLL);
+  REPORT(fish_sel_re_nLL);
   REPORT(jnLL);
   
   // ADREPORT 
@@ -617,9 +657,6 @@ Type objective_function<Type>::operator() ()
   ADREPORT(Total_Fy);
   ADREPORT(Total_Rec);
   ADREPORT(Total_Biom);
-  ADREPORT(pred_srv_indices);
-  ADREPORT(pred_fish_indices);
-  ADREPORT(pred_catches);
 
   return jnLL;
   

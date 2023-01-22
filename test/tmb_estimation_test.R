@@ -24,13 +24,13 @@
                 Fish_Start_yr = c(70, 70), Surv_Start_yr = c(70), 
                 max_rel_F_M = c(1.5, 1.5), desc_rel_F_M = c(0.15), 
                 F_type = c("Contrast", "Const_Inc"), yr_chng = c(86), 
-                fish_Neff_max = c(150, 150), srv_Neff_max = c(10), fish_CV = c(0.1, 0.1),
+                fish_Neff_max = c(500, 500), srv_Neff_max = c(10), fish_CV = c(0.1, 0.1),
                 srv_CV = c(0.1), catch_CV = c(0, 0), Neff_Fish_Time = "F_Vary", fixed_Neff = c(100, 100),
                 Mort_Time = "Constant", q_Mean_Fish = c(0.05, 0.05), q_Mean_Surv = 0.01, 
                 Rec_Dev_Type = "iid", rho_rec = NA, 
-                fish_selex = c("logistic", "logistic"), srv_selex = c("logistic"), 
+                fish_selex = c("logistic", "gamma"), srv_selex = c("logistic"), 
                 fish_pars = list(Fleet_1_L = matrix(data = c(6, 0.8), nrow = 1, byrow = TRUE),
-                                 Fleet_1_L = matrix(data = c(10, 0.8), nrow = 1, byrow = TRUE)),
+                                 Fleet_1_L = matrix(data = c(10, 5), nrow = 1, byrow = TRUE)),
                 srv_pars = list(Fleet_3_SL = matrix(data = c(4,0.8), nrow = 1, byrow = TRUE)), 
                 f_ratio = 1, m_ratio = 0)
   
@@ -59,9 +59,9 @@
                    n_fleets = 1, 
                    catch_cv = c(0.01),
                    F_Slx_Blocks_Input = matrix(c(rep(0, 31)),
-                                               nrow = length(years), ncol = 1), # fishery blocks
+                                        nrow = length(years), ncol = 1), # fishery blocks
                    S_Slx_Blocks_Input = matrix(c(0), # selectivity blocks
-                                               nrow = length(years), ncol = 1),
+                                        nrow = length(years), ncol = 1),
                    use_catch = TRUE,
                    use_fish_index = FALSE,
                    use_srv_index = TRUE,
@@ -73,10 +73,12 @@
                    Sex_Ratio = as.vector(1),
                    sim = sim)
   
-    input$data$F_Slx_re_model <- as.matrix(0, nrow = 1, ncol = 1) # 0 = AR1Y, 1 == AR1A, 2 = 2DAR1
-    input$parameters$ln_fish_selpars_re <- array(rnorm((length(years)* 1 * n_sex * 1), 0, 1), 
-                                                 dim = c(length(years), 1, 1, 1))
-    input$parameters$sel_re_fish <- array(0.1, dim = c(2, 1, 1))
+    input$data$F_Slx_re_model <- as.matrix(2, nrow = 1, ncol = 1) # 0 = RW, 1 = AR1_y, 2 == 2DAR1 
+    input$data$F_Slx_2DAR1_Blocks <- matrix(rep(0:9, length.out = 30, each = 3), nrow = length(ages),
+                                            ncol = 1)
+    input$parameters$ln_fish_selpars_re <- array(rnorm(((length(years))* 10 * n_sex * 1), 0, 1), 
+                                                 dim = c((length(years)), 10, 1, 1))
+    input$parameters$fixed_sel_re_fish <- array(0.5, dim = c(3, 1, 1))
 
     # Map to fix parameters
     map <- list(
@@ -90,7 +92,7 @@
   # Run EM model here and get sdrep
   model <- run_EM(data = input$data, parameters = input$parameters, 
                   map = map, n.newton = 3, random = "ln_fish_selpars_re",
-                  silent = T, getsdrep = TRUE)
+                  silent = F, getsdrep = TRUE)
   
   # Checking fixed effects parameter length
   # sum(names(model$sd_rep$par.fixed) == "ln_fish_selpars_re")
@@ -100,12 +102,12 @@
   f_pars <- model$sd_rep$par.fixed[names(model$sd_rep$par.fixed) == "ln_fish_selpars"]
   f_repars <- model$sd_rep$par.random[names(model$sd_rep$par.random) == "ln_fish_selpars_re"]
   
-  plot(model$model_fxn$rep$ln_fish_selpars_re, type = "l")
+  plot(model$model_fxn$rep$ln_fish_selpars_re[5,,1,1], type = "l")
   
   # Checking fixed effects
   
   for(i in 1:31) {
-    if(i == 1)  plot(model$model_fxn$rep$F_Slx[i,,,], type = "l", ylim = c(0,1))
+    if(i == 1)  plot(model$model_fxn$rep$F_Slx[i,,,], type = "l", ylim = c(0,3))
     else lines(model$model_fxn$rep$F_Slx[i,,,])
   }
   
@@ -118,7 +120,7 @@
   lines(Fish_selex_at_age[1,,1,,1], col = "red", lwd= 3)
   lines(Fish_selex_at_age[1,,2,,1], col = "blue", lwd= 3)
   
-  Matrix::image(model$model_fxn$env$spHess(random=TRUE))
+  # Matrix::image(model$model_fxn$env$spHess(random=TRUE))
 
   # Check model convergence
   convergence_status <- check_model_convergence(mle_optim = model$mle_optim, 
