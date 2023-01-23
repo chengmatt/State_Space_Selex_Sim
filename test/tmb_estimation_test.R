@@ -24,13 +24,13 @@
                 Fish_Start_yr = c(70, 70), Surv_Start_yr = c(70), 
                 max_rel_F_M = c(1.5, 1.5), desc_rel_F_M = c(0.15), 
                 F_type = c("Contrast", "Const_Inc"), yr_chng = c(86), 
-                fish_Neff_max = c(500, 500), srv_Neff_max = c(10), fish_CV = c(0.1, 0.1),
-                srv_CV = c(0.1), catch_CV = c(0, 0), Neff_Fish_Time = "F_Vary", fixed_Neff = c(100, 100),
+                fish_Neff_max = c(500, 500), srv_Neff_max = c(100), fish_CV = c(0.1, 0.1),
+                srv_CV = c(0.1), catch_CV = c(0, 0), Neff_Fish_Time = "F_Vary", fixed_Neff = c(500, 500),
                 Mort_Time = "Constant", q_Mean_Fish = c(0.05, 0.05), q_Mean_Surv = 0.01, 
                 Rec_Dev_Type = "iid", rho_rec = NA, 
-                fish_selex = c("logistic", "gamma"), srv_selex = c("logistic"), 
+                fish_selex = c("logistic", "logistic"), srv_selex = c("logistic"), 
                 fish_pars = list(Fleet_1_L = matrix(data = c(6, 0.8), nrow = 1, byrow = TRUE),
-                                 Fleet_1_L = matrix(data = c(10, 5), nrow = 1, byrow = TRUE)),
+                                 Fleet_1_L = matrix(data = c(10, 0.8), nrow = 1, byrow = TRUE)),
                 srv_pars = list(Fleet_3_SL = matrix(data = c(4,0.8), nrow = 1, byrow = TRUE)), 
                 f_ratio = 1, m_ratio = 0)
   
@@ -57,7 +57,7 @@
   # Prepare inputs here
   input <- prepare_EM_input(years = years,
                    n_fleets = 1, 
-                   catch_cv = c(0.01),
+                   catch_cv = c(0.05),
                    F_Slx_Blocks_Input = matrix(c(rep(0, 31)),
                                         nrow = length(years), ncol = 1), # fishery blocks
                    S_Slx_Blocks_Input = matrix(c(0), # selectivity blocks
@@ -73,16 +73,17 @@
                    Sex_Ratio = as.vector(1),
                    sim = sim)
   
-    input$data$F_Slx_re_model <- as.matrix(2, nrow = 1, ncol = 1) # 0 = RW, 1 = AR1_y, 2 == 2DAR1 
-    input$data$F_Slx_2DAR1_Blocks <- matrix(rep(0:9, length.out = 30, each = 3), nrow = length(ages),
+    input$data$F_Slx_re_model <- as.matrix(0, nrow = 1, ncol = 1) # 0 = RW, 1 = AR1_y, 2 == 2DAR1 
+    input$data$F_Slx_2DAR1_Blocks <- matrix(rep(0, length.out = 30, each = 10), nrow = length(ages),
                                             ncol = 1)
-    input$parameters$ln_fish_selpars_re <- array(rnorm(((length(years))* 10 * n_sex * 1), 0, 1), 
-                                                 dim = c((length(years)), 10, 1, 1))
-    input$parameters$fixed_sel_re_fish <- array(0.5, dim = c(3, 1, 1))
+    input$parameters$ln_fish_selpars_re <- array(rnorm(((length(years)) - 1 * 2 * n_sex * 1), 0, 1), 
+                                                 dim = c((length(years)) - 1, 2, 1, 1))
+    input$parameters$fixed_sel_re_fish <- array(0.5, dim = c(2, 1, 1))
 
     # Map to fix parameters
     map <- list(
     ln_SigmaRec = factor(NA),
+    ln_M = factor(NA),
     # sel_re_fish = factor(c(NA, 1)),
     # ln_fish_selpars_re = factor(c(NA, 1)),
     ln_q_fish = factor(rep(NA, 1)))
@@ -102,12 +103,13 @@
   f_pars <- model$sd_rep$par.fixed[names(model$sd_rep$par.fixed) == "ln_fish_selpars"]
   f_repars <- model$sd_rep$par.random[names(model$sd_rep$par.random) == "ln_fish_selpars_re"]
   
-  plot(model$model_fxn$rep$ln_fish_selpars_re[5,,1,1], type = "l")
+  sel_res <- model$model_fxn$rep$ln_fish_selpars_re
+  plot(sel_res[,1,1,1], type = "l")
   
   # Checking fixed effects
   
   for(i in 1:31) {
-    if(i == 1)  plot(model$model_fxn$rep$F_Slx[i,,,], type = "l", ylim = c(0,3))
+    if(i == 1)  plot(model$model_fxn$rep$F_Slx[i,,,], type = "l")
     else lines(model$model_fxn$rep$F_Slx[i,,,])
   }
   
@@ -178,7 +180,7 @@
   # # Check fishery mean age
   fish_mean_ages <- extract_mean_age_vals(mod_rep = model$model_fxn, comp_name = "pred_fish_age_comps",
                                          bins = ages, comp_start_yr = Fish_Start_yr[1], sim = sim,
-                                         n_fish_true_fleets = 1) %>% mutate(conv = conv[sim])
+                                         n_fish_true_fleets = 2) %>% mutate(conv = conv[sim])
   fish_mu_age <- rbind(fish_mu_age, fish_mean_ages)
 
   print(paste("done w/  sim = ", sim))
