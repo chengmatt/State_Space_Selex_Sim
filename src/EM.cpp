@@ -234,7 +234,7 @@ Type objective_function<Type>::operator() ()
             if(y == 0) { 
               tmp_sel_vec(y, p) = tmp_ln_selpars(p); // ln_selpars is estimated for time t1
             } else{
-              tmp_sel_vec(y, p) = tmp_sel_vec(y - 1, p) + exp(ln_fish_selpars_re(y - 1, p, f, s));
+              tmp_sel_vec(y, p) = tmp_sel_vec(y - 1, p) + ln_fish_selpars_re(y - 1, p, f, s);
             } // else = adding in random walk deviations
             
             // re-exchange/recycle variables to the lnselpar container to be consistent w/ Get_Selex function

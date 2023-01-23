@@ -64,8 +64,8 @@ run_EM <- function(data, parameters, map, n.newton, random = NULL,
   
   # Make AD Function here
   model_fxn <- TMB::MakeADFun(data, parameters, map, random = random,
-                              DLL="EM", silent = silent, checkParameterOrder = TRUE, 
-                              random.start = expression(last.par.best[random]))
+                              DLL="EM", silent = silent, 
+                              checkParameterOrder = TRUE)
   
   # Optimize model here w/ nlminb
   mle_optim <- stats::nlminb(model_fxn$par, model_fxn$fn, model_fxn$gr, 

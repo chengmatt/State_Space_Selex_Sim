@@ -1,195 +1,201 @@
-# Purpose: To test TMB EM biases, debug, troubleshoot, and develop fxns and EM model
-  # Set up ------------------------------------------------------------------
-  
-  library(here)
-  library(tidyverse)
-  library(TMB)
-  library(cowplot)
-  
-  # Load in all functions into the environment
-  fxn_path <- here("R_scripts", "functions")
-  source(here(fxn_path, "simulate_data.R"))
-  source(here(fxn_path, "Utility_fxns.R"))
-  source(here(fxn_path, "prepare_EM_input.R"))
-  
-  compile_tmb(wd = here("src"), cpp = "EM.cpp")
-  
-  # Path to general input biological parameters
-  spreadsheet_path <- here("input", "Sablefish_Inputs.xlsx")
-  
-  # simulate data
-  simulate_data(fxn_path = fxn_path, spreadsheet_path = spreadsheet_path, 
-                check_equil = FALSE, rec_type = "mean_rec",
-                n_years = 101, Start_F = c(0.01, 0.01), 
-                Fish_Start_yr = c(70, 70), Surv_Start_yr = c(70), 
-                max_rel_F_M = c(1.5, 1.5), desc_rel_F_M = c(0.15), 
-                F_type = c("Contrast", "Const_Inc"), yr_chng = c(86), 
-                fish_Neff_max = c(500, 500), srv_Neff_max = c(100), fish_CV = c(0.1, 0.1),
-                srv_CV = c(0.1), catch_CV = c(0, 0), Neff_Fish_Time = "F_Vary", fixed_Neff = c(500, 500),
-                Mort_Time = "Constant", q_Mean_Fish = c(0.05, 0.05), q_Mean_Surv = 0.01, 
-                Rec_Dev_Type = "iid", rho_rec = NA, 
-                fish_selex = c("logistic", "logistic"), srv_selex = c("logistic"), 
-                fish_pars = list(Fleet_1_L = matrix(data = c(6, 0.8), nrow = 1, byrow = TRUE),
-                                 Fleet_1_L = matrix(data = c(10, 0.8), nrow = 1, byrow = TRUE)),
-                srv_pars = list(Fleet_3_SL = matrix(data = c(4,0.8), nrow = 1, byrow = TRUE)), 
-                f_ratio = 1, m_ratio = 0)
-  
-  plot_OM(path = here("figs", "Base_OM_Figs"), file_name = "OM_Check.pdf")
-
-  # Load in data ------------------------------------------------------------
-  
-  ssb_all <- data.frame()
-  f_all <- data.frame()
-  rec_all <- data.frame()
-  biom_all <- data.frame()
-  par_all <- data.frame()
-  max_par <- vector()
-  fish_mu_age <- data.frame()
-  srv_mu_age <- data.frame()
-  conv <- vector()
-  depletion_all <- data.frame()
-  
-  # Specify years here
-  years <- Fish_Start_yr[1]:(n_years - 1)
-  
-  for(sim in 1:n_sims){
-  
-  # Prepare inputs here
-  input <- prepare_EM_input(years = years,
-                   n_fleets = 1, 
-                   catch_cv = c(0.05),
-                   F_Slx_Blocks_Input = matrix(c(rep(0, 31)),
-                                        nrow = length(years), ncol = 1), # fishery blocks
-                   S_Slx_Blocks_Input = matrix(c(0), # selectivity blocks
-                                        nrow = length(years), ncol = 1),
-                   use_catch = TRUE,
-                   use_fish_index = FALSE,
-                   use_srv_index = TRUE,
-                   use_fish_comps = TRUE,
-                   use_srv_comps = TRUE,
-                   rec_model = 0, 
-                   F_Slx_Model_Input = c("logistic"),
-                   S_Slx_Model_Input = c("logistic"), 
-                   Sex_Ratio = as.vector(1),
-                   sim = sim)
-  
-    input$data$F_Slx_re_model <- as.matrix(0, nrow = 1, ncol = 1) # 0 = RW, 1 = AR1_y, 2 == 2DAR1 
-    input$data$F_Slx_2DAR1_Blocks <- matrix(rep(0, length.out = 30, each = 10), nrow = length(ages),
-                                            ncol = 1)
-    input$parameters$ln_fish_selpars_re <- array(rnorm(((length(years)) - 1 * 2 * n_sex * 1), 0, 1), 
-                                                 dim = c((length(years)) - 1, 2, 1, 1))
-    input$parameters$fixed_sel_re_fish <- array(0.5, dim = c(2, 1, 1))
-
-    # Map to fix parameters
-    map <- list(
-    ln_SigmaRec = factor(NA),
-    ln_M = factor(NA),
-    # sel_re_fish = factor(c(NA, 1)),
-    # ln_fish_selpars_re = factor(c(NA, 1)),
-    ln_q_fish = factor(rep(NA, 1)))
+  # Purpose: To test TMB EM biases, debug, troubleshoot, and develop fxns and EM model
+    # Set up ------------------------------------------------------------------
+    
+    library(here)
+    library(tidyverse)
+    library(TMB)
+    library(cowplot)
+    
+    # Load in all functions into the environment
+    fxn_path <- here("R_scripts", "functions")
+    source(here(fxn_path, "simulate_data.R"))
+    source(here(fxn_path, "Utility_fxns.R"))
+    source(here(fxn_path, "prepare_EM_input.R"))
     
     compile_tmb(wd = here("src"), cpp = "EM.cpp")
-
-  # Run EM model here and get sdrep
-  model <- run_EM(data = input$data, parameters = input$parameters, 
-                  map = map, n.newton = 3, random = "ln_fish_selpars_re",
-                  silent = F, getsdrep = TRUE)
+    
+    # Path to general input biological parameters
+    spreadsheet_path <- here("input", "Sablefish_Inputs.xlsx")
+    
+    # simulate data
+    simulate_data(fxn_path = fxn_path, spreadsheet_path = spreadsheet_path, 
+                  check_equil = FALSE, rec_type = "mean_rec",
+                  n_years = 101, Start_F = c(0.01, 0.01), 
+                  Fish_Start_yr = c(70, 70), Surv_Start_yr = c(70), 
+                  max_rel_F_M = c(1.5, 1.5), desc_rel_F_M = c(0.15), 
+                  F_type = c("Contrast", "Const_Inc"), yr_chng = c(86), 
+                  fish_Neff_max = c(150, 150), srv_Neff_max = c(150), fish_CV = c(0.1, 0.1),
+                  srv_CV = c(0.1), catch_CV = c(0, 0), 
+                  Neff_Fish_Time = "F_Vary", fixed_Neff = c(30, 30),
+                  Mort_Time = "Constant", q_Mean_Fish = c(0.05, 0.05), q_Mean_Surv = 0.01, 
+                  Rec_Dev_Type = "iid", rho_rec = NA, 
+                  fish_selex = c("logistic", "logistic"), srv_selex = c("logistic"), 
+                  fish_pars = list(Fleet_1_L = matrix(data = c(5, 0.8), nrow = 1, byrow = TRUE),
+                                   Fleet_1_L = matrix(data = c(15, 0.8), nrow = 1, byrow = TRUE)),
+                  srv_pars = list(Fleet_3_SL = matrix(data = c(4,0.8), nrow = 1, byrow = TRUE)), 
+                  f_ratio = 1, m_ratio = 0)
+    
+    plot_OM(path = here("figs", "Base_OM_Figs"), file_name = "OM_Check.pdf")
   
-  # Checking fixed effects parameter length
-  # sum(names(model$sd_rep$par.fixed) == "ln_fish_selpars_re")
+    # Load in data ------------------------------------------------------------
+    
+    ssb_all <- data.frame()
+    f_all <- data.frame()
+    rec_all <- data.frame()
+    biom_all <- data.frame()
+    par_all <- data.frame()
+    max_par <- vector()
+    fish_mu_age <- data.frame()
+    srv_mu_age <- data.frame()
+    conv <- vector()
+    depletion_all <- data.frame()
+    
+    # Specify years here
+    years <- Fish_Start_yr[1]:(n_years - 1)
+    
+    start.time <- Sys.time()
+    
+    for(sim in 1:n_sims){
+    
+    # Prepare inputs here
+    input <- prepare_EM_input(years = years,
+                     n_fleets = 1, 
+                     catch_cv = c(0.01),
+                     F_Slx_Blocks_Input = matrix(c(rep(0, 31)),
+                                          nrow = length(years), ncol = 1), # fishery blocks
+                     S_Slx_Blocks_Input = matrix(c(0), # selectivity blocks
+                                          nrow = length(years), ncol = 1),
+                     use_catch = TRUE,
+                     use_fish_index = FALSE,
+                     use_srv_index = TRUE,
+                     use_fish_comps = TRUE,
+                     use_srv_comps = TRUE,
+                     rec_model = 0, 
+                     F_Slx_Model_Input = c("logistic"),
+                     S_Slx_Model_Input = c("logistic"), 
+                     Sex_Ratio = as.vector(1),
+                     sim = sim)
+     
+      input$data$F_Slx_re_model <- as.matrix(0, nrow = 1, ncol = 1) # 0 = RW, 1 = AR1_y, 2 == 2DAR1 
+      input$data$F_Slx_2DAR1_Blocks <- matrix(rep(0, length.out = 30, each = 10), 
+                                              nrow = length(ages), ncol = 1)
+      input$parameters$ln_fish_selpars_re <- array(rnorm(((length(years)) - 1 * 1 * n_sex * 1), 0, 0.05), 
+                                                   dim = c((length(years)) - 1, 1, 1, 1))
+      input$parameters$fixed_sel_re_fish <- array(0.5, dim = c(1, 1, 1))
   
-  model$sd_rep
-
-  f_pars <- model$sd_rep$par.fixed[names(model$sd_rep$par.fixed) == "ln_fish_selpars"]
-  f_repars <- model$sd_rep$par.random[names(model$sd_rep$par.random) == "ln_fish_selpars_re"]
+      # Map to fix parameters
+      map <- list(
+      ln_SigmaRec = factor(NA),
+      # ln_M = factor(NA),
+      # sel_re_fish = factor(c(NA, 1)),
+      # ln_fish_selpars_re = factor(c(NA, 1)),
+      ln_q_fish = factor(rep(NA, 1)))
+      
+      compile_tmb(wd = here("src"), cpp = "EM.cpp")
   
-  sel_res <- model$model_fxn$rep$ln_fish_selpars_re
-  plot(sel_res[,1,1,1], type = "l")
+    # Run EM model here and get sdrep
+    model <- run_EM(data = input$data, parameters = input$parameters, 
+                    map = map, n.newton = 3, random = "ln_fish_selpars_re",
+                    silent = T, getsdrep = TRUE)
+    
+    # Checking fixed effects parameter length
+    # sum(names(model$sd_rep$par.fixed) == "ln_fish_selpars_re")
+    
+    # model$sd_rep
   
-  # Checking fixed effects
+    # f_pars <- model$sd_rep$par.fixed[names(model$sd_rep$par.fixed) == "ln_fish_selpars"]
+    # f_repars <- model$sd_rep$par.random[names(model$sd_rep$par.random) == "ln_fish_selpars_re"]
+    # 
+    # sel_res <- model$model_fxn$rep$ln_fish_selpars_re
+    # plot(sel_res[,1,1,1], type = "l")
+    
+    # Checking fixed effects
+    
+    for(i in 1:31) {
+      if(i == 1)  plot(model$model_fxn$rep$F_Slx[i,,,], type = "l")
+      else lines(model$model_fxn$rep$F_Slx[i,,,])
+    }
+    
+    # melt(model$model_fxn$rep$F_Slx)  %>% 
+    #   ggplot(aes(x = Var2, y = value, color = Var1, group = Var1)) +
+    #   geom_line() +
+    #   scale_color_viridis_c()
+    
+    lines(model$model_fxn$rep$F_Slx[31,,,], lwd= 3, col = "purple")
+    lines(Fish_selex_at_age[1,,1,,1], col = "red", lwd= 3)
+    lines(Fish_selex_at_age[1,,2,,1], col = "blue", lwd= 3)
+    
+    # Matrix::image(model$model_fxn$env$spHess(random=TRUE))
   
-  for(i in 1:31) {
-    if(i == 1)  plot(model$model_fxn$rep$F_Slx[i,,,], type = "l")
-    else lines(model$model_fxn$rep$F_Slx[i,,,])
-  }
+    # Check model convergence
+    convergence_status <- check_model_convergence(mle_optim = model$mle_optim, 
+                                                  mod_rep = model$model_fxn,
+                                                  sd_rep = model$sd_rep, min_grad = 0.001)
+    conv[sim] <- convergence_status$Convergence
+    max_par[sim] <- convergence_status$Max_Grad_Par
   
-  # melt(model$model_fxn$rep$F_Slx)  %>% 
-  #   ggplot(aes(x = Var2, y = value, color = Var1, group = Var1)) +
-  #   geom_line() +
-  #   scale_color_viridis_c()
+    # Get parameter estimates
+    M_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_M", log = TRUE) %>% 
+      mutate(t = mean(Mort_at_age), type = "mortality", sim = sim, conv = conv[sim])
+    q_srv_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_q_srv", log = TRUE) %>% 
+      mutate(t = mean(q_Surv), type = "q_surv", sim = sim, conv = conv[sim])
+    # fsh_sel_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_fish_selpars", log = TRUE) %>% 
+    #   mutate(t = c(10, 6), type = c("d_1", "amax_1"), sim = sim, conv = conv[sim])
+    srv_sel_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_srv_selpars", log = TRUE) %>% 
+      mutate(t = c(4, 0.8), type = c("a50_srv", "k_srv"), sim = sim, conv = conv[sim])
+    meanrec_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_MeanRec", log = TRUE) %>% 
+      mutate(t = exp(2.75), type = "meanrec", sim = sim, conv = conv[sim])
+    
+    # Bind parameter estimates
+    par_all <- rbind(M_df, q_srv_df, srv_sel_df, meanrec_df, par_all)
   
-  lines(model$model_fxn$rep$F_Slx[31,,,], lwd= 3, col = "purple")
-  lines(Fish_selex_at_age[1,,1,,1], col = "red", lwd= 3)
-  lines(Fish_selex_at_age[1,,2,,1], col = "blue", lwd= 3)
+    # Recruitment
+    rec_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "Total_Rec") %>% 
+      mutate(t = rec_total[70:(n_years-1),sim], sim = sim, conv = conv[sim],
+             year = 70:(n_years-1))
+    rec_all <- rbind(rec_df, rec_all)
+    
+    # Check SSB
+    ssb_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "SSB") %>% 
+      mutate(t = SSB[Fish_Start_yr[1]:(n_years-1), sim], sim = sim, conv = conv[sim],
+             year = 70:(n_years-1))
+    ssb_all <- rbind(ssb_df, ssb_all)
   
-  # Matrix::image(model$model_fxn$env$spHess(random=TRUE))
-
-  # Check model convergence
-  convergence_status <- check_model_convergence(mle_optim = model$mle_optim, 
-                                                mod_rep = model$model_fxn,
-                                                sd_rep = model$sd_rep, min_grad = 0.001)
-  conv[sim] <- convergence_status$Convergence
-  max_par[sim] <- convergence_status$Max_Grad_Par
-
-  # Get parameter estimates
-  M_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_M", log = TRUE) %>% 
-    mutate(t = mean(Mort_at_age), type = "mortality", sim = sim, conv = conv[sim])
-  q_srv_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_q_srv", log = TRUE) %>% 
-    mutate(t = mean(q_Surv), type = "q_surv", sim = sim, conv = conv[sim])
-  # fsh_sel_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_fish_selpars", log = TRUE) %>% 
-  #   mutate(t = c(10, 6), type = c("d_1", "amax_1"), sim = sim, conv = conv[sim])
-  srv_sel_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_srv_selpars", log = TRUE) %>% 
-    mutate(t = c(4, 0.8), type = c("a50_srv", "k_srv"), sim = sim, conv = conv[sim])
-  meanrec_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_MeanRec", log = TRUE) %>% 
-    mutate(t = exp(2.75), type = "meanrec", sim = sim, conv = conv[sim])
+    # Check F
+    f_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "Total_Fy") %>% 
+      mutate(t = rowSums(fish_mort[Fish_Start_yr[1]:(n_years-1),,sim]), sim = sim, conv = conv[sim],
+             year = 70:(n_years-1))
+    f_all <- rbind(f_all, f_df)
+    
+    # Check depletion rates
+    depletion_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "Depletion") %>%
+      mutate(t = (SSB[Fish_Start_yr[1]:(n_years-1),sim]/SSB[Fish_Start_yr[1],sim]),
+             sim = sim, conv = conv[sim], year = Fish_Start_yr[1]:(n_years-1))
+    depletion_all <- rbind(depletion_df, depletion_all)
+    # 
+    # # Check survey mean age
+    srv_mean_ages <- extract_mean_age_vals(mod_rep = model$model_fxn, comp_name = "pred_srv_age_comps",
+                          bins = ages, comp_start_yr = Fish_Start_yr[1], sim = sim,
+                          n_fish_true_fleets = NULL) %>% mutate(conv = conv[sim])
+    
+    srv_mu_age <- rbind(srv_mu_age, srv_mean_ages)
+    
+    # # Check fishery mean age
+    fish_mean_ages <- extract_mean_age_vals(mod_rep = model$model_fxn, comp_name = "pred_fish_age_comps",
+                                           bins = ages, comp_start_yr = Fish_Start_yr[1], sim = sim,
+                                           n_fish_true_fleets = 2) %>% mutate(conv = conv[sim])
+    fish_mu_age <- rbind(fish_mu_age, fish_mean_ages)
   
-  # Bind parameter estimates
-  par_all <- rbind(M_df, q_srv_df, srv_sel_df, meanrec_df, par_all)
-
-  # Recruitment
-  rec_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "Total_Rec") %>% 
-    mutate(t = rec_total[70:(n_years-1),sim], sim = sim, conv = conv[sim],
-           year = 70:(n_years-1))
-  rec_all <- rbind(rec_df, rec_all)
-  
-  # Check SSB
-  ssb_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "SSB") %>% 
-    mutate(t = SSB[Fish_Start_yr[1]:(n_years-1), sim], sim = sim, conv = conv[sim],
-           year = 70:(n_years-1))
-  ssb_all <- rbind(ssb_df, ssb_all)
-
-  # Check F
-  f_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "Total_Fy") %>% 
-    mutate(t = fish_mort[Fish_Start_yr[1]:(n_years-1),1,sim], sim = sim, conv = conv[sim],
-           year = 70:(n_years-1))
-  f_all <- rbind(f_all, f_df)
-  
-  # Check depletion rates
-  depletion_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "Depletion") %>%
-    mutate(t = (SSB[Fish_Start_yr[1]:(n_years-1),sim]/SSB[Fish_Start_yr[1],sim]),
-           sim = sim, conv = conv[sim], year = Fish_Start_yr[1]:(n_years-1))
-  depletion_all <- rbind(depletion_df, depletion_all)
-  # 
-  # # Check survey mean age
-  srv_mean_ages <- extract_mean_age_vals(mod_rep = model$model_fxn, comp_name = "pred_srv_age_comps",
-                        bins = ages, comp_start_yr = Fish_Start_yr[1], sim = sim,
-                        n_fish_true_fleets = NULL) %>% mutate(conv = conv[sim])
-  
-  srv_mu_age <- rbind(srv_mu_age, srv_mean_ages)
-  
-  # # Check fishery mean age
-  fish_mean_ages <- extract_mean_age_vals(mod_rep = model$model_fxn, comp_name = "pred_fish_age_comps",
-                                         bins = ages, comp_start_yr = Fish_Start_yr[1], sim = sim,
-                                         n_fish_true_fleets = 2) %>% mutate(conv = conv[sim])
-  fish_mu_age <- rbind(fish_mu_age, fish_mean_ages)
-
-  print(paste("done w/  sim = ", sim))
-  print(conv[sim])
-  
-}
-  
-  
-  
+    print(paste("done w/  sim = ", sim))
+    print(conv[sim])
+    
+    }
+    end.time <- Sys.time()
+    
+    end.time - start.time
+    
+    
+    
 # Summary Checks ----------------------------------------------------------
 
 # Get percentiles
