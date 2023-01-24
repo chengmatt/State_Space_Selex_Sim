@@ -31,7 +31,7 @@
                   Rec_Dev_Type = "iid", rho_rec = NA, 
                   fish_selex = c("logistic", "logistic"), srv_selex = c("logistic"), 
                   fish_pars = list(Fleet_1_L = matrix(data = c(5, 0.8), nrow = 1, byrow = TRUE),
-                                   Fleet_1_L = matrix(data = c(15, 0.8), nrow = 1, byrow = TRUE)),
+                                   Fleet_1_L = matrix(data = c(15, 3), nrow = 1, byrow = TRUE)),
                   srv_pars = list(Fleet_3_SL = matrix(data = c(4,0.8), nrow = 1, byrow = TRUE)), 
                   f_ratio = 1, m_ratio = 0)
     
@@ -76,12 +76,11 @@
                      Sex_Ratio = as.vector(1),
                      sim = sim)
      
-      input$data$F_Slx_re_model <- as.matrix(0, nrow = 1, ncol = 1) # 0 = RW, 1 = AR1_y, 2 == 2DAR1 
-      input$data$F_Slx_2DAR1_Blocks <- matrix(rep(0, length.out = 30, each = 10), 
-                                              nrow = length(ages), ncol = 1)
-      input$parameters$ln_fish_selpars_re <- array(rnorm(((length(years)) - 1 * 1 * n_sex * 1), 0, 0.05), 
-                                                   dim = c((length(years)) - 1, 1, 1, 1))
-      input$parameters$fixed_sel_re_fish <- array(0.5, dim = c(1, 1, 1))
+      input$data$F_Slx_re_model <- as.matrix(2, nrow = 1, ncol = 1) # 0 = RW, 1 = AR1_y, 2 == 2DAR1 
+      input$data$F_Slx_2DAR1_Blocks <- matrix(c(0:29), nrow = length(ages), ncol = 1)
+      input$parameters$ln_fish_selpars_re <- array(rnorm(((length(years)) * 30 * n_sex * 1), 0, 0.05), 
+                                                   dim = c((length(years)), 30, 1, 1))
+      input$parameters$fixed_sel_re_fish <- array(0.5, dim = c(3, 1, 1))
   
       # Map to fix parameters
       map <- list(
@@ -96,7 +95,7 @@
     # Run EM model here and get sdrep
     model <- run_EM(data = input$data, parameters = input$parameters, 
                     map = map, n.newton = 3, random = "ln_fish_selpars_re",
-                    silent = T, getsdrep = TRUE)
+                    silent = F, getsdrep = TRUE)
     
     # Checking fixed effects parameter length
     # sum(names(model$sd_rep$par.fixed) == "ln_fish_selpars_re")

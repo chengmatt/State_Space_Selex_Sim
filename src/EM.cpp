@@ -4,7 +4,6 @@
 
 // TO DO:
 // Beverton Holt SR
-// Set Selectivities
 
 #include<TMB.hpp>
 #include "Get_Selex.hpp"
@@ -173,19 +172,19 @@ Type objective_function<Type>::operator() ()
         
       } // end random walk if statement
       
-      // if(F_Slx_re_model(f, s) == 1) { // AR1 process by year (shared AR1 term for all parameters in a fleet)
-      //   
-      //   // Create container to fill in with empty array 
-      //   array<Type> tmp_F_selpars_re(n_re_years); 
-      //   
-      //   for(int y = 0; y < n_re_years; y++) tmp_F_selpars_re(y) = ln_fish_selpars_re(y, 0, f, s); 
-      //   
-      //     Type sigma_fish = exp( fixed_sel_re_fish(0, f, s) ); // sigma for determining variance
-      //     // Bound correlation between -1 and 1
-      //     Type rho_y = Type(2)/(Type(1) + exp(-Type(2) * fixed_sel_re_fish(1, f, s) )) - Type(1); // corr by selex year
-      //     Type sigma_sel =  pow(pow(sigma_fish,2) / (1-pow(rho_y,2)),0.5); // Variance of the AR process
-      //     fish_sel_re_nLL += SCALE(AR1(rho_y), sigma_sel)(tmp_F_selpars_re);
-      // }
+      if(F_Slx_re_model(f, s) == 1) { // AR1 process by year (shared AR1 term for all parameters in a fleet)
+
+        // Create container to fill in with empty array
+        array<Type> tmp_F_selpars_re(n_re_years);
+
+        for(int y = 0; y < n_re_years; y++) tmp_F_selpars_re(y) = ln_fish_selpars_re(y, 0, f, s);
+
+          Type sigma_fish = exp( fixed_sel_re_fish(0, f, s) ); // sigma for determining variance
+          // Bound correlation between -1 and 1
+          Type rho_y = Type(2)/(Type(1) + exp(-Type(2) * fixed_sel_re_fish(1, f, s) )) - Type(1); // corr by selex year
+          Type sigma_sel =  pow(pow(sigma_fish,2) / (1-pow(rho_y,2)),0.5); // Variance of the AR process
+          fish_sel_re_nLL += SCALE(AR1(rho_y), sigma_sel)(tmp_F_selpars_re);
+      }
       
       // if(F_Slx_re_model(f,s) == 2) { // 2DAR1
       // 
@@ -193,9 +192,8 @@ Type objective_function<Type>::operator() ()
       //   array<Type> tmp_F_selpars_re(n_years, n_re_pars);
       // 
       //   for(int y = 0; y < n_years; y++) { // fill in loop to make sure stuff is getting indexed correctly
-      // 
       //     for(int a = 0; a < n_re_pars; a++) { // loop through number of age blocks/unique re parameters
-      //       tmp_F_selpars_re(y, a) = ln_fish_selpars_re(y, a, f, s); 
+      //       tmp_F_selpars_re(y, a) = ln_fish_selpars_re(y, a, f, s);
       //     } // a loop
       //   } // y loop
       // 
@@ -244,15 +242,16 @@ Type objective_function<Type>::operator() ()
           
         } // end if statement for random walk
         
-        // if(F_Slx_re_model(f, s) == 1) { // AR1 process by year 
-        //   
-        //   // Get number of fixed selectivity parameters we want to loop through
-        //  int n_fixed_pars = tmp_ln_selpars.size();
-        //   
-        //  // Add a shared global AR1 process to all parameters for a given fleet and sex
-        //  for(int p = 0; p < 1; p++) tmp_ln_selpars(p) += ln_fish_selpars_re(y, 0, f, s);
-        // 
-        // } // end if statement for AR1_y
+        if(F_Slx_re_model(f, s) == 1) { // AR1 process by year
+          
+          // Get number of fixed selectivity parameters we want to loop through
+          int n_fixed_pars = tmp_ln_selpars.size();
+
+         // Add a shared global AR1 process to all parameters for a given fleet and sex 
+         // (adding annual devs to parameters)
+         for(int p = 0; p < n_fixed_pars; p++) tmp_ln_selpars(p) += ln_fish_selpars_re(y, 0, f, s);
+
+        } // end if statement for AR1_y
         
       } // if statement for random effects
       
@@ -260,18 +259,18 @@ Type objective_function<Type>::operator() ()
         // a + 1 because TMB indexes starting at 0
         F_Slx(y,a,f,s) = Get_Selex(a + 1, F_Slx_model(f), tmp_ln_selpars);
         
-        // // 2DAR1_ay (devs on selex vals)
+        // 2DAR1_ay (devs on selex vals)
         // if(F_Slx_re_model(f,s) == 2) {
-        //   
+        // 
         //   // Create temporary variable that indicates the age block and loop through
         //   // random effects with specified age blocks (as in Xu et al. 2019)
-        //   int age_blk = F_Slx_2DAR1_Blocks(a, f);
-        //   
+        //   // int age_blk = F_Slx_2DAR1_Blocks(a, f);
+        // 
         //   // Now, allow deviations to occur by multiplying selex by the exponent
-        //   F_Slx(y,a,f,s) *= exp(ln_fish_selpars_re(y, age_blk, f, s));
+        //   F_Slx(y,a,f,s) *= exp(ln_fish_selpars_re(y, a, f, s));
         // 
         // } // if statement for 2DAR1
-        
+        // 
         } // a loop
       } // s loop
     } // f loop
@@ -377,6 +376,15 @@ Type objective_function<Type>::operator() ()
           NAA(y + 1, n_ages - 1, s) = NAA(y + 1, n_ages - 1, s) + (NAA(y, n_ages - 1, s) *  
                                                                   SAA(y, n_ages - 1, s));
         } // plus group calculation
+        
+        // Get SSB quantities here
+        if(s == 0) {
+          SSB(y) += NAA(y, a, 0) * WAA(y, a, 0) * MatAA(y, a, 0); 
+          if(a == n_ages - 1) {
+            Depletion(y) = SSB(y) / SSB(0); 
+          } // a = n_ages - 1
+        } // sex == 0 (female)
+        
         // Increment Numbers at age to get total biomass
         Total_Biom(y) += NAA(y, a, s) * WAA(y, a, s);
       } // end ages loop
@@ -387,15 +395,6 @@ Type objective_function<Type>::operator() ()
     } // end sex loop
   } // end year loop
   
-  for(int y = 0; y < n_years; y++) {
-    for(int a = 0; a < n_ages; a++) {
-        // Get SSB here
-        SSB(y) += NAA(y, a, 0) * WAA(y, a, 0) * MatAA(y, a, 0); 
-    } // a loop
-    // Get depletion here
-    // Calculate depletion rates here
-    Depletion(y) = SSB(y) / SSB(0); 
-  }
   
   // Catch ----------------------------------------------
   pred_catches.setZero(); // set zero
