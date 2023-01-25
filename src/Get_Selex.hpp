@@ -45,5 +45,3 @@ Type Get_Selex(int age, int sel_model, vector<Type> ln_selpars) {
 
   return selex;
 } // end function
-
-

@@ -76,13 +76,12 @@
                      Sex_Ratio = as.vector(1),
                      sim = sim)
      
-      input$data$F_Slx_re_model <- as.matrix(2, nrow = 1, ncol = 1) # 0 = RW, 1 = AR1_y, 2 == 2DAR1 
-      input$data$F_Slx_2DAR1_Blocks <- matrix(c(0:29), nrow = length(ages), ncol = 1)
-      input$parameters$ln_fish_selpars_re <- array(rnorm(((length(years)) * 30 * n_sex * 1), 0, 0.05), 
-                                                   dim = c((length(years)), 30, 1, 1))
-      input$parameters$fixed_sel_re_fish <- array(0.5, dim = c(3, 1, 1))
-  
-      # Map to fix parameters
+      input$data$F_Slx_re_model <- as.matrix(1, nrow = 1, ncol = 1) # 0 = RW, 1 = AR1_y, 2 == 2DAR1 
+      input$parameters$ln_fish_selpars_re <- array(rnorm(((length(years)) * 2 * n_sex * 1), 0, 0.05), 
+                                                   dim = c((length(years)), 2, 1, 1))
+      input$parameters$fixed_sel_re_fish <- array(0.5, dim = c(2, 2, 1, 1))
+      
+      # Fix pars
       map <- list(
       ln_SigmaRec = factor(NA),
       # ln_M = factor(NA),
@@ -105,13 +104,13 @@
     # f_pars <- model$sd_rep$par.fixed[names(model$sd_rep$par.fixed) == "ln_fish_selpars"]
     # f_repars <- model$sd_rep$par.random[names(model$sd_rep$par.random) == "ln_fish_selpars_re"]
     # 
-    # sel_res <- model$model_fxn$rep$ln_fish_selpars_re
-    # plot(sel_res[,1,1,1], type = "l")
+    sel_res <- model$model_fxn$rep$ln_fish_selpars_re
+    plot(sel_res[,,1,1], type = "l")
     
     # Checking fixed effects
     
     for(i in 1:31) {
-      if(i == 1)  plot(model$model_fxn$rep$F_Slx[i,,,], type = "l")
+      if(i == 1)  plot(model$model_fxn$rep$F_Slx[i,,,], type = "l", ylim = c(0,1))
       else lines(model$model_fxn$rep$F_Slx[i,,,])
     }
     
@@ -124,7 +123,7 @@
     lines(Fish_selex_at_age[1,,1,,1], col = "red", lwd= 3)
     lines(Fish_selex_at_age[1,,2,,1], col = "blue", lwd= 3)
     
-    # Matrix::image(model$model_fxn$env$spHess(random=TRUE))
+    Matrix::image(model$model_fxn$env$spHess(random=TRUE))
   
     # Check model convergence
     convergence_status <- check_model_convergence(mle_optim = model$mle_optim, 
