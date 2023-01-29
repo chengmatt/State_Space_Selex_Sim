@@ -60,6 +60,14 @@ prepare_EM_input <- function(years,
   if(n_fleets == 1) { # if single fleet - sum across or leave as is
     obs_catches <- as.matrix(apply( as.matrix(Catch_agg[(Fish_Start_yr[1]:(n_years-1)),,sim]), 1, FUN = sum),
                              ncol = 1)
+    
+    # Get catch weighting if there is more than one fleet
+    if(dim(Catch_agg)[2] > 1) {
+      # sum across rows
+      catch_sum <- rowSums(as.matrix(Catch_agg[(Fish_Start_yr[1]:(n_years-1)),,sim]))
+      catch_weight <- as.matrix(Catch_agg[(Fish_Start_yr[1]:(n_years-1)),,sim]) / catch_sum
+    } # if catch weighting
+
   } else{ # multi fleet - leave as is
     obs_catches <- matrix(Catch_agg[(Fish_Start_yr[1]:(n_years-1)),,sim], nrow = length(years), ncol = n_fleets)
   } # end else
@@ -75,19 +83,23 @@ prepare_EM_input <- function(years,
     for(f in 1:dim(Fish_Age_Comps)[3]) {
       for(s in 1:n_sexes) {
         # Filter to save as an object
-        fish_age_comps <-  Fish_Age_Comps[Fish_Start_yr[1]:(n_years - 1),,f,s,sim]
+        fish_age_comps <-  Fish_Age_Comps[Fish_Start_yr[1]:(n_years - 1),,f,s,sim] * catch_weight[,f]
         # Increment comps - fixing fleet index to 1 here
         obs_fish_age_comps[,,1,s] <- obs_fish_age_comps[,,1,s] + fish_age_comps
       } # end s loop
     } # end f loop
     
+    # obs_fish_age_Neff <- as.matrix(
+    #   rowSums(floor(obs_fish_age_comps)), ncol = n_fleets
+    # )
+    
+    # Effective Sample Sizes
+    obs_fish_age_Neff <- matrix(rowSums(fish_Neff[Fish_Start_yr[1]:(n_years - 1),] * catch_weight[,]), 
+                                nrow = length(years), ncol = n_fleets)
+
     # Now, apply the proportion function over a single fleet
     obs_fish_age_comps <- array(t(apply(obs_fish_age_comps, MARGIN = 1, FUN=function(x) { x/sum(x) })),
                                 dim = c(length(years), length(ages), n_fleets, n_sexes))
-    
-    # Effective Sample Sizes
-    obs_fish_age_Neff <- as.matrix(apply(as.matrix(fish_Neff[Fish_Start_yr[1]:(n_years - 1),]), MARGIN = 1, FUN = sum), 
-                                   nrow = length(years), ncol = n_fleets)
     
   } else{ # more than one fleet here
     
@@ -175,6 +187,7 @@ prepare_EM_input <- function(years,
     if(F_Slx_Model_Input[i] == "logistic") F_Slx_model[i] <- 0
     if(F_Slx_Model_Input[i] == "gamma") F_Slx_model[i] <- 1
     if(F_Slx_Model_Input[i] == "double_logistic") F_Slx_model[i] <- 2
+    if(F_Slx_Model_Input[i] == "exp_logistic") F_Slx_model[i] <- 3
   } # end loop for selectivity model input for fishery
   
   # Survey selex model input
@@ -182,6 +195,7 @@ prepare_EM_input <- function(years,
     if(S_Slx_Model_Input[i] == "logistic") S_Slx_model[i] <- 0
     if(S_Slx_Model_Input[i] == "gamma") S_Slx_model[i] <- 1
     if(S_Slx_Model_Input[i] == "double_logistic") S_Slx_model[i] <- 2
+    if(S_Slx_Model_Input[i] == "exp_logistic") S_Slx_model[i] <- 3
   } # end loop for selectivity model input for survey
   
   # Specify selectivity blocks here
@@ -284,6 +298,7 @@ prepare_EM_input <- function(years,
   for(i in 1:length(S_Slx_Model_Input)) {
     if(S_Slx_Model_Input[i] == "logistic") n_srv_pars[i] <- 2
     if(S_Slx_Model_Input[i] == "gamma") n_srv_pars[i] <- 2
+    if(S_Slx_Model_Input[i] == "exp_logistic") n_srv_pars[i] <- 3
     if(S_Slx_Model_Input[i] == "double_logistic") n_srv_pars[i] <- 4
   } # end i loop
   # Put array into our list
@@ -296,11 +311,12 @@ prepare_EM_input <- function(years,
   for(i in 1:length(F_Slx_Model_Input)) {
     if(F_Slx_Model_Input[i] == "logistic") n_fish_pars[i] <- 2
     if(F_Slx_Model_Input[i] == "gamma") n_fish_pars[i] <- 2
+    if(F_Slx_Model_Input[i] == "exp_logistic") n_fish_pars[i] <- 3
     if(F_Slx_Model_Input[i] == "double_logistic") n_fish_pars[i] <- 4
   } # end i loop
   
   # put array into our parameter list
-  pars$ln_fish_selpars <- array(rnorm(1, 0, 1), dim = c(n_fish_comps, n_sexes, n_fish_blocks, max(n_fish_pars)))
+  pars$ln_fish_selpars <- array(log(0.5), dim = c(n_fish_comps, n_sexes, n_fish_blocks, max(n_fish_pars)))
   
   return(list(data = data, parameters = pars))
   

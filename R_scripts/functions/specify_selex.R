@@ -15,7 +15,7 @@ selex_opts <- function(selex_type, bins, par_values) {
     
     # List out all the different parameters there are
     par_vec <- c("a50", "k", "amax", "delta", "slope_1", "slope_2", "infl_1", "infl_2",
-                 "p1", "p2", "p3", "p4", "p5", "p6")
+                 "p1", "p2", "p3", "p4", "p5", "p6", "gamma", "alpha", "beta")
     
     # Create a matrix to assign values to - input parameter names in the 2nd col and nas (values) in the 1st
     par_mat <- matrix(data = c(rep(NA, length(par_vec)), par_vec), ncol = 2, nrow = length(par_vec))
@@ -58,6 +58,26 @@ selex_opts <- function(selex_type, bins, par_values) {
     
   } # gamma dome-shaped selectivity
   
+  if(selex_type == "exp_logistic") { # 3 parameters
+    
+    # Get alpha value
+    alpha <- as.numeric(par_mat[,1][par_mat[,2] == "alpha"]) # Degree of doming
+    # Get beta value
+    beta <- as.numeric(par_mat[,1][par_mat[,2] == "beta"])
+    # Get gamma value
+    gamma <- as.numeric(par_mat[,1][par_mat[,2] == "gamma"])
+    
+    # Define parts of the equation
+    first = (1 / (1 - gamma)) 
+    second = ((1 - gamma) / gamma)^gamma
+    third = exp( alpha * gamma * (beta - bins ) )
+    fourth = 1 + exp(alpha * (beta - bins))
+    
+    # Calculate selectivity here
+    selex = first * second * (third/fourth)
+
+  }
+  
   if(selex_type == "double_logistic") { # 4 parameters
     
     # TESTING 
@@ -76,13 +96,13 @@ selex_opts <- function(selex_type, bins, par_values) {
     infl_2 <- as.numeric(par_mat[,1][par_mat[,2] == "infl_2"])
     
     # Calculate logistic curve 1 - mediates the ascending limb
-    logistic_1 <- 1/(1 + exp(-(bins - infl_1)/slope_1)) 
+    logistic_1 <- 1/(1 + exp(-slope_1 * (bins - infl_1))) 
     
     # Calculate logistic curve 2 - mediates the descending limb
-    logistic_2 <- 1/(1 + exp((bins - infl_2)/slope_2))
+    logistic_2 <- 1/(1 + exp(-slope_2 * (bins - infl_2)))
     
     # multiply the logistic curves and scale to a max of 1
-    selex <- logistic_1 * logistic_2
+    selex <- logistic_1 * (1- logistic_2)
     
     # plot(selex)
     
@@ -191,11 +211,13 @@ specify_selex <- function(fish_selex, srv_selex, fish_pars, srv_pars, bins) {
       if(ncol(fish_pars[[f]]) != n_pars) stop("Number of parameters specified does not equal number of parameters required for a gamma (2)!")}
       if(fish_selex[f] == "double_logistic") {n_pars <- 4; par_names <- c("slope_1", "slope_2", "infl_1", "infl_2")
       if(ncol(fish_pars[[f]]) != n_pars) stop("Number of parameters specified does not equal number of parameters required for a double logistic (4)!")}
+      if(fish_selex[f] == "exp_logistic") {n_pars <- 3; par_names <- c("gamma", "alpha", "beta")
+      if(ncol(fish_pars[[f]]) != n_pars) stop("Number of parameters specified does not equal number of parameters required for a exponential logistic (3)!")}
       if(fish_selex[f] == "double_normal") {n_pars <- 6; par_names <- c("p1", 'p2', "p3", "p4", "p5", "p6") 
       if(ncol(fish_pars[[f]]) != n_pars) stop("Number of parameters specified does not equal number of parameters required for a double normal (6)!")}
       
       # Create an empty named matrix to store specified values in
-      fish_mat <- matrix(data = fish_pars[[f]], nrow = n_sex, ncol = n_pars) # fIrst row = female, second row = male if 2 sexes
+      fish_mat <- matrix(data = fish_pars[[f]], nrow = n_sex, ncol = n_pars) # first row = female, second row = male if 2 sexes
       # Specify column names based on the selectivity type
       colnames(fish_mat) <- par_names
       
@@ -240,6 +262,8 @@ specify_selex <- function(fish_selex, srv_selex, fish_pars, srv_pars, bins) {
     if(ncol(srv_pars[[sf]]) != n_pars) stop("Number of parameters specified does not equal number of parameters required for a double logistic (4)!")}
     if(srv_selex[sf] == "double_normal") {n_pars <- 6; par_names <- c("p1", 'p2', "p3", "p4", "p5", "p6") 
     if(ncol(srv_pars[[sf]]) != n_pars) stop("Number of parameters specified does not equal number of parameters required for a double normal (6)!")}
+    if(srv_selex[sf] == "exp_logistic") {n_pars <- 3; par_names <- c("gamma", "alpha", "beta")
+    if(ncol(srv_pars[[sf]]) != n_pars) stop("Number of parameters specified does not equal number of parameters required for a exponential logistic (3)!")}
     
     # Create an empty named matrix to store specified values in
     srv_mat <- matrix(data = srv_pars[[sf]], nrow = n_sex, ncol = n_pars) # fIrst row = female, second row = male if 2 sexes

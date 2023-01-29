@@ -60,6 +60,13 @@ specify_F_pattern <- function(Start_F, Fish_Start_yr, F_type, n_years, max_rel_F
     F_vec <- seq(Start_F, (max_rel_F_M * mean_nat_mort), length.out = length(Fish_Start_yr:n_years))
     
   } # if statement for F pattern that is increasing
+  
+  if(F_type == "Decrease") { # Decreasing F type
+    
+    F_vec <- seq(Start_F, (max_rel_F_M * mean_nat_mort), length.out = length(Fish_Start_yr:n_years))
+    
+  } # if statement for F pattern that is decreasing
+  
 
   if(F_type == "Increase_Plat") { # if increases and plateaus out
     

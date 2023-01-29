@@ -4,7 +4,10 @@ template <class Type> // Function to call different selectivity parameterization
 // @param sel_model = integer of selectivity model 
 // == 0, logistic
 // @param ln_selpars vector of log selectivity parameters.
-Type Get_Selex(int age, int sel_model, vector<Type> ln_selpars) {
+Type Get_Selex(int age, 
+               int sel_model, 
+               vector<Type> ln_selpars
+                 ) {
   
   // Create container to return predicted selectivity value
   Type selex = 0;
@@ -33,15 +36,35 @@ Type Get_Selex(int age, int sel_model, vector<Type> ln_selpars) {
     Type slope_2 = exp(ln_selpars(1)); // Slope of descending limb
     Type infl_1 = exp(ln_selpars(2)); // Inflection point of ascending limb
     Type infl_2 = exp(ln_selpars(3)); // Inflection point of descending limb
-    
+
     // Calculate logistic curve 1
-    Type logist_1 = 1.0/(1.0 + exp(-(age - infl_1)/slope_1));
+    Type logist_1 = 1.0/(1.0 + exp(-slope_1 * (age - infl_1)));
     // Calculate logistic curve 2
-    Type logist_2 = 1.0/(1.0 + exp((age - infl_2)/slope_2));
+    Type logist_2 = 1/(1.0 + exp(-slope_2 * (age - infl_2)));
     // Return selectivity - product of two logistic selectivity curves
-    selex = logist_1 * logist_2;
+    selex = logist_1 * (1 - logist_2);
 
   }
+  
+  if(sel_model == 3) { // exponential logistic (Thompson 1994)
+    
+    // Extract out and exponentiate the parameters here
+    Type gamma = exp(ln_selpars(0)); 
+    Type alpha = exp(ln_selpars(1)); 
+    Type beta = exp(ln_selpars(2)); 
+    
+    // Define equations to minimize mistakes
+    Type first = (1 / (1 - gamma));
+    Type second = pow((1 - gamma) / gamma, gamma);
+    Type third = exp( alpha * gamma * (beta - age ) );
+    Type fourth = 1 + exp(alpha * (beta - age));
 
+    // Return selectivity
+    selex = first * second * (third/fourth);
+
+  }
+  
+  
+    
   return selex;
 } // end function

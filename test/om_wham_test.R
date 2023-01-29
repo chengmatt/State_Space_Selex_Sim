@@ -19,18 +19,21 @@ spreadsheet_path <- here("input", "Sablefish_Inputs.xlsx")
 # simulate data
 simulate_data(fxn_path = fxn_path, spreadsheet_path = spreadsheet_path, 
               check_equil = FALSE, rec_type = "mean_rec",
-              n_years = 101, Start_F = c(0.01), 
-              Fish_Start_yr = c(70), Surv_Start_yr = c(70), 
-              max_rel_F_M = c(1.5), desc_rel_F_M = c(0.15), 
-              F_type = c("Contrast"), yr_chng = c(86), 
-              fish_Neff = c(150), srv_Neff = c(150), fish_CV = c(0.1),
-              srv_CV = c(0.1), Neff_Fish_Time = "F_Vary", fixed_Neff = 30,
-              Mort_Time = "Constant", q_Mean_Fish = 0.08, q_Mean_Surv = 0.01, 
+              n_years = 101, Start_F = c(0.15, 0.01), 
+              Fish_Start_yr = c(70, 70), Surv_Start_yr = c(70), 
+              max_rel_F_M = c(0.1, 1.5), desc_rel_F_M = c(0.05), 
+              F_type = c("Constant", "Constant"), yr_chng = c(86), 
+              fish_Neff_max = c(200, 200), srv_Neff_max = c(200), fish_CV = c(0.1, 0.1),
+              srv_CV = c(0.1), catch_CV = c(0, 0), 
+              Neff_Fish_Time = "F_Vary", fixed_Neff = c(50, 50),
+              Mort_Time = "Constant", q_Mean_Fish = c(0.05, 0.05), q_Mean_Surv = 0.01, 
               Rec_Dev_Type = "iid", rho_rec = NA, 
-              fish_selex = c("gamma"), srv_selex = c("logistic"), 
-              fish_pars = list(Fleet_1_L = matrix(data = c(6,3), nrow = 1, byrow = TRUE)),
-              srv_pars = list(Fleet_3_SL = matrix(data = c(4,0.8), nrow = 1, byrow = TRUE)), 
+              fish_selex = c("logistic", "logistic"), srv_selex = c("logistic"), 
+              fish_pars = list(Fleet_1_L = matrix(data = c(4, 0.8), nrow = 1, byrow = TRUE),
+                               Fleet_1_L = matrix(data = c(9, 0.8), nrow = 1, byrow = TRUE)),
+              srv_pars = list(Fleet_3_SL = matrix(data = c(3,0.8), nrow = 1, byrow = TRUE)), 
               f_ratio = 1, m_ratio = 0)
+
 
 plot_OM(path = here("figs", "Base_OM_Figs"), file_name = "OM_Check.pdf")
 
@@ -77,7 +80,7 @@ n_indices <- c(3, 2, rep(2,4))
 Catch_CV_Val <- list(c(0.01, 0.01), 0.01, 0.01, 0.01, 0.01, 0.01)
 units_indices <- list(c(1,1,2), c(1,2), c(1,2), c(1,2), c(1,2), c(1,2))
 units_index_paa <- list(c(2,2,2), c(2, 2,2), c(2,2), c(2,2), c(2,2), c(2,2))
-noFish_Idx <- c(FALSE, FALSE, TRUE, TRUE, TRUE, TRUE)
+noFish_Idx <- c(TRUE, TRUE, TRUE, TRUE, TRUE, TRUE)
 
 # Save results
 ssb_results <- data.frame()
@@ -197,7 +200,7 @@ for(i in 2:length(selectivity)) {
       geom_hline(aes(yintercept = 0), col = "black", lty = 2, size = 1, alpha = 0.85) +
       theme_bw() + 
       facet_grid(~Type, scales = "free") +
-      ylim(-0.3,0.3)+
+      # ylim(-0.3,0.3)+
       labs(x = "Year", y  ="Relative Error")+
       theme(strip.text = element_text(size = 15),
             axis.title = element_text(size = 15),

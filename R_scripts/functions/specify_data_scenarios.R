@@ -36,7 +36,7 @@ fish_surv_data_scenarios <- function(Fish_Start_yr, Surv_Start_yr, fish_Neff_max
   srv_CV <<- srv_CV # Survey CV
   
   if(Neff_Fish_Time == "Constant") { # If our effective sample sizes stay constant throughout the fishery
-    fish_Neff_mat <- matrix(data = fish_Neff, nrow = n_years, ncol = n_fish_fleets, byrow = TRUE) # create matrix
+    fish_Neff_mat <- matrix(data = fish_Neff_max, nrow = n_years, ncol = n_fish_fleets, byrow = TRUE) # create matrix
   } # if constant
   
   if(Neff_Fish_Time == "F_Vary") {
@@ -58,12 +58,12 @@ fish_surv_data_scenarios <- function(Fish_Start_yr, Surv_Start_yr, fish_Neff_max
           # Scale N_effs by relative fishing mortality rates - fix sim index at 1,
           # because these will remain constant across simulations
           fish_Neff_mat[y,f] <- round(fish_Neff_max[f] * F_scalar[f] * fish_mort[y,f,1])
+          
+          # Fix Neff at a specified value for those that are < said specified value
+          if(fish_Neff_mat[y,f] < fixed_Neff[f] &
+             fish_Neff_mat[y,f] != 0) fish_Neff_mat[y,f] <- fixed_Neff[f]
 
       } # end year loop
-      
-      # Fix Neff at a specified value for those that are < said specified value
-      if(fish_Neff_mat[y,f] < fixed_Neff[f] &
-         fish_Neff_mat[y,f] != 0) fish_Neff_mat[y,f] <- fixed_Neff[f]
       
     } # end fleet loop
     
