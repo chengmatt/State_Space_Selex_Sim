@@ -189,21 +189,6 @@ simulate_data <- function(fxn_path,
         # Generate observations  ---------------------------------------------------
         
         if(check_equil == FALSE) { # end sampling if we want to check equilibrium
-          
-          # Calculate mortality here
-            # Create/reset Z variable
-            Z_s <- 0
-            
-            for(f in 1:n_fish_fleets) {
-              for(s in 1:n_sex) {
-                # Mortality due to a given fleet
-                Z_f <- fish_mort[y-1,f,sim] * Fish_selex_at_age[y-1,,f,s,sim]
-                # Add to/increment total fleet mortality
-                Z_s <- Z_f + Z_s 
-              } # s loop
-              # Add natural mortality to get total mortality when you're done
-              if(f == n_fish_fleets) Z_s <- Z_s + Mort_at_age[y-1,,sim]
-            } # f loop
 
           ### Fishery fleet loop ------------------------------------------------------
           
@@ -211,10 +196,17 @@ simulate_data <- function(fxn_path,
             
             for(s in 1:n_sex) {
               
+              # Calculate total mortality here
+              if(n_fish_fleets > 1) { # If > 1 fishery fleet
+                Z_s <- rowSums(fish_mort[y-1,,sim] * Fish_selex_at_age[y-1,,,s,sim]) + Mort_at_age[y-1,,sim]
+              } else{
+                Z_s <- (fish_mort[y-1,f,sim] * Fish_selex_at_age[y-1,,f,s,sim]) +  Mort_at_age[y-1,,sim]
+              } # if only 1 fishery fleet
+              
               ###  Get Catch at Age (Only F to C for now) -----------------------------------
               
               # Calculate instantaneous fishing mortality for a given fleet, sex, and age
-              Fish_Fleet_Mort <- (fish_mort[y-1,f,sim] * Fish_selex_at_age[y-1,,f,s,sim])
+              Fish_Fleet_Mort <- fish_mort[y-1,f,sim] * Fish_selex_at_age[y-1,,f,s,sim]
               
               # Now, get catch at age in weight
               Catch_at_age[y-1,,f,s,sim] <- Fish_Fleet_Mort * N_at_age[y-1,,s,sim] * (1-exp(-Z_s)) / Z_s
@@ -246,10 +238,10 @@ simulate_data <- function(fxn_path,
             } # end sex index
             
             # Summarize this fishery index aggregated by sex and applying some error
-            Fishery_Index_Agg[y-1,f,sim] <<- sum(melt(Fishery_Index[y-1,f,,sim]), na.rm = TRUE) # Aggregate
+            Fishery_Index_Agg[y-1,f,sim] <- sum(melt(Fishery_Index[y-1,f,,sim]), na.rm = TRUE) # Aggregate
             
             # Apply error here, index fish_CV vector
-            Fishery_Index_Agg[y-1,f,sim] <<- idx_obs_error(error = "log_normal", 
+            Fishery_Index_Agg[y-1,f,sim] <- idx_obs_error(error = "log_normal", 
                                                           true_index = Fishery_Index_Agg[y-1,f,sim],
                                                           CV = fish_CV[f])
           } # end fishery fleet index and loop
@@ -266,7 +258,7 @@ simulate_data <- function(fxn_path,
               if(y > Surv_Start_yr[sf]) { 
                 
                 # Get survey index here (numbers based)
-                Survey_Index[y-1,sf,s,sim] <<- q_Surv[y-1,sf,sim]  * sum(N_at_age[y-1,,s,sim] *
+                Survey_Index[y-1,sf,s,sim] <- q_Surv[y-1,sf,sim]  * sum(N_at_age[y-1,,s,sim] *
                                                                            Surv_selex_at_age[y-1,,sf,s,sim])
                 
                 # Get probability of sampling a given age class for use in multinomial
@@ -281,10 +273,10 @@ simulate_data <- function(fxn_path,
               } # Only start sampling if we are at the start of the survey start year
               
               # Summarize this fishery index aggregated by sex and applying some error
-              Survey_Index_Agg[y-1,sf,sim] <<- sum(melt(Survey_Index[y-1,sf,,sim]), na.rm = TRUE) # Aggregate
+              Survey_Index_Agg[y-1,sf,sim] <- sum(melt(Survey_Index[y-1,sf,,sim]), na.rm = TRUE) # Aggregate
               
               # Apply error here, index srv_CV vector
-              Survey_Index_Agg[y-1,sf,sim] <<- idx_obs_error(error = "log_normal", 
+              Survey_Index_Agg[y-1,sf,sim] <- idx_obs_error(error = "log_normal", 
                                                             true_index = Survey_Index_Agg[y-1,sf,sim],
                                                             CV = srv_CV[sf])
               

@@ -285,9 +285,10 @@ print( # Print lines here!
 
 print( # Overlay
   ggplot(fish_sel_df %>% 
-           filter(Year == "Year_1"), aes(x = Age, y = Selex, group = Fleet, color = Fleet)) +
+           filter(Year == "Year_1"), aes(x = Age, y = Selex, 
+                                         group = Fleet, color = Fleet)) +
     geom_line( size = 1.5) +
-    # facet_grid(Sex~Fleet, scales = "free") +
+    facet_grid(Sex~Fleet, scales = "free") +
     # scale_fill_viridis_c() +
     theme_bw() +
     theme(legend.position = "top") +

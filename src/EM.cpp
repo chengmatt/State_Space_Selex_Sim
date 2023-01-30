@@ -277,14 +277,14 @@ Type objective_function<Type>::operator() ()
       // Increment F by fleet to get total
       Total_Fy(y) += F(y, f);
       
-      for(int s = 0; s < n_sexes; s ++) {
         for(int a = 0; a < n_ages; a++) {
+          for(int s = 0; s < n_sexes; s ++) {
           // Calculate F_at_age
           FAA(y, a, f, s) = F(y, f) * F_Slx(y, a, f, s);
           // Increment to add FAA to ZAA 
           sum_FAA(y, a, s) += FAA(y, a, f, s);
-        } // a loop
-      } // s loop
+        } // s loop
+      } // a loop
       
     } // f loop
   } // y loop
@@ -306,7 +306,7 @@ Type objective_function<Type>::operator() ()
   for(int s = 0; s < n_sexes; s++) {
     for(int a = 1; a < n_ages; a++){
       if(a != n_ages - 1) { // not plus group
-        NAA(0, a, s) = exp(ln_MeanRec + ln_N1_Devs(a - 1) -M * Type(a) -(0.5 * ln_SigmaRec2) ) * Sex_Ratio(s);
+        NAA(0, a, s) = exp(ln_MeanRec + ln_N1_Devs(a - 1) -(0.5 * ln_SigmaRec2) -M * Type(a) ) * Sex_Ratio(s);
       } else{
         NAA(0, n_ages - 1, s) = (exp(ln_MeanRec -M * Type( n_ages - 1) ) / (1 - exp(-M)) ) * Sex_Ratio(s);
       }  // Plus group calculation for initializing population (no recruitment deviates)
@@ -319,7 +319,7 @@ Type objective_function<Type>::operator() ()
     for(int s = 0; s < n_sexes; s++) {
       
     if(rec_model == 0) { // Mean Recruitment 
-    NAA(y, 0, s) = exp( ln_MeanRec + ln_RecDevs(y) -(0.5 * ln_SigmaRec2)) * Sex_Ratio(s); 
+    NAA(y, 0, s) = exp( ln_MeanRec + ln_RecDevs(y) -0.5 * ln_SigmaRec2) * Sex_Ratio(s); 
     } // if for rec_model == 0
     
     } // s loop
@@ -337,25 +337,25 @@ Type objective_function<Type>::operator() ()
         } else{ // Increment previous year's plus group back in 
           NAA(y + 1, n_ages - 1, s) += (NAA(y, n_ages - 1, s) * SAA(y, n_ages - 1, s));
         } 
-        
         // Increment Numbers at age to get total biomass
         Total_Biom(y) += NAA(y, a, s) * WAA(y, a, s);
-        
-        // Get SSB quantities here
-        if(s == 0) {
-          SSB(y) += NAA(y, a, 0) * WAA(y, a, 0) * MatAA(y, a, 0); 
-          if(a == n_ages - 1) Depletion(y) = SSB(y) / SSB(0); 
-        } // sex == 0 (female)
-        
       } // end ages loop
-      
       // Increment total recruitment here
       Total_Rec(y) += NAA(y, 0, s);
-      
     } // end sex loop
   } // end year loop
   
-  
+  // Get SSB quantities ehre
+  for(int y = 0; y < n_years; y++) {
+    for(int a = 0; a < n_ages; a++) {
+      SSB(y) += NAA(y, a, 0) * WAA(y, a, 0) * MatAA(y, a, 0); 
+      if(a == n_ages - 1) { // Get depletion
+        Depletion(y) = SSB(y) / SSB(0); 
+      } // if statement
+    } // a loop
+  } // y loop
+  // Get SSB quantities here
+
   // Catch ----------------------------------------------
   pred_catches.setZero(); // set zero
   
@@ -386,10 +386,10 @@ Type objective_function<Type>::operator() ()
     for(int y = 0; y < n_years; y++) { 
         for(int s = 0; s < n_sexes; s++) {
           for(int a = 0; a < n_ages; a++) {
-            pred_fish_indices(y, fi) += NAA(y, a, s) * WAA(y, a, s) * F_Slx(y, a, fi, s);
+            pred_fish_indices(y, fi) += exp(ln_q_fish(fi))  * NAA(y, a, s) * 
+                                         WAA(y, a, s) * F_Slx(y, a, fi, s);
           } // a loop
         } // s loop
-        pred_fish_indices(y, fi) = exp(ln_q_fish(fi)) * pred_fish_indices(y, fi);
     } // y loop
   } // fi loop
   
@@ -398,10 +398,10 @@ Type objective_function<Type>::operator() ()
     for(int y = 0; y < n_years; y++) {
         for(int s = 0; s < n_sexes; s++) {
           for(int a = 0; a < n_ages; a++) {
-            pred_srv_indices(y, si) += NAA(y, a, s) * S_Slx(y, a, si, s);
+            pred_srv_indices(y, si) += exp(ln_q_srv(si)) * NAA(y, a, s) * 
+                                                     S_Slx(y, a, si, s);
           } // a loop
         } // s loop
-        pred_srv_indices(y, si) = exp(ln_q_srv(si)) * pred_srv_indices(y, si);
     } // y loop
   } // si loop  
   

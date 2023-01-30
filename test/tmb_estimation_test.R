@@ -18,22 +18,40 @@
     spreadsheet_path <- here("input", "Sablefish_Inputs.xlsx")
     
     # simulate data
-    simulate_data(fxn_path = fxn_path, spreadsheet_path = spreadsheet_path, 
-                  check_equil = FALSE, rec_type = "mean_rec",
-                  n_years = 101, Start_F = c(0.01, 0.01), 
-                  Fish_Start_yr = c(70, 70), Surv_Start_yr = c(70), 
-                  max_rel_F_M = c(1.5, 1), desc_rel_F_M = c(0.05), 
-                  F_type = c("Contrast", "Const_Inc"), yr_chng = 86, 
-                  fish_Neff_max = c(150, 150), srv_Neff_max = c(200), fish_CV = c(0.1, 0.1),
-                  srv_CV = c(0.1), catch_CV = c(0, 0), 
-                  Neff_Fish_Time = "F_Vary", fixed_Neff = c(20, 20),
-                  Mort_Time = "Constant", q_Mean_Fish = c(0.05, 0.05), q_Mean_Surv = 0.01, 
-                  Rec_Dev_Type = "iid", rho_rec = NA, 
-                  fish_selex = c("exp_logistic", "exp_logistic"), srv_selex = c("logistic"), 
-                  fish_pars = list(Fleet_1_L = matrix(data = c(0.1, 0.5, 12), nrow = 1, byrow = TRUE),
-                                   Fleet_2_EL = matrix(data = c(0.1, 0.5, 12), nrow = 1, byrow = TRUE)),
-                  srv_pars = list(Fleet_3_SL = matrix(data = c(3,0.8), nrow = 1, byrow = TRUE)), 
-                  f_ratio = 1, m_ratio = 0)
+    simulate_data(fxn_path = fxn_path, 
+                  spreadsheet_path = spreadsheet_path, 
+                  check_equil = FALSE, 
+                  rec_type = "mean_rec",
+                  n_years = 101, 
+                  Start_F = c(0.01, 0.01), 
+                  Fish_Start_yr = c(70, 70), 
+                  Surv_Start_yr = c(70), 
+                  max_rel_F_M = c(1.5, 1), 
+                  desc_rel_F_M = c(0.05), 
+                  F_type = c("Contrast", "Const_Inc"),
+                  yr_chng = 86, 
+                  fish_Neff_max = c(150, 150), 
+                  srv_Neff_max = c(200),
+                  fish_CV = c(0.1, 0.1),
+                  srv_CV = c(0.1), 
+                  catch_CV = c(0, 0), 
+                  Neff_Fish_Time = "F_Vary", 
+                  fixed_Neff = c(20, 20),
+                  Mort_Time = "Constant", 
+                  q_Mean_Fish = c(0.05, 0.05), 
+                  q_Mean_Surv = 0.01, 
+                  Rec_Dev_Type = "iid", 
+                  rho_rec = NA, 
+                  fish_selex = c("logistic", "logistic"), 
+                  srv_selex = c("logistic"), 
+                  fish_pars = list(Fleet_1_L = matrix(data = c(5, 0.8, 3, 0.4),
+                                                      nrow = 2, byrow = TRUE),
+                                   Fleet_2_EL = matrix(data = c(6, 0.9, 6, 0.9), 
+                                                       nrow = 2, byrow = TRUE)),
+                  srv_pars = list(Fleet_3_SL = matrix(data = c(3,0.8, 4, 0.8), 
+                                                      nrow = 2, byrow = TRUE)), 
+                  f_ratio = 0.5, 
+                  m_ratio = 0.5)
     
     plot_OM(path = here("figs", "Base_OM_Figs"), file_name = "OM_Check.pdf")
   
@@ -59,11 +77,11 @@
     
     # Prepare inputs here
     input <- prepare_EM_input(years = years,
-                     n_fleets = 1, 
-                     catch_cv = c(0.01),
+                     n_fleets = 2, 
+                     catch_cv = c(0.001, 0.001),
                      F_Slx_Blocks_Input = matrix(rep(0, 31),
                                           nrow = length(years),
-                                          ncol = 1), # fishery blocks
+                                          ncol = 2), # fishery blocks
                      S_Slx_Blocks_Input = matrix(c(0), # selectivity blocks
                                           nrow = length(years), 
                                           ncol = 1),
@@ -73,24 +91,24 @@
                      use_fish_comps = TRUE,
                      use_srv_comps = TRUE,
                      rec_model = 0, 
-                     F_Slx_Model_Input = c("exp_logistic"),
+                     F_Slx_Model_Input = c("logistic", "logistic"),
                      S_Slx_Model_Input = c("logistic"), 
-                     Sex_Ratio = as.vector(1),
                      sim = sim)
      
-      input$data$F_Slx_re_model <- matrix(10, nrow = 1, ncol = 1) # 0 = RW, 1 = AR1_y, 2 == GMRF 
+      input$data$F_Slx_re_model <- matrix(10, nrow = 2, ncol = 2) # 0 = RW, 1 = AR1_y, 2 == GMRF 
       input$parameters$ln_fish_selpars_re <- array(rnorm(((length(years)) * 1 * n_sex * 1), 0, 0.05), 
-                                                   dim = c((length(years)), 1, 1, 1))
-      input$parameters$fixed_sel_re_fish <- array(c(0.32), dim = c(1, 1, 1))
+                                                   dim = c((length(years)), 1, 2, 2))
+      input$parameters$fixed_sel_re_fish <- array(c(1), dim = c(1, 2, 2))
 
       # Fix pars
       map <- list(
       ln_SigmaRec = factor(NA),
-      ln_fish_selpars_re = factor(rep(NA, 31)),
-      fixed_sel_re_fish = factor(rep(NA, 1)),
-      ln_q_fish = factor(rep(NA, 1)))
+      ln_fish_selpars_re = factor(rep(NA, 124)),
+      fixed_sel_re_fish = factor(rep(NA, 4)),
+      ln_q_fish = factor(rep(NA, 2))
+      )
       
-      compile_tmb(wd = here("src"), cpp = "EM.cpp")
+      # compile_tmb(wd = here("src"), cpp = "EM.cpp")
   
     # Run EM model here and get sdrep
     model <- run_EM(data = input$data, parameters = input$parameters, 
@@ -141,13 +159,14 @@
       mutate(t = mean(q_Surv), type = "q_surv", sim = sim, conv = conv[sim])
     # fsh_sel_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_fish_selpars", log = TRUE) %>% 
     #   mutate(t = c(10, 6), type = c("d_1", "amax_1"), sim = sim, conv = conv[sim])
-    srv_sel_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_srv_selpars", log = TRUE) %>% 
-      mutate(t = c(3, 0.8), type = c("a50_srv", "k_srv"), sim = sim, conv = conv[sim])
+    # srv_sel_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_srv_selpars", log = TRUE) %>%
+      # mutate(t = c(3, 0.8, 4, 0.8), type = c("a50_srvf", "k_srvf",
+                                             # "a50_srvm", "k_srvm"), sim = sim, conv = conv[sim])
     meanrec_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_MeanRec", log = TRUE) %>% 
       mutate(t = exp(2.75), type = "meanrec", sim = sim, conv = conv[sim])
     
     # Bind parameter estimates
-    par_all <- rbind(M_df, q_srv_df, srv_sel_df, meanrec_df, par_all)
+    par_all <- rbind(M_df, q_srv_df, meanrec_df, par_all)
   
     # Recruitment
     rec_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "Total_Rec") %>% 

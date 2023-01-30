@@ -33,7 +33,6 @@ prepare_EM_input <- function(years,
                           use_srv_index, 
                           use_fish_comps,
                           use_srv_comps,
-                          Sex_Ratio,
                           F_Slx_Model_Input,
                           S_Slx_Model_Input,
                           rec_model = 0,
@@ -89,13 +88,8 @@ prepare_EM_input <- function(years,
       } # end s loop
     } # end f loop
     
-    # obs_fish_age_Neff <- as.matrix(
-    #   rowSums(floor(obs_fish_age_comps)), ncol = n_fleets
-    # )
-    
-    # Effective Sample Sizes
-    obs_fish_age_Neff <- matrix(rowSums(fish_Neff[Fish_Start_yr[1]:(n_years - 1),] * catch_weight[,]), 
-                                nrow = length(years), ncol = n_fleets)
+    # Effective sample size
+    obs_fish_age_Neff <- as.matrix(rowSums(floor(obs_fish_age_comps)), ncol = n_fleets)
 
     # Now, apply the proportion function over a single fleet
     obs_fish_age_comps <- array(t(apply(obs_fish_age_comps, MARGIN = 1, FUN=function(x) { x/sum(x) })),
@@ -168,7 +162,7 @@ prepare_EM_input <- function(years,
                  dim = c(length(Fish_Start_yr[1]:(n_years)), length(ages), n_sexes))
   
   # Sex Ratios
-  Sex_Ratio <- Sex_Ratio
+  Sex_Ratio <- sex_ratio[1,]
   
 # CV inputs ---------------------------------------------------------------
   
