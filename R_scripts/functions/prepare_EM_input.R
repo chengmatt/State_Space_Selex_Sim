@@ -163,7 +163,7 @@ prepare_EM_input <- function(years,
 # Biological inputs -------------------------------------------------------
 
   # Weight at age
-  WAA <- array(wt_at_age[Fish_Start_yr[1]:(n_years),,1,sim], 
+  WAA <- array(wt_at_age[Fish_Start_yr[1]:(n_years),,,sim], 
                dim = c(length(Fish_Start_yr[1]:(n_years)), length(ages), n_sexes))
   
   # Maturity at age
