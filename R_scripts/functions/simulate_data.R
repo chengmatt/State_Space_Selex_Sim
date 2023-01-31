@@ -211,9 +211,10 @@ simulate_data <- function(fxn_path,
               # Now, get catch at age in weight
               Catch_at_age[y-1,,f,s,sim] <- Fish_Fleet_Mort * N_at_age[y-1,,s,sim] * (1-exp(-Z_s)) / Z_s
               
-              # Get catch aggregated across ages and sexes, and add lognormal errors
-              Catch_agg[y-1, f, sim] <- sum(Catch_at_age[y-1,,f,,sim] * wt_at_age[y,,s,sim]) * 
-                                               exp( rnorm(1, 0, sqrt(log(catch_CV^2 + 1))) )
+              if(s == n_sex) { # Get catch aggregated across ages and sexes, and add lognormal errors
+                Catch_agg[y-1, f, sim] <- sum(Catch_at_age[y-1,,f,,sim] * wt_at_age[y,,,sim]) * 
+                  exp( rnorm(1, 0, sqrt(log(catch_CV^2 + 1))) )
+              } # if we are done w/ looping through sexes
 
               ### Sample Fishery Index and Comps ------------------------------------------
               
@@ -272,15 +273,15 @@ simulate_data <- function(fxn_path,
                 
               } # Only start sampling if we are at the start of the survey start year
               
-              # Summarize this fishery index aggregated by sex and applying some error
-              Survey_Index_Agg[y-1,sf,sim] <- sum(melt(Survey_Index[y-1,sf,,sim]), na.rm = TRUE) # Aggregate
-              
-              # Apply error here, index srv_CV vector
-              Survey_Index_Agg[y-1,sf,sim] <- idx_obs_error(error = "log_normal", 
-                                                            true_index = Survey_Index_Agg[y-1,sf,sim],
-                                                            CV = srv_CV[sf])
-              
             } # end sex loop for survey here
+            
+            # Summarize this fishery index aggregated by sex and applying some error
+            Survey_Index_Agg[y-1,sf,sim] <- sum(melt(Survey_Index[y-1,sf,,sim]), na.rm = TRUE) # Aggregate
+            
+            # Apply error here, index srv_CV vector
+            Survey_Index_Agg[y-1,sf,sim] <- idx_obs_error(error = "log_normal", 
+                                                          true_index = Survey_Index_Agg[y-1,sf,sim],
+                                                          CV = srv_CV[sf])
             
           } # end sf loop
           

@@ -162,13 +162,17 @@ prepare_EM_input <- function(years,
   
 # Biological inputs -------------------------------------------------------
 
+  WAA <- array(data = NA, dim = c(length(Fish_Start_yr[1]:(n_years)), 
+                                  length(ages), n_sexes))
   # Weight at age
-  WAA <- array(wt_at_age[Fish_Start_yr[1]:(n_years),,,sim], 
-               dim = c(length(Fish_Start_yr[1]:(n_years)), length(ages), n_sexes))
+  for(s in 1:n_sexes) {
+    WAA[,,s] <- wt_at_age[Fish_Start_yr[1]:(n_years),,s,sim]
+  }
   
   # Maturity at age
-  MatAA <- array(mat_at_age[Fish_Start_yr[1]:(n_years),,1,sim]  ,
-                 dim = c(length(Fish_Start_yr[1]:(n_years)), length(ages), n_sexes))
+  MatAA <- array(mat_at_age[Fish_Start_yr[1]:(n_years),,1,sim],
+                 dim = c(length(Fish_Start_yr[1]:(n_years)), 
+                         length(ages), n_sexes))
   
   # Sex Ratios
   Sex_Ratio <- sex_ratio[1,]
@@ -280,8 +284,8 @@ prepare_EM_input <- function(years,
 
   # Set up parameters
   pars$ln_SigmaRec <- sigma_rec # recruitment variability
-  pars$ln_RecDevs <- rnorm(length(years)-1, -1, 0.05) # rec devs
-  pars$ln_N1_Devs <- rnorm(length(ages)-1, -1, 0.05) # intial recruitment deviaates
+  pars$ln_RecDevs <- rnorm(length(years), -1, 0.05) # rec devs
+  pars$ln_N1_Devs <- rnorm(length(ages)-2, -1, 0.05) # intial recruitment deviaates
   pars$ln_M <- rnorm(1, 0, 0.1) # natural mortality
   pars$ln_Fy <- matrix(rnorm(n_fleets * length(years), -3, 0.05), 
                           ncol = n_fleets, nrow = length(years)) # fishing mortality

@@ -28,7 +28,7 @@
                   Surv_Start_yr = c(70), 
                   max_rel_F_M = c(1.5, 1), 
                   desc_rel_F_M = c(0.05), 
-                  F_type = c("Constant", "Constant"),
+                  F_type = c("Contrast", "Const_Inc"),
                   yr_chng = 86, 
                   fish_Neff_max = c(150, 150), 
                   srv_Neff_max = c(200),
@@ -44,7 +44,7 @@
                   rho_rec = NA, 
                   fish_selex = c("logistic", "logistic"), 
                   srv_selex = c("logistic"), 
-                  fish_pars = list(Fleet_1_L = matrix(data = c(5, 0.8, 7, 0.4),
+                  fish_pars = list(Fleet_1_L = matrix(data = c(7, 0.8, 9, 0.4),
                                                       nrow = 2, byrow = TRUE),
                                    Fleet_2_EL = matrix(data = c(7, 0.8, 9, 0.4), 
                                                        nrow = 2, byrow = TRUE)),
@@ -78,7 +78,7 @@
     # Prepare inputs here
     input <- prepare_EM_input(years = years,
                      n_fleets = 1, 
-                     catch_cv = c(0.01),
+                     catch_cv = c(0.005),
                      F_Slx_Blocks_Input = matrix(rep(0, 31),
                                           nrow = length(years),
                                           ncol = 1), # fishery blocks

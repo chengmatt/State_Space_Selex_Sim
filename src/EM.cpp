@@ -304,9 +304,9 @@ Type objective_function<Type>::operator() ()
   // Initialization ----------------------------------------------
   
   for(int s = 0; s < n_sexes; s++) {
-    for(int a = 0; a < n_ages; a++){
+    for(int a = 1; a < n_ages; a++){
       if(a != n_ages - 1) { // not plus group
-        NAA(0, a, s) = exp( ln_RecPars(0) + ln_N1_Devs(a) -(0.5 * ln_SigmaRec2) -M * Type(a) ) * Sex_Ratio(s);
+        NAA(0, a, s) = exp( ln_RecPars(0) + ln_N1_Devs(a - 1) -(0.5 * ln_SigmaRec2) -M * Type(a) ) * Sex_Ratio(s);
       } else{
         NAA(0, n_ages - 1, s) = ( exp(ln_RecPars(0) -M * Type( n_ages - 1) ) / (1 - exp(-M)) ) * Sex_Ratio(s);
       }  // Plus group calculation for initializing population (no recruitment deviates)
@@ -315,12 +315,12 @@ Type objective_function<Type>::operator() ()
   
   // Recruitment ----------------------------------------------
   // Start recruitment in year 2 because we fill in via initialization
-  for(int y = 0; y < n_years-1; y++) { 
+  for(int y = 0; y < n_years; y++) { 
     for(int s = 0; s < n_sexes; s++) {
       
       if(rec_model == 0) { // Mean Recruitment 
         Type ln_MeanRec = ln_RecPars(0); // Mean Recruitment parameter
-        NAA(y + 1, 0, s) = exp( ln_MeanRec + ln_RecDevs(y) -Type(0.5) * ln_SigmaRec2) * Sex_Ratio(s); 
+        NAA(y, 0, s) = exp( ln_MeanRec + ln_RecDevs(y) -Type(0.5) * ln_SigmaRec2) * Sex_Ratio(s); 
       } // if for rec_model == 0
       
     } // s loop
