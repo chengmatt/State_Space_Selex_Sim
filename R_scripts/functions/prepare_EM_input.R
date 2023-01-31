@@ -79,21 +79,28 @@ prepare_EM_input <- function(years,
   if(n_fleets == 1) { # one fleet = sum across
     
     # Loop through to sum - index the 3rd dimension to get fleets
-    for(f in 1:dim(Fish_Age_Comps)[3]) {
-      for(s in 1:n_sexes) {
+    for(s in 1:n_sexes) {
+      for(f in 1:dim(Fish_Age_Comps)[3]) {
         # Filter to save as an object
         fish_age_comps <-  Fish_Age_Comps[Fish_Start_yr[1]:(n_years - 1),,f,s,sim] * catch_weight[,f]
         # Increment comps - fixing fleet index to 1 here
         obs_fish_age_comps[,,1,s] <- obs_fish_age_comps[,,1,s] + fish_age_comps
-      } # end s loop
-    } # end f loop
+      } # end f loop
+    } # end s loop
     
-    # Effective sample size
-    obs_fish_age_Neff <- as.matrix(rowSums(floor(obs_fish_age_comps)), ncol = n_fleets)
-
+    # Empty array to store values in
+    obs_fish_age_Neff <- array(data = NA, dim = c(length(years), n_fleets, n_sexes))
+    
+      # Effective sample size
+    for(s in 1:n_sexes) {
+      obs_fish_age_Neff[,1,s] <- rowSums(floor(obs_fish_age_comps[,,,s]))
+    } # s loop
+    
     # Now, apply the proportion function over a single fleet
-    obs_fish_age_comps <- array(t(apply(obs_fish_age_comps, MARGIN = 1, FUN=function(x) { x/sum(x) })),
-                                dim = c(length(years), length(ages), n_fleets, n_sexes))
+    for(s in 1:n_sexes) {
+      obs_fish_age_comps[,,,s] <- t(apply(obs_fish_age_comps[,,,s], MARGIN = 1, 
+                                          FUN=function(x) { x/sum(x) }))
+    } # s loop
     
   } else{ # more than one fleet here
     
@@ -116,16 +123,18 @@ prepare_EM_input <- function(years,
 # Survey Age Comps --------------------------------------------------------
 # Right now, this is only able to accomdate one single survey fleet
   
+  obs_srv_age_comps <- array(data = NA, dim = c(length(years), length(ages), n_srv_comps, n_sexes))
+
   # Apply function to get proportions and munge into matrix
-  obs_srv_age_comps <- array(
-    t(apply(Survey_Age_Comps[Fish_Start_yr[1]:(n_years - 1),,,,sim], MARGIN = 1, 
-            FUN=function(x) { x/sum(x) })),
-    dim = c(length(years), length(ages), n_srv_comps, n_sexes)
-  )
-  
+  # Now, apply the proportion function over a single fleet
+  for(s in 1:n_sexes) {
+    obs_srv_age_comps[,,,s] <- t(apply(Survey_Age_Comps[Fish_Start_yr[1]:(n_years - 1),,,s,sim],
+                                        MARGIN = 1, FUN=function(x) { x/sum(x) }))
+  } # s loop
+
   # Get survey age neffs
-  obs_srv_age_Neff <- matrix(srv_Neff[Fish_Start_yr[1]:(n_years - 1),], 
-                             nrow = length(years), ncol = n_srv_comps)
+  obs_srv_age_Neff <- array(srv_Neff[Fish_Start_yr[1]:(n_years - 1),], 
+                             dim = c(length(years), n_srv_comps, n_sexes))
   
 
 # Abundance Indices -------------------------------------------------------
@@ -271,14 +280,16 @@ prepare_EM_input <- function(years,
 
   # Set up parameters
   pars$ln_SigmaRec <- sigma_rec # recruitment variability
-  pars$ln_RecDevs <- rnorm(length(years), -1, 0.05) # rec devs
-  pars$ln_MeanRec <- rnorm(1, 3, 0.1)  # recruitment
-  pars$ln_N1_Devs <- rnorm(length(ages)-2, -1, 0.05) # intial recruitment deviaates
+  pars$ln_RecDevs <- rnorm(length(years)-1, -1, 0.05) # rec devs
+  pars$ln_N1_Devs <- rnorm(length(ages)-1, -1, 0.05) # intial recruitment deviaates
   pars$ln_M <- rnorm(1, 0, 0.1) # natural mortality
   pars$ln_Fy <- matrix(rnorm(n_fleets * length(years), -3, 0.05), 
                           ncol = n_fleets, nrow = length(years)) # fishing mortality
   pars$ln_q_fish <- rnorm(n_fish_indices, -1, 0.05) # catchability for fishery
   pars$ln_q_srv <- rnorm(n_srv_indices, -1, 0.05) # catchability for survey
+  
+  if(rec_model == 0) pars$ln_RecPars <- as.vector(rnorm(1, 0.1)) # Mean Recruitment (1 parameter)
+  if(rec_model == 1) pars$ln_RecPars <- as.vector(rnorm(2, 0.1)) # BH Recruitment (2 parameters)
   
   # Selectivity parameters
   

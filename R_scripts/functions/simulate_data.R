@@ -132,7 +132,7 @@ simulate_data <- function(fxn_path,
         
         if(rec_type == "BH") { # do beverton holt recruitment
           # Now generate new recruits with the updated SSB
-          rec_total[y,sim] <- beverton_holt_recruit_new(ssb = SSB[y,sim], h = h, r0 = r0, ssb0 = ssb0) * 
+          rec_total[y,sim] <- beverton_holt_recruit(ssb = SSB[y-1,sim], h = h, r0 = r0, ssb0 = ssb0) * 
             exp(rec_devs[y,sim] - ((sigma_rec^2)/2))
         }
         if(rec_type == "mean_rec") {

@@ -23,12 +23,12 @@
                   check_equil = FALSE, 
                   rec_type = "mean_rec",
                   n_years = 101, 
-                  Start_F = c(0.01, 0.01), 
+                  Start_F = c(0.05, 0.01), 
                   Fish_Start_yr = c(70, 70), 
                   Surv_Start_yr = c(70), 
                   max_rel_F_M = c(1.5, 1), 
                   desc_rel_F_M = c(0.05), 
-                  F_type = c("Contrast", "Const_Inc"),
+                  F_type = c("Constant", "Constant"),
                   yr_chng = 86, 
                   fish_Neff_max = c(150, 150), 
                   srv_Neff_max = c(200),
@@ -44,11 +44,11 @@
                   rho_rec = NA, 
                   fish_selex = c("logistic", "logistic"), 
                   srv_selex = c("logistic"), 
-                  fish_pars = list(Fleet_1_L = matrix(data = c(5, 0.8, 3, 0.4),
+                  fish_pars = list(Fleet_1_L = matrix(data = c(5, 0.8, 7, 0.4),
                                                       nrow = 2, byrow = TRUE),
-                                   Fleet_2_EL = matrix(data = c(6, 0.9, 6, 0.9), 
+                                   Fleet_2_EL = matrix(data = c(7, 0.8, 9, 0.4), 
                                                        nrow = 2, byrow = TRUE)),
-                  srv_pars = list(Fleet_3_SL = matrix(data = c(3,0.8, 4, 0.8), 
+                  srv_pars = list(Fleet_3_SL = matrix(data = c(3,0.8, 6, 0.8), 
                                                       nrow = 2, byrow = TRUE)), 
                   f_ratio = 0.5, 
                   m_ratio = 0.5)
@@ -77,11 +77,11 @@
     
     # Prepare inputs here
     input <- prepare_EM_input(years = years,
-                     n_fleets = 2, 
-                     catch_cv = c(0.001, 0.001),
+                     n_fleets = 1, 
+                     catch_cv = c(0.01),
                      F_Slx_Blocks_Input = matrix(rep(0, 31),
                                           nrow = length(years),
-                                          ncol = 2), # fishery blocks
+                                          ncol = 1), # fishery blocks
                      S_Slx_Blocks_Input = matrix(c(0), # selectivity blocks
                                           nrow = length(years), 
                                           ncol = 1),
@@ -91,25 +91,25 @@
                      use_fish_comps = TRUE,
                      use_srv_comps = TRUE,
                      rec_model = 0, 
-                     F_Slx_Model_Input = c("logistic", "logistic"),
+                     F_Slx_Model_Input = c("logistic"),
                      S_Slx_Model_Input = c("logistic"), 
                      sim = sim)
      
-      input$data$F_Slx_re_model <- matrix(10, nrow = 2, ncol = 2) # 0 = RW, 1 = AR1_y, 2 == GMRF 
+      input$data$F_Slx_re_model <- matrix(10, nrow = 1, ncol = 2) # 0 = RW, 1 = AR1_y, 2 == GMRF 
       input$parameters$ln_fish_selpars_re <- array(rnorm(((length(years)) * 1 * n_sex * 1), 0, 0.05), 
-                                                   dim = c((length(years)), 1, 2, 2))
-      input$parameters$fixed_sel_re_fish <- array(c(1), dim = c(1, 2, 2))
+                                                   dim = c((length(years)), 1, 1, 2))
+      input$parameters$fixed_sel_re_fish <- array(c(1), dim = c(1, 1, 2))
 
       # Fix pars
       map <- list(
       ln_SigmaRec = factor(NA),
-      ln_fish_selpars_re = factor(rep(NA, 124)),
-      fixed_sel_re_fish = factor(rep(NA, 4)),
-      ln_q_fish = factor(rep(NA, 2))
+      ln_fish_selpars_re = factor(rep(NA, 62)),
+      fixed_sel_re_fish = factor(rep(NA, 2)),
+      ln_q_fish = factor(rep(NA,1))
+      # ln_RecPars = factor(rep(NA, 3))
       )
-      
-      # compile_tmb(wd = here("src"), cpp = "EM.cpp")
-  
+      compile_tmb(wd = here("src"), cpp = "EM.cpp")
+
     # Run EM model here and get sdrep
     model <- run_EM(data = input$data, parameters = input$parameters, 
                     map = map, n.newton = 3, 
@@ -130,8 +130,8 @@
     # Checking fixed effects
     
     for(i in 1:31) {
-      if(i == 1)  plot(model$model_fxn$rep$F_Slx[i,,1,], type = "l", ylim = c(0,1))
-      else lines(model$model_fxn$rep$F_Slx[i,,1,])
+      if(i == 1)  plot(model$model_fxn$rep$F_Slx[i,,1,1], type = "l", ylim = c(0,1))
+      else lines(model$model_fxn$rep$F_Slx[i,,1,1])
     }
     
     # melt(model$model_fxn$rep$F_Slx)  %>% 
@@ -139,16 +139,17 @@
     #   geom_line() +
     #   scale_color_viridis_c()
     
-    lines(model$model_fxn$rep$F_Slx[31,,,], lwd= 3, col = "purple")
-    lines(Fish_selex_at_age[1,,1,,1], col = "red", lwd= 3)
-    lines(Fish_selex_at_age[1,,2,,1], col = "blue", lwd= 3)
+    lines(model$model_fxn$rep$F_Slx[31,,1,1], lwd= 3, col = "purple")
+    lines(Fish_selex_at_age[1,,1,1,1], col = "red", lwd= 3)
+    lines(Fish_selex_at_age[1,,2,1,1], col = "blue", lwd= 3)
     
     # Matrix::image(model$model_fxn$env$spHess(random=TRUE))
   
     # Check model convergence
     convergence_status <- check_model_convergence(mle_optim = model$mle_optim, 
                                                   mod_rep = model$model_fxn,
-                                                  sd_rep = model$sd_rep, min_grad = 0.001)
+                                                  sd_rep = model$sd_rep, 
+                                                  min_grad = 0.001)
     conv[sim] <- convergence_status$Convergence
     max_par[sim] <- convergence_status$Max_Grad_Par
   
@@ -162,7 +163,7 @@
     # srv_sel_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_srv_selpars", log = TRUE) %>%
       # mutate(t = c(3, 0.8, 4, 0.8), type = c("a50_srvf", "k_srvf",
                                              # "a50_srvm", "k_srvm"), sim = sim, conv = conv[sim])
-    meanrec_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_MeanRec", log = TRUE) %>% 
+    meanrec_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_RecPars", log = TRUE) %>% 
       mutate(t = exp(2.75), type = "meanrec", sim = sim, conv = conv[sim])
     
     # Bind parameter estimates

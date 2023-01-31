@@ -36,8 +36,8 @@ Type objective_function<Type>::operator() ()
   DATA_MATRIX(obs_catches); // Matrix of catch from each fleet; n_years * n_fleets
   DATA_ARRAY(obs_fish_age_comps); // Array of fishery age comps; n_years * n_ages * n_fleets * n_sexes
   DATA_ARRAY(obs_srv_age_comps); // Array of survey age comps; n_years * n_ages * n_srv_indices * n_sexes
-  DATA_MATRIX(obs_fish_age_Neff); // Array of fishery age comps; n_years * n_fleets 
-  DATA_MATRIX(obs_srv_age_Neff); // Array of survey age comps; n_years * n_srv_indices 
+  DATA_ARRAY(obs_fish_age_Neff); // Array of fishery age comps; n_years * n_fleets * n_sexes 
+  DATA_ARRAY(obs_srv_age_Neff); // Array of survey age comps; n_years * n_srv_indices * n_sexes 
   DATA_MATRIX(obs_fish_indices); // Matrix of Fishery Indices of Abundance
   DATA_MATRIX(obs_srv_indices); // Matrix of Survey Indices of Abundance
   DATA_VECTOR(catch_cv); // Vector of catch CVs
@@ -77,7 +77,7 @@ Type objective_function<Type>::operator() ()
  
   // Biological parameters
   PARAMETER(ln_M); // log natural mortality
-  PARAMETER(ln_MeanRec); // log mean recruitment 
+  PARAMETER_VECTOR(ln_RecPars); // Vector of recruitment parameters
   PARAMETER(ln_SigmaRec); // log sigma for recruitment
   PARAMETER_VECTOR(ln_N1_Devs); // log deviations for initial abundance
   PARAMETER_VECTOR(ln_RecDevs); // log recruitment deviations
@@ -304,27 +304,28 @@ Type objective_function<Type>::operator() ()
   // Initialization ----------------------------------------------
   
   for(int s = 0; s < n_sexes; s++) {
-    for(int a = 1; a < n_ages; a++){
+    for(int a = 0; a < n_ages; a++){
       if(a != n_ages - 1) { // not plus group
-        NAA(0, a, s) = exp(ln_MeanRec + ln_N1_Devs(a - 1) -(0.5 * ln_SigmaRec2) -M * Type(a) ) * Sex_Ratio(s);
+        NAA(0, a, s) = exp( ln_RecPars(0) + ln_N1_Devs(a) -(0.5 * ln_SigmaRec2) -M * Type(a) ) * Sex_Ratio(s);
       } else{
-        NAA(0, n_ages - 1, s) = (exp(ln_MeanRec -M * Type( n_ages - 1) ) / (1 - exp(-M)) ) * Sex_Ratio(s);
+        NAA(0, n_ages - 1, s) = ( exp(ln_RecPars(0) -M * Type( n_ages - 1) ) / (1 - exp(-M)) ) * Sex_Ratio(s);
       }  // Plus group calculation for initializing population (no recruitment deviates)
     } // n_ages - 1 a loop
   } // s loop
   
   // Recruitment ----------------------------------------------
-  
-  for(int y = 0; y < n_years; y++) {
+  // Start recruitment in year 2 because we fill in via initialization
+  for(int y = 0; y < n_years-1; y++) { 
     for(int s = 0; s < n_sexes; s++) {
       
-    if(rec_model == 0) { // Mean Recruitment 
-    NAA(y, 0, s) = exp( ln_MeanRec + ln_RecDevs(y) -0.5 * ln_SigmaRec2) * Sex_Ratio(s); 
-    } // if for rec_model == 0
-    
+      if(rec_model == 0) { // Mean Recruitment 
+        Type ln_MeanRec = ln_RecPars(0); // Mean Recruitment parameter
+        NAA(y + 1, 0, s) = exp( ln_MeanRec + ln_RecDevs(y) -Type(0.5) * ln_SigmaRec2) * Sex_Ratio(s); 
+      } // if for rec_model == 0
+      
     } // s loop
   } // y loop
-
+  
   // Project Numbers At Age Forward ----------------------------------------------
   
   for(int y = 0; y < n_years; y++) {
@@ -340,6 +341,7 @@ Type objective_function<Type>::operator() ()
         // Increment Numbers at age to get total biomass
         Total_Biom(y) += NAA(y, a, s) * WAA(y, a, s);
       } // end ages loop
+      
       // Increment total recruitment here
       Total_Rec(y) += NAA(y, 0, s);
     } // end sex loop
@@ -355,7 +357,7 @@ Type objective_function<Type>::operator() ()
     } // a loop
   } // y loop
   // Get SSB quantities here
-
+  
   // Catch ----------------------------------------------
   pred_catches.setZero(); // set zero
   
@@ -521,7 +523,7 @@ Type objective_function<Type>::operator() ()
       for(int s = 0; s < n_sexes; s++) { 
         
         // Pull out observed age vector and multiply by the effective sample size
-        obs_fish_age_vec = obs_fish_age_comps.col(s).col(fc).transpose().col(y) * obs_fish_age_Neff(y, fc);
+        obs_fish_age_vec = obs_fish_age_comps.col(s).col(fc).transpose().col(y) * obs_fish_age_Neff(y, fc, s);
         
         // Pull out predicted age vector
         pred_fish_age_vec = (pred_fish_age_comps.col(s).col(fc).transpose().col(y) + c);
@@ -541,7 +543,7 @@ Type objective_function<Type>::operator() ()
       for(int s = 0; s < n_sexes; s++) {
         
         // Pull out observed age vector and multiply by the effective sample size
-        obs_srv_age_vec = obs_srv_age_comps.col(s).col(sc).transpose().col(y) * obs_srv_age_Neff(y, sc);
+        obs_srv_age_vec = obs_srv_age_comps.col(s).col(sc).transpose().col(y) * obs_srv_age_Neff(y, sc, s);
         
         // Pull out predicted age vector
         pred_srv_age_vec = (pred_srv_age_comps.col(s).col(sc).transpose().col(y) + c);
