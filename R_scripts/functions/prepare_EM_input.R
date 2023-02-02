@@ -16,6 +16,8 @@
 #' @param rec_model recruitment model == 0 (mean recruitment)
 #' @param F_Slx_Model_Input Fishery selectivity model character (logistic, gamma, double_logistic)
 #' @param S_Slx_Model_Input same as above
+#' @param time_selex Type of time-varying to do (Options are: None, RW, and AR1_y)
+#' @param n_time_selex_pars Number of time-varying selectivity parameters we want to estimate on the parametric form
 #' @param sim simulation indexing
 #'
 #' @return
@@ -36,6 +38,8 @@ prepare_EM_input <- function(years,
                           F_Slx_Model_Input,
                           S_Slx_Model_Input,
                           rec_model = 0,
+                          time_selex = "None",
+                          n_time_selex_pars = 1,
                           sim) {
   
   # Make data into a list 
@@ -53,6 +57,7 @@ prepare_EM_input <- function(years,
   n_fish_indices <- n_fleets # number of fish indices = number of fleets
   n_srv_comps <- dim(Surv_selex_at_age)[3] # 3rd dimension of this array = number of survey fleets
   n_srv_indices <- dim(Survey_Index_Agg)[2] # 2nd dimension of this array = number of survey fleets
+  
   
 # Catch -------------------------------------------------------------------
 
@@ -114,8 +119,8 @@ prepare_EM_input <- function(years,
     } # end f loop
     
     # Effective Sample Sizes
-    obs_fish_age_Neff <- matrix(fish_Neff[Fish_Start_yr[1]:(n_years - 1),], 
-                                    nrow = length(years), ncol = n_fleets)
+    obs_fish_age_Neff <- array(fish_Neff[Fish_Start_yr[1]:(n_years - 1),], 
+                                    dim = c(length(years), 2, n_sexes))
     
   } # end else
   
@@ -275,7 +280,6 @@ prepare_EM_input <- function(years,
   data$use_srv_index  <- use_srv_index 
   data$use_fish_comps <- use_fish_comps
   data$use_srv_comps  <- use_srv_comps 
-  data$rec_model <- rec_model
   data$S_Slx_model <- S_Slx_model
   data$F_Slx_model <- F_Slx_model
   
@@ -292,8 +296,14 @@ prepare_EM_input <- function(years,
   pars$ln_q_fish <- rnorm(n_fish_indices, -1, 0.05) # catchability for fishery
   pars$ln_q_srv <- rnorm(n_srv_indices, -1, 0.05) # catchability for survey
   
-  if(rec_model == 0) pars$ln_RecPars <- as.vector(rnorm(1, 0.1)) # Mean Recruitment (1 parameter)
-  if(rec_model == 1) pars$ln_RecPars <- as.vector(rnorm(2, 0.1)) # BH Recruitment (2 parameters)
+  if(rec_model == "mean_rec") {
+    pars$ln_RecPars <- as.vector(rnorm(1, 0.1)) # Mean Recruitment (1 parameter)
+    data$rec_model <- 0
+  }
+  if(rec_model == "BH") {
+    pars$ln_RecPars <- as.vector(rnorm(2, 0.1)) # BH Recruitment (2 parameters)
+    data$rec_model <- 1
+  }
   
   # Selectivity parameters
   
@@ -326,7 +336,32 @@ prepare_EM_input <- function(years,
   
   # put array into our parameter list
   pars$ln_fish_selpars <- array(log(0.5), dim = c(n_fish_comps, n_sexes, n_fish_blocks, max(n_fish_pars)))
-  
+
+  # Time-Varying Selectivity Options (Fishery)
+    if(time_selex == "None") { # No time-varying
+      data$F_Slx_re_model <- matrix(100, nrow = n_fish_comps, ncol = n_sexes)
+      pars$ln_fish_selpars_re <- array(rnorm(1, 0, 0.05),
+                                       dim = c((length(years)), n_time_selex_pars, n_fish_comps, n_sexes))
+      pars$fixed_sel_re_fish <- array(rnorm(1,0,1), dim = c(1, n_fish_comps, n_sexes))
+    } # none if statement
+    
+    if(time_selex == "RW") { # Random Walk
+      data$F_Slx_re_model <- matrix(0, nrow = n_fish_comps, ncol = n_sexes)
+      pars$ln_fish_selpars_re <- array(rnorm(1, 0, 0.05),
+                                       dim = c((length(years)), n_time_selex_pars, n_fish_comps, n_sexes))
+      pars$fixed_sel_re_fish <- array(rnorm(1,0,1), dim = c(n_time_selex_pars, n_fish_comps, n_sexes))
+    } # random walk if statement
+    
+    if(time_selex == "AR1_y") { # Autoregressive 1 by year
+      data$F_Slx_re_model <- matrix(0, nrow = n_fish_comps, ncol = n_sexes)
+      pars$ln_fish_selpars_re <- array(rnorm(1, 1, 0.05),
+                                       dim = c((length(years)), n_time_selex_pars, n_fish_comps, n_sexes))
+      pars$fixed_sel_re_fish <- array(rnorm(1, 1 ,0.05), dim = c(2 * n_time_selex_pars, n_fish_comps, n_sexes))
+    } # AR1_y if statement
+    
   return(list(data = data, parameters = pars))
   
 }
+
+
+

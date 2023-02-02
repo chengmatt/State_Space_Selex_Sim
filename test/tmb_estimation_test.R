@@ -46,7 +46,7 @@
                   srv_selex = c("logistic"), 
                   fish_pars = list(Fleet_1_L = matrix(data = c(7, 0.8, 9, 0.4),
                                                       nrow = 2, byrow = TRUE),
-                                   Fleet_2_EL = matrix(data = c(7, 0.8, 9, 0.4), 
+                                   Fleet_2_EL = matrix(data = c(4, 0.8, 6, 0.4), 
                                                        nrow = 2, byrow = TRUE)),
                   srv_pars = list(Fleet_3_SL = matrix(data = c(3,0.8, 6, 0.8), 
                                                       nrow = 2, byrow = TRUE)), 
@@ -78,7 +78,7 @@
     # Prepare inputs here
     input <- prepare_EM_input(years = years,
                      n_fleets = 1, 
-                     catch_cv = c(0.005),
+                     catch_cv = c(0.01),
                      F_Slx_Blocks_Input = matrix(rep(0, 31),
                                           nrow = length(years),
                                           ncol = 1), # fishery blocks
@@ -90,16 +90,15 @@
                      use_srv_index = TRUE,
                      use_fish_comps = TRUE,
                      use_srv_comps = TRUE,
-                     rec_model = 0, 
+                     rec_model = "mean_rec", 
                      F_Slx_Model_Input = c("logistic"),
                      S_Slx_Model_Input = c("logistic"), 
+                     time_selex = "None",
+                     n_time_selex_pars = 1,
                      sim = sim)
-     
-      input$data$F_Slx_re_model <- matrix(10, nrow = 1, ncol = 2) # 0 = RW, 1 = AR1_y, 2 == GMRF 
-      input$parameters$ln_fish_selpars_re <- array(rnorm(((length(years)) * 1 * n_sex * 1), 0, 0.05), 
-                                                   dim = c((length(years)), 1, 1, 2))
-      input$parameters$fixed_sel_re_fish <- array(c(1), dim = c(1, 1, 2))
-
+    
+    # input$parameters$fixed_sel_re_fish[] <- c(0.2, 0.15)
+ 
       # Fix pars
       map <- list(
       ln_SigmaRec = factor(NA),
@@ -130,14 +129,10 @@
     # Checking fixed effects
     
     for(i in 1:31) {
-      if(i == 1)  plot(model$model_fxn$rep$F_Slx[i,,1,1], type = "l", ylim = c(0,1))
-      else lines(model$model_fxn$rep$F_Slx[i,,1,1])
+      if(i == 1)  plot(model$model_fxn$rep$F_Slx[i,,,1], type = "l", ylim = c(0,1))
+      else lines(model$model_fxn$rep$F_Slx[i,,,1])
     }
-    
-    # melt(model$model_fxn$rep$F_Slx)  %>% 
-    #   ggplot(aes(x = Var2, y = value, color = Var1, group = Var1)) +
-    #   geom_line() +
-    #   scale_color_viridis_c()
+  
     
     lines(model$model_fxn$rep$F_Slx[31,,1,1], lwd= 3, col = "purple")
     lines(Fish_selex_at_age[1,,1,1,1], col = "red", lwd= 3)
