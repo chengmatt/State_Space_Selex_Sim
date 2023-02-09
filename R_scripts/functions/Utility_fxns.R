@@ -69,7 +69,8 @@ run_EM <- function(data, parameters, map, n.newton, random = NULL,
   
   # Optimize model here w/ nlminb
   mle_optim <- stats::nlminb(model_fxn$par, model_fxn$fn, model_fxn$gr, 
-                     control = list(iter.max = iter.max, eval.max = eval.max))
+                     control = list(iter.max = iter.max, eval.max = eval.max), 
+                     lower = -15, upper = 15)
   
   # Take additional newton steps
   add_newton(n.newton = n.newton, ad_model = model_fxn, mle_optim = mle_optim)

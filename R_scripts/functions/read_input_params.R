@@ -134,7 +134,6 @@ read_params_create_OM_objects <- function(spreadsheet_path) {
   recruitment_pars <- read_xlsx(spreadsheet_path, sheet = "Recruitment_Mortality")
   h <<- as.numeric(recruitment_pars$Value[recruitment_pars$Par == "h"]) # Steepness (Recruitment at 20% of SSB0)
   r0 <<- as.numeric(recruitment_pars$Value[recruitment_pars$Par == "r0"] ) # Virgin Recruitment
-  ssb0 <<- as.numeric(recruitment_pars$Value[recruitment_pars$Par == "ssb0"]) # Virgin SSB
   sigma_rec <<- as.numeric(recruitment_pars$Value[recruitment_pars$Par == "sigma_rec"]) # Recruitment variability
   mu_rec <<- as.numeric(recruitment_pars$Value[recruitment_pars$Par == "mu_rec"]) # Mean recruitment
   Mean_M <<- as.numeric(recruitment_pars$Value[recruitment_pars$Par == "M"]) # Mortality

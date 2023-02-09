@@ -8,7 +8,6 @@ simulate_data <- function(fxn_path,
                           spreadsheet_path, 
                           check_equil = FALSE,
                           rec_type = "mean_rec",
-                          n_years,
                           Start_F,
                           Fish_Start_yr,
                           Surv_Start_yr,
@@ -16,6 +15,7 @@ simulate_data <- function(fxn_path,
                           desc_rel_F_M,
                           F_type,
                           yr_chng, 
+                          yr_chng_end,
                           fish_Neff_max, 
                           srv_Neff_max, 
                           fish_CV, 
@@ -53,7 +53,8 @@ simulate_data <- function(fxn_path,
          max_rel_F_M = max_rel_F_M, 
          desc_rel_F_M = desc_rel_F_M, 
          mean_nat_mort = Mean_M,
-         yr_chng = yr_chng)
+         yr_chng = yr_chng,
+         yr_chng_end = yr_chng_end)
   
   # Specify data scenarios here
   fish_surv_data_scenarios(Fish_Start_yr = Fish_Start_yr, 
@@ -132,7 +133,7 @@ simulate_data <- function(fxn_path,
         
         if(rec_type == "BH") { # do beverton holt recruitment
           # Now generate new recruits with the updated SSB
-          rec_total[y,sim] <- beverton_holt_recruit(ssb = SSB[y-1,sim], h = h, r0 = r0, ssb0 = ssb0) * 
+          rec_total[y,sim] <- beverton_holt_recruit(ssb = SSB[y-1,sim], h = h, r0 = r0) * 
             exp(rec_devs[y,sim] - ((sigma_rec^2)/2))
         }
         if(rec_type == "mean_rec") {

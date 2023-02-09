@@ -13,24 +13,19 @@
 #' @param F_type Specify type of fishing mortality pattern
 #' @param mean_nat_mort Mean natural mortality
 #' @param yr_chng If we are simulating a fleet structure change, when do we want this change to occur at 
-#' Note that this is only applicable for (Const_Inc and Contrast)
+#' Note that this is only applicable for (Const_Inc, Contrast, Const_Ramp_Const, and Contrast_Const)
+#' @param yr_chng_end If we are simulating a fleet structure change, when do we want this fleet structure change
+#' to end. Applicable for (Const_Ramp_Const, Contrast_Const)
 
 specify_F_pattern <- function(Start_F, Fish_Start_yr, F_type, n_years, max_rel_F_M, desc_rel_F_M,
-                              mean_nat_mort, yr_chng = NULL) {
+                              mean_nat_mort, yr_chng = NULL, yr_chng_end = NULL) {
   
   if(F_type == "Contrast") { # Contrast F type
     
     if(desc_rel_F_M > max_rel_F_M) stop("Descending limb of fishing mortality contrast is larger than ascending limb! Specify another pattern or adjust the relative mortality rates to reflect a contrast pattern!")
-    
-    if(!is.null(yr_chng)) { # if this is a fleet sturcture change,
-      # calculate when this change should occur
-      chngpoint <- yr_chng
-      print(paste("F mort contrast decreasing at user specified value:", chngpoint))
-    } else{
-      # Determine the mid point of when to ramp back down
-      chngpoint <- round(mean(Fish_Start_yr:(n_years)))
-      print(paste("F mort contrast decreasing at fxn calculated value:", chngpoint))
-    } # else statement for change point
+
+    # Change point here
+    chngpoint <- yr_chng
     
     # Increase fishing mortality (ramp up); here we are specifying fishing mortality relative to natural mortality.
     # We will allow it go over natural mortality first by 1.5x
@@ -85,16 +80,8 @@ specify_F_pattern <- function(Start_F, Fish_Start_yr, F_type, n_years, max_rel_F
   
   if(F_type == "Const_Inc") { # Constant and Increasing F type
     
-    if(!is.null(yr_chng)) { # if this is a fleet sturcture change,
-      # calculate when this change should occur
-      chngpoint <- yr_chng
-      print(paste("F mort Const_Inc increasing at user specified value:", chngpoint))
-    } else{
-      # Determine the mid point of when to ramp back down
-      chngpoint <- round(mean(Fish_Start_yr:(n_years)))
-      print(paste("F mort Const_Inc increasing at fxn calculated value:", chngpoint))
-    } # else statement for change point
-    
+    # Change point for fmort
+    chngpoint <- yr_chng
     # F stays constant initially
     constant_F <- seq(Start_F, Start_F, length.out = length(Fish_Start_yr:chngpoint))
     # Change point for F
@@ -103,6 +90,50 @@ specify_F_pattern <- function(Start_F, Fish_Start_yr, F_type, n_years, max_rel_F
     F_vec <- c(constant_F, change_F[-1]) # Removing the first year from this sequence
     
   } # if fleet structure is constant and increases after
+  
+  if(F_type == "Const_Ramp_Const") { # Constant, Ramp (can be increase or decrease), 
+    # and then remains constant
+    
+    chngpoint <- yr_chng     # Change point for fmort
+    chngpoint_end <- yr_chng_end # when does change point end
+    
+    # F stays constant initially
+    constant_F <- seq(Start_F, Start_F, length.out = length(Fish_Start_yr:chngpoint))
+    # Change point for F (Ramp)
+    change_F <- seq(Start_F, (max_rel_F_M * mean_nat_mort), length.out = length(chngpoint:chngpoint_end))
+    # Change point end (plateaus/stays constant now)
+    change_F_const <- seq((max_rel_F_M * mean_nat_mort), (max_rel_F_M * mean_nat_mort),
+                          length.out = length(chngpoint_end:n_years))
+    
+    # Make F vector here
+    F_vec <- c(constant_F, change_F[-1], change_F_const[-1])
+  }
+  
+  if(F_type == "Contrast_Const") { # Constrast but declines to a constant rate
+    
+    chngpoint <- yr_chng    # Change point here
+    chngpoint_end <- yr_chng_end # when does change point end
+
+    # Increase fishing mortality (ramp up); here we are specifying fishing mortality relative to natural mortality.
+    # We will allow it go over natural mortality first by 1.5x
+    fish_mort_1 <- seq(Start_F, 
+                       (max_rel_F_M * mean_nat_mort), 
+                       length.out = length(Fish_Start_yr:chngpoint)) 
+    
+    # Now, decrease fihsing mortality (ramp down) - decrease to 0.75 of the mean natural mortality
+    fish_mort_2 <- seq(((max_rel_F_M * mean_nat_mort)), 
+                       (desc_rel_F_M * mean_nat_mort), 
+                       length.out = length(chngpoint:chngpoint_end))
+    
+    # Finally, make this stay constant at a given rate
+    fish_mort_3 <- seq(((desc_rel_F_M * mean_nat_mort)), 
+                       (desc_rel_F_M * mean_nat_mort), 
+                       length.out = length(chngpoint_end:n_years))
+    
+    # Now bind all of these fish morts into a vector
+    F_vec <- c(fish_mort_1, fish_mort_2[-1], fish_mort_3[-3]) # Remove first element so it connects smoothly
+    
+  }
   
   return(F_vec)
   
@@ -120,7 +151,7 @@ specify_F_pattern <- function(Start_F, Fish_Start_yr, F_type, n_years, max_rel_F
 #' @param mean_nat_mort Mean natural mortality
 
 get_Fs <- function(Start_F, Fish_Start_yr, F_type, n_years, max_rel_F_M, desc_rel_F_M,
-                   mean_nat_mort, yr_chng = NULL) {
+                   mean_nat_mort, yr_chng = NULL, yr_chng_end = NULL) {
   
   if(n_fish_fleets != length(Start_F) & n_fish_fleets != length(Fish_Start_yr) &
      n_fish_fleets != length(F_type) & n_fish_fleets != length(max_rel_F_M) &
@@ -141,7 +172,8 @@ get_Fs <- function(Start_F, Fish_Start_yr, F_type, n_years, max_rel_F_M, desc_re
                                               max_rel_F_M = max_rel_F_M[f], # Apical F relative to M
                                               desc_rel_F_M = desc_rel_F_M[f], # Descending F after apical relative to M
                                               mean_nat_mort = mean_nat_mort, # Mean Natural Mortality
-                                              yr_chng = yr_chng) # what year fleet structure begins to change
+                                              yr_chng = yr_chng, # what year fleet structure begins to change
+                                              yr_chng_end = yr_chng_end) # year fleet structure chagne ends
   } # end f loop
   
   # Output into environment
