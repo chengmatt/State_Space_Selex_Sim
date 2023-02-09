@@ -1,9 +1,7 @@
-// General single species age-structured stock assessment
+// General single species age-and sex-structured stock assessment
 // that accommodates multiple fishery fleets written in TMB
 // Creator: Matthew LH. Cheng (UAF-CFOS)
-
-// TO DO:
-// Beverton Holt SR
+// Date updated: 2/8/23
 
 #include<TMB.hpp>
 #include "Get_Selex.hpp"
@@ -166,8 +164,8 @@ Type objective_function<Type>::operator() ()
         for(int p = 0; p < n_re_pars; p++) {
           for(int y = 0; y < n_re_years; y++) {
             // penalize deviations
-            fish_sel_re_nLL -= dnorm(ln_fish_selpars_re(y, p, f, s), 
-                                     Type(0.0), fixed_sel_re_fish(p, f, s), true);
+            fish_sel_re_nLL -= dnorm(ln_fish_selpars_re(y, p, f, s), Type(0.0), 
+                                     fixed_sel_re_fish(p, f, s), true);
           } // y loop
         } // p loop
 
@@ -307,13 +305,13 @@ Type objective_function<Type>::operator() ()
   for(int s = 0; s < n_sexes; s++) {
     for(int a = 0; a < n_ages; a++){
       
+      // Define initial recruitment parameter
       Type ln_RecInit = ln_RecPars(0); 
-      if(a != n_ages - 1) { // not plus group
-        NAA(0, a, s) = exp( (ln_RecInit + ln_N1_Devs(a) -(0.5 * ln_SigmaRec2)) -M * Type(a) ) * Sex_Ratio(s);
-      } else{
-        NAA(0, n_ages - 1, s) = ( exp(ln_RecInit + ln_N1_Devs(a) -M * Type( n_ages - 1) ) / (1 - exp(-M)) ) * Sex_Ratio(s);
-      }  // Plus group calculation for initializing population (no recruitment deviates)
       
+      // Fill in initial age-structure
+      NAA(0, a, s) = exp( (ln_RecInit + ln_N1_Devs(a) 
+                       -(0.5 * ln_SigmaRec2)) -M * Type(a) ) * Sex_Ratio(s);
+
       // Calculate SSB, Depletion and SBPR0 at first time point here
       if(s == 0) {
         SSB(0) += NAA(0, a, 0) * WAA(0, a, 0) * MatAA(0, a, 0);
@@ -332,7 +330,8 @@ Type objective_function<Type>::operator() ()
         
         if(rec_model == 0) { // Mean Recruitment
           Type ln_MeanRec = ln_RecPars(0); // Mean Recruitment parameter
-          NAA(y, 0, s) = exp( ln_MeanRec + ln_RecDevs(y - 1) - Type(0.5) * ln_SigmaRec2) * Sex_Ratio(s);
+          NAA(y, 0, s) = exp( ln_MeanRec + ln_RecDevs(y - 1) 
+                            - Type(0.5) * ln_SigmaRec2) * Sex_Ratio(s);
         } // if for rec_model == 0
         
         if(rec_model == 1) { // Beverton Holt Recruitment
@@ -343,7 +342,8 @@ Type objective_function<Type>::operator() ()
           Type ssb0 = SBPR0 * R0; // SSB0
           
           // Get recruitment here
-          NAA(y, 0, s) = ( (Type(4) * h * R0 * SSB(y - 1))  / ( ssb0*(Type(1)-h) + SSB(y - 1) * (Type(5)*h-Type(1)) ) * 
+          NAA(y, 0, s) = ( (Type(4) * h * R0 * SSB(y - 1))  / 
+                         ( ssb0*(Type(1)-h) + SSB(y - 1) * (Type(5)*h-Type(1)) ) * 
                          exp( ln_RecDevs(y-1) - Type(0.5) * ln_SigmaRec2 ) ) * Sex_Ratio(s);
           
           // Report Derived Quantities here

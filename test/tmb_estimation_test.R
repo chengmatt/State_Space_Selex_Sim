@@ -22,7 +22,7 @@
                   check_equil = FALSE,
                   spreadsheet_path = spreadsheet_path, 
                   rec_type = "BH",
-                  Start_F = c(0.015, 0.015), 
+                  Start_F = c(0.01, 0.01), 
                   Fish_Start_yr = c(70, 70), 
                   Surv_Start_yr = c(70), 
                   max_rel_F_M = c(1, 1), 
@@ -48,8 +48,7 @@
                                                        nrow = 2, byrow = TRUE)),
                   srv_pars = list(Fleet_3_SL = matrix(data = c(4,0.8, 6, 0.8), 
                                                       nrow = 2, byrow = TRUE)), 
-                  f_ratio = 0.5, 
-                  m_ratio = 0.5)
+                  f_ratio = 0.5, m_ratio = 0.5)
     
     plot_OM(path = here("figs", "Base_OM_Figs"), file_name = "OM_Check.pdf")
   
@@ -76,7 +75,7 @@
     # Prepare inputs here
     input <- prepare_EM_input(years = years,
                      n_fleets = 1, 
-                     catch_cv = c(0.01),
+                     catch_cv = c(0.005),
                      F_Slx_Blocks_Input = matrix(c(rep(0)),
                                           nrow = length(years),
                                           ncol = 1), # fishery blocks
@@ -88,24 +87,16 @@
                      F_Slx_Model_Input = c("logistic"),
                      S_Slx_Model_Input = c("logistic"), 
                      time_selex = "None",
-                     n_time_selex_pars = 1,
+                     n_time_selex_pars = 2,
+                     fix_pars = c("ln_SigmaRec", "logit_q_fish", "ln_h"),
                      sim = sim)
     
-      # Fix pars
-      map <- list(
-      ln_SigmaRec = factor(NA),
-      ln_fish_selpars_re = factor(rep(NA, 62)),
-      fixed_sel_re_fish = factor(rep(NA, 2)),
-      logit_q_fish = factor(rep(NA, 1))
-      # ln_M = factor(rep(NA)),
-      # ln_RecPars = factor(c(1, NA))
-      )
-      
+      # input$parameters$fixed_sel_re_fish[] <- c(0.5, 0.3, 0.5, 0.3)
       compile_tmb(wd = here("src"), cpp = "EM.cpp")
 
     # Run EM model here and get sdrep
     model <- run_EM(data = input$data, parameters = input$parameters, 
-                    map = map, n.newton = 3, 
+                    map = input$map, n.newton = 3, 
                     # random = "ln_fish_selpars_re",
                     silent = F, getsdrep = TRUE, )
     
@@ -116,23 +107,23 @@
     # sum(names(model$sd_rep$par.fixed) == "ln_fish_selpars_re")
     # model$sd_rep
   
-    # f_pars <- model$sd_rep$par.fixed[names(model$sd_rep$par.fixed) == "ln_fish_selpars"]
-    # f_repars <- model$sd_rep$par.random[names(model$sd_rep$par.random) == "ln_fish_selpars_re"]
-    # 
-    # sel_res <- model$model_fxn$rep$ln_fish_selpars_re
-    # plot(sel_res[,,1,1], type = "l")
-    # 
-    # # Checking fixed effects
-    # 
-    # for(i in 1:31) {
-    #   if(i == 1)  plot(model$model_fxn$rep$F_Slx[i,,,1], type = "l", ylim = c(0,1))
-    #   else lines(model$model_fxn$rep$F_Slx[i,,,1])
-    # }
-    # 
-    # 
-    # lines(model$model_fxn$rep$F_Slx[31,,1,1], lwd= 3, col = "purple")
-    # lines(Fish_selex_at_age[1,,1,1,1], col = "red", lwd= 3)
-    # lines(Fish_selex_at_age[1,,2,1,1], col = "blue", lwd= 3)
+    f_pars <- model$sd_rep$par.fixed[names(model$sd_rep$par.fixed) == "ln_fish_selpars"]
+    f_repars <- model$sd_rep$par.random[names(model$sd_rep$par.random) == "ln_fish_selpars_re"]
+
+    sel_res <- model$model_fxn$rep$ln_fish_selpars_re
+    plot(sel_res[,,1,1], type = "l")
+
+    # Checking fixed effects
+
+    for(i in 1:31) {
+      if(i == 1)  plot(model$model_fxn$rep$F_Slx[i,,,1], type = "l", ylim = c(0,1))
+      else lines(model$model_fxn$rep$F_Slx[i,,,1])
+    }
+
+
+    lines(model$model_fxn$rep$F_Slx[31,,1,1], lwd= 3, col = "purple")
+    lines(Fish_selex_at_age[1,,1,1,1], col = "red", lwd= 3)
+    lines(Fish_selex_at_age[1,,2,1,1], col = "blue", lwd= 3)
     
     # Matrix::image(model$model_fxn$env$spHess(random=TRUE))
   
@@ -145,17 +136,13 @@
     max_par[sim] <- convergence_status$Max_Grad_Par
   
     # Get parameter estimates
-    M_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_M", log = TRUE) %>% 
+    M_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_M", trans = "log") %>% 
       mutate(t = mean(Mort_at_age), type = "mortality", sim = sim, conv = conv[sim])
-    q_srv_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "logit_q_srv", log = TRUE) %>% 
+    q_srv_df <- extract_parameter_vals(sd_rep = model$sd_rep, 
+                                       par = "logit_q_srv", trans = "logit", logit_bounds = c(0, 1)) %>% 
       mutate(t = mean(q_Surv), type = "q_surv", sim = sim, conv = conv[sim])
-    # fsh_sel_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_fish_selpars", log = TRUE) %>% 
-    #   mutate(t = c(10, 6), type = c("d_1", "amax_1"), sim = sim, conv = conv[sim])
-    # srv_sel_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_srv_selpars", log = TRUE) %>%
-      # mutate(t = c(3, 0.8, 4, 0.8), type = c("a50_srvf", "k_srvf",
-                                             # "a50_srvm", "k_srvm"), sim = sim, conv = conv[sim])
-    meanrec_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_RecPars", log = TRUE) %>% 
-      mutate(t = 20, type = "meanrec", sim = sim, conv = conv[sim])
+    meanrec_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_RecPars", trans = "log") %>% 
+      mutate(t = 250, type = "meanrec", sim = sim, conv = conv[sim])
 
     # Bind parameter estimates
     par_all <- rbind(M_df, q_srv_df, meanrec_df, par_all)
@@ -244,7 +231,7 @@ all <- rbind(rec_sum, ssb_sum, f_sum, depletion_sum, srv_mu_age_sum, fish_mu_age
 (est_plot <- plot_RE_ts(data = all, x = year, y = median, 
            lwr_1 = lwr_80, upr_1 = upr_80,
            lwr_2 = lwr_95, upr_2 = upr_95, 
-           facet_name = par_name, ylim = c(-0.3, 0.3)))
+           facet_name = par_name, ylim = c(-0.6, 0.6)))
 
 # Parameter estimates
 par_df <- par_all %>% mutate(RE = (mle_val - t ) / t) %>% 

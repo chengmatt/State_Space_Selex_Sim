@@ -151,13 +151,14 @@ extract_ADREP_vals <- function(sd_rep, par) {
 #'
 #' @param sd_rep sd_rep object from TMB
 #' @param par parameter name we want to extract
-#' @param log whether or not parameter is in log space - if TRUE, include backtransformed values
+#' @param trans parameter space a given parameter is estimated in ("none", "log", "logit")
+#' @param logit_bounds if estimated in logit space, what are the specified bounds
 #' @return Dataframe with MLE values and error estimates, with 95% confidence intervals
 #' @export
 #'
 #' @examples
 
-extract_parameter_vals <- function(sd_rep, par, log) {
+extract_parameter_vals <- function(sd_rep, par, trans = NA, logit_bounds = NA) {
   
   # Get parameter MLE estimates
   par_vals <- sd_rep$par.fixed[names(sd_rep$par.fixed) == par]
@@ -166,16 +167,40 @@ extract_parameter_vals <- function(sd_rep, par, log) {
   par_var_vals <- diag(sd_rep$cov.fixed)[names(diag(sd_rep$cov.fixed)) == par]
     
   # Put these values into a dataframe
-  if(log == TRUE) { # include exponentiated values and errors if log = TRUE
-    mle_df <- data.frame(ln_mle_val = par_vals, mle_val = exp(par_vals), 
+  if(trans == "log") { # log transformation
+    mle_df <- data.frame(trans_mle_val = par_vals, mle_val = exp(par_vals), 
                          mle_var = par_var_vals, mle_sd = sqrt(par_var_vals), 
                          lwr_95 = exp(par_vals - (1.96 * sqrt(par_var_vals))),
                          upr_95 = exp(par_vals + (1.96 * sqrt(par_var_vals))))
-  } else{ 
-    mle_df <- data.frame(mle_val = par_vals, mle_var = par_var_vals, mle_sd = sqrt(par_var_vals), 
+  } 
+  
+  if(trans == "logit"){ # log transformation
+    
+    # Inverse logit parameter values
+    inv_par_vals <- logit_bounds[1] + (logit_bounds[2] - logit_bounds[1])/
+      (1 + exp(-par_vals))
+    
+    # Get confidence intervals in logit space
+    logit_q_lwr_95 <- par_vals - qnorm(0.975)*sqrt(par_var_vals)
+    logit_q_upr_95 = par_vals + qnorm(0.975)*sqrt(par_var_vals)
+    
+    # Transform into normal space
+    lwr_95 <- logit_bounds[1] + (logit_bounds[2] - logit_bounds[1])/  (1 + exp(-logit_q_lwr_95))
+    upr_95 <- logit_bounds[1] + (logit_bounds[2] - logit_bounds[1])/  (1 + exp(-logit_q_upr_95))
+    
+    # Now construct dataframe
+    mle_df <- data.frame(trans_mle_val = par_vals, mle_val = inv_par_vals, 
+                         mle_var = par_var_vals, mle_sd = sqrt(par_var_vals), 
+                         lwr_95 = lwr_95, upr_95 = upr_95)
+  } 
+  
+  
+  if(trans == "none") { # No transofmration needed
+    mle_df <- data.frame(trans_mle_val = par_vals, mle_var = par_var_vals, mle_sd = sqrt(par_var_vals), 
                          lwr_95 = par_vals - (1.96 * sqrt(par_var_vals)),
                          upr_95 = par_vals + (1.96 * sqrt(par_var_vals)))
   }
+
   return(mle_df)
 }
 
@@ -233,7 +258,7 @@ extract_mean_age_vals <- function(mod_rep, comp_name, bins, comp_start_yr,
           # Get true age proportions
           prop_ages <- N_at_age[(Fish_Start_yr[1] - 1 + i),,s,sim] * Surv_selex_at_age[(Fish_Start_yr[1] - 1 + i),,f,s,sim]
           # Get true mean age
-          true_ages[i, f, s] <- sum((prop_ages / sum(prop_ages)) * 1:30)
+          true_ages[i, f, s] <- sum((prop_ages / sum(prop_ages)) * bins)
         } # s loop
       } # f loop
     } # i loop
@@ -249,7 +274,7 @@ extract_mean_age_vals <- function(mod_rep, comp_name, bins, comp_start_yr,
           # Get true age proportions - sum across fleets
           prop_ages <- Catch_at_age[(Fish_Start_yr[1] - 1 + i),,1,s,sim]
           # Get true mean age
-          true_ages[i, 1, s] <- sum((prop_ages / sum(prop_ages)) * 1:30)
+          true_ages[i, 1, s] <- sum((prop_ages / sum(prop_ages)) * bins)
         } # s loop
       } # i loop
     } # end if this is a single fleet
@@ -261,7 +286,7 @@ extract_mean_age_vals <- function(mod_rep, comp_name, bins, comp_start_yr,
           # Get true age proportions - sum across fleets for catcha t age
           prop_ages <- rowSums(Catch_at_age[(Fish_Start_yr[1]  - 1 + i),,,s,sim])
           # Get true mean age
-          true_ages[i, 1, s] <- sum((prop_ages / sum(prop_ages)) * 1:30)
+          true_ages[i, 1, s] <- sum((prop_ages / sum(prop_ages)) * bins)
         } # s loop
       } # i loop
     } # end if this is modeled as a single fleet when there are > 1 fleet
@@ -281,7 +306,7 @@ extract_mean_age_vals <- function(mod_rep, comp_name, bins, comp_start_yr,
             # Get true age proportions - sum across fleets
             prop_ages <- Catch_at_age[(Fish_Start_yr[f]  - 1 + i),,f,s,sim] 
             # Get true mean age
-            true_ages[i, f, s] <- sum((prop_ages / sum(prop_ages)) * 1:30)
+            true_ages[i, f, s] <- sum((prop_ages / sum(prop_ages)) * bins)
           } # s loop
         } # f loop 
       } # i loop

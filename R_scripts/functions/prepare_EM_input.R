@@ -17,6 +17,7 @@
 #' @param F_Slx_Model_Input Fishery selectivity model character (logistic, gamma, double_logistic)
 #' @param S_Slx_Model_Input same as above
 #' @param time_selex Type of time-varying to do (Options are: None, RW, and AR1_y)
+#' @param fix_pars What parameters we want to fix
 #' @param n_time_selex_pars Number of time-varying selectivity parameters we want to estimate on the parametric form
 #' @param sim simulation indexing
 #'
@@ -40,12 +41,15 @@ prepare_EM_input <- function(years,
                           rec_model = 0,
                           time_selex = "None",
                           n_time_selex_pars = 1,
+                          fix_pars = NA,
                           sim) {
   
   # Make data into a list 
   data <- list()
   # Make parameters into a list
   pars <- list()
+  # Mapping to fix certain parameters
+  map <- list()
   
   # Specify dimensions 
   ages <- ages # ages
@@ -339,10 +343,15 @@ prepare_EM_input <- function(years,
 
   # Time-Varying Selectivity Options (Fishery)
     if(time_selex == "None") { # No time-varying
-      data$F_Slx_re_model <- matrix(100, nrow = n_fish_comps, ncol = n_sexes)
+      data$F_Slx_re_model <- matrix(10000, nrow = n_fish_comps, ncol = n_sexes)
       pars$ln_fish_selpars_re <- array(rnorm(1, 0, 0.05),
                                        dim = c((length(years)), n_time_selex_pars, n_fish_comps, n_sexes))
       pars$fixed_sel_re_fish <- array(rnorm(1,0,1), dim = c(1, n_fish_comps, n_sexes))
+      
+      # Set mapping here for random effects (no random effects)
+      map$ln_fish_selpars_re <- factor(rep(NA, length(pars$ln_fish_selpars_re))) # Fix random effects
+      map$fixed_sel_re_fish <- factor(rep(NA, length(pars$fixed_sel_re_fish))) # fixed deivation parameters/don't estimate
+
     } # none if statement
     
     if(time_selex == "RW") { # Random Walk
@@ -358,10 +367,32 @@ prepare_EM_input <- function(years,
                                        dim = c((length(years)), n_time_selex_pars, n_fish_comps, n_sexes))
       pars$fixed_sel_re_fish <- array(rnorm(1, 1 ,0.05), dim = c(2 * n_time_selex_pars, n_fish_comps, n_sexes))
     } # AR1_y if statement
-    
-  return(list(data = data, parameters = pars))
   
-}
+
+# Parameter mapping -------------------------------------------------------
+  if(sum(fix_pars %in% c("ln_h")) == 1) {
+    map$ln_RecPars <- factor(c(1, NA)) # fixing steepness
+    # Remove steepness from fix_pars vector so it goes through the next loop properly
+    fix_pars <- fix_pars[fix_pars != 'ln_h']
+  }
+  # Loop through to map parameters
+  for(i in 1:length(fix_pars)) {
+    
+    # Get parameter length here
+    par_length <- length(input$parameters[names(input$parameters) == fix_pars[i]])
+    
+    # Now, stick the map parameter into a list
+    map_par <- list( factor(rep(NA, par_length)) )
+    names(map_par) <- fix_pars[i] # name the list
+    
+    # Now, append this to our map list
+    map <- c(map_par, map)
+    
+  } # end i
+
+  return(list(data = data, parameters = pars, map = map))
+  
+} # end function
 
 
 
