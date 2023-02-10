@@ -15,7 +15,8 @@
     compile_tmb(wd = here("src"), cpp = "EM.cpp")
     
     # Path to general input biological parameters
-    spreadsheet_path <- here("input", "EBS_Pollock_Inputs.xlsx")
+    # spreadsheet_path <- here("input", "EBS_Pollock_Inputs.xlsx")
+    spreadsheet_path <- here("input", "Sablefish_Inputs.xlsx")
     
     # simulate data
     simulate_data(fxn_path = fxn_path, 
@@ -42,12 +43,15 @@
                   q_Mean_Surv = 0.01, 
                   fish_selex = c("logistic", "logistic"), 
                   srv_selex = c("logistic"), 
-                  fish_pars = list(Fleet_1_L = matrix(data = c(7, 0.8),
-                                                      nrow = 1, byrow = TRUE),
-                                   Fleet_2_EL = matrix(data = c(7, 0.8), 
-                                                       nrow = 1, byrow = TRUE)),
-                  srv_pars = list(Fleet_3_SL = matrix(data = c(4,0.8), 
-                                                      nrow = 1, byrow = TRUE)), 
+                  # if switching to a single sex, be sure to change the nrow to the number of sexes,
+                  # and to make sure the selex parameters for the fleets align n_pars * n_sexes
+                  # e.g., (7, 0.8, 4, 0.3) for a logistic with two sexes, nrow = 2
+                  fish_pars = list(Fleet_1_L = matrix(data = c(7, 0.8, 4, 0.3), 
+                                                      nrow = 2, byrow = TRUE), # fish fleet 1
+                                   Fleet_2_EL = matrix(data = c(7, 0.8, 4, 0.3), 
+                                                       nrow = 2, byrow = TRUE)), # fish fleet 2
+                  srv_pars = list(Fleet_3_SL = matrix(data = c(4,0.8, 4, 0.4), 
+                                                      nrow = 2, byrow = TRUE)), # survey fleet 1
                   f_ratio = 0.5, m_ratio = 0.5)
     
     plot_OM(path = here("figs", "Base_OM_Figs"), file_name = "OM_Check.pdf")
