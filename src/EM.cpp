@@ -117,7 +117,6 @@ Type objective_function<Type>::operator() ()
   array<Type> FAA(n_years, n_ages, n_fleets, n_sexes); // Fishing Mortality
   array<Type> sum_FAA(n_years, n_ages, n_sexes); // Fishing mortality summed across fleets
   array<Type> CAA(n_years, n_ages, n_fleets, n_sexes); // Catch at Age
-  
   matrix<Type> F(n_years, n_fleets); // Get F by fleet in normal space
   vector<Type> Total_Fy(n_years); // Total F summed across fleets
   vector<Type> Total_Rec(n_years); // Total Recruitment
@@ -395,9 +394,10 @@ Type objective_function<Type>::operator() ()
           
           // Get Aggregated Catch - Increment catch in biomass
           pred_catches(y, f) += ( CAA(y, a, f, s) * WAA(y, a, s) );
-          
+
         } // a loop
       } // s loop
+      
     } // y loop
   } // f loop
   
@@ -409,15 +409,18 @@ Type objective_function<Type>::operator() ()
   // Fishery Index of Abundance
   for(int fi = 0; fi < n_fish_indices; fi++) {
     for(int y = 0; y < n_years; y++) { 
-        for(int s = 0; s < n_sexes; s++) {
-          for(int a = 0; a < n_ages; a++) {
-            pred_fish_indices(y, fi) += NAA(y, a, s) * WAA(y, a, s) * F_Slx(y, a, fi, s);
+      for(int s = 0; s < n_sexes; s++) {
+        for(int a = 0; a < n_ages; a++) {
+            // Increment to get total index, conditional on selectivity
+            pred_fish_indices(y, fi) += NAA(y, a, s) * WAA(y, a, s) *  F_Slx(y, a, fi, s);
           } // a loop
         } // s loop
+        
         // Inverse logit transform
         Type tmp_q_fish = Type(0) + (Type(1) - Type(0))/(1 + exp(-logit_q_fish(fi))); 
         // Scale index by catchability here
         pred_fish_indices(y, fi) = tmp_q_fish  * pred_fish_indices(y, fi); 
+        
     } // y loop
   } // fi loop
   
@@ -426,13 +429,16 @@ Type objective_function<Type>::operator() ()
     for(int y = 0; y < n_years; y++) {
       for(int s = 0; s < n_sexes; s++) {
         for(int a = 0; a < n_ages; a++) {
+            // Increment to get index conditional on selectivity
             pred_srv_indices(y, si) +=  NAA(y, a, s) * S_Slx(y, a, si, s);
           } // a loop
         } // s loop
+      
         // Inverse logit transform here
         Type tmp_q_srv = Type(0) + (Type(1) - Type(0))/(1 + exp(-logit_q_srv(si))); 
         // Scale index by catchability
         pred_srv_indices(y, si) = tmp_q_srv * pred_srv_indices(y, si); 
+        
     } // y loop
   } // si loop  
   
@@ -615,9 +621,9 @@ Type objective_function<Type>::operator() ()
   REPORT(pred_fish_age_comps); // Predicted fishery age comps
   REPORT(pred_srv_age_comps); // Predicted survey age comps
   REPORT(ln_fish_selpars_re); // Selectivity random effects
-    
+  REPORT(SBPR0); // Spawning biomass per recruit
+  
   //  Likelihoods
-  REPORT(SBPR0);
   REPORT(catch_nLL);
   REPORT(srv_index_nLL);
   REPORT(fish_index_nLL);

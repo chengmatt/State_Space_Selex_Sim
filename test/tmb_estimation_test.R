@@ -15,7 +15,7 @@
     compile_tmb(wd = here("src"), cpp = "EM.cpp")
     
     # Path to general input biological parameters
-    spreadsheet_path <- here("input", "Sablefish_Inputs.xlsx")
+    spreadsheet_path <- here("input", "EBS_Pollock_Inputs.xlsx")
     
     # simulate data
     simulate_data(fxn_path = fxn_path, 
@@ -42,12 +42,12 @@
                   q_Mean_Surv = 0.01, 
                   fish_selex = c("logistic", "logistic"), 
                   srv_selex = c("logistic"), 
-                  fish_pars = list(Fleet_1_L = matrix(data = c(7, 0.8, 9, 0.4),
-                                                      nrow = 2, byrow = TRUE),
-                                   Fleet_2_EL = matrix(data = c(7, 0.8, 9, 0.4), 
-                                                       nrow = 2, byrow = TRUE)),
-                  srv_pars = list(Fleet_3_SL = matrix(data = c(4,0.8, 6, 0.8), 
-                                                      nrow = 2, byrow = TRUE)), 
+                  fish_pars = list(Fleet_1_L = matrix(data = c(7, 0.8),
+                                                      nrow = 1, byrow = TRUE),
+                                   Fleet_2_EL = matrix(data = c(7, 0.8), 
+                                                       nrow = 1, byrow = TRUE)),
+                  srv_pars = list(Fleet_3_SL = matrix(data = c(4,0.8), 
+                                                      nrow = 1, byrow = TRUE)), 
                   f_ratio = 0.5, m_ratio = 0.5)
     
     plot_OM(path = here("figs", "Base_OM_Figs"), file_name = "OM_Check.pdf")
@@ -62,6 +62,7 @@
     max_par <- vector()
     fish_mu_age <- data.frame()
     srv_mu_age <- data.frame()
+    all_harv_rates <- data.frame()
     conv <- vector()
     depletion_all <- data.frame()
     
@@ -75,7 +76,7 @@
     # Prepare inputs here
     input <- prepare_EM_input(years = years,
                      n_fleets = 1, 
-                     catch_cv = c(0.005),
+                     catch_cv = c(0.01),
                      F_Slx_Blocks_Input = matrix(c(rep(0)),
                                           nrow = length(years),
                                           ncol = 1), # fishery blocks
@@ -91,7 +92,8 @@
                      fix_pars = c("ln_SigmaRec", "logit_q_fish", "ln_h"),
                      sim = sim)
     
-      # input$parameters$fixed_sel_re_fish[] <- c(0.5, 0.3, 0.5, 0.3)
+      # input$parameters$fixed_sel_re_fish[] <- c(0.35, 0.3)
+      
       compile_tmb(wd = here("src"), cpp = "EM.cpp")
 
     # Run EM model here and get sdrep
@@ -178,12 +180,12 @@
     
     srv_mu_age <- rbind(srv_mu_age, srv_mean_ages)
     
-    # # Check fishery mean age
+    # Check fishery mean age
     fish_mean_ages <- extract_mean_age_vals(mod_rep = model$model_fxn, comp_name = "pred_fish_age_comps",
                                            bins = ages, comp_start_yr = Fish_Start_yr[1], sim = sim,
                                            n_fish_true_fleets = 2) %>% mutate(conv = conv[sim])
     fish_mu_age <- rbind(fish_mu_age, fish_mean_ages)
-  
+    
     print(paste("done w/  sim = ", sim))
     print(conv[sim])
     
@@ -231,7 +233,7 @@ all <- rbind(rec_sum, ssb_sum, f_sum, depletion_sum, srv_mu_age_sum, fish_mu_age
 (est_plot <- plot_RE_ts(data = all, x = year, y = median, 
            lwr_1 = lwr_80, upr_1 = upr_80,
            lwr_2 = lwr_95, upr_2 = upr_95, 
-           facet_name = par_name, ylim = c(-0.6, 0.6)))
+           facet_name = par_name))
 
 # Parameter estimates
 par_df <- par_all %>% mutate(RE = (mle_val - t ) / t) %>% 
@@ -268,7 +270,6 @@ plot_grid(par_plot, est_plot, ncol = 1, align = "hv", axis = "bl",
 plot(rowSums(fish_mort[Fish_Start_yr[1]:(n_years-1),,sim]), type = "l")
 lines(exp(model$sd_rep$par.fixed[names(model$sd_rep$par.fixed) == "ln_Fy"]),
       col = "red")
-
 
 f_all %>% 
   ggplot(aes(x = year, y = mle_val, group = sim)) +

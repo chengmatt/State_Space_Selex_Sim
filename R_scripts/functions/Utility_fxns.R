@@ -194,7 +194,6 @@ extract_parameter_vals <- function(sd_rep, par, trans = NA, logit_bounds = NA) {
                          lwr_95 = lwr_95, upr_95 = upr_95)
   } 
   
-  
   if(trans == "none") { # No transofmration needed
     mle_df <- data.frame(trans_mle_val = par_vals, mle_var = par_var_vals, mle_sd = sqrt(par_var_vals), 
                          lwr_95 = par_vals - (1.96 * sqrt(par_var_vals)),
@@ -203,7 +202,6 @@ extract_parameter_vals <- function(sd_rep, par, trans = NA, logit_bounds = NA) {
 
   return(mle_df)
 }
-
 
 #' Title Extract true and predicted mean age values for a given fleet and composition type
 #'
