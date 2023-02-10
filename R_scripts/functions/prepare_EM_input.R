@@ -379,7 +379,7 @@ prepare_EM_input <- function(years,
   for(i in 1:length(fix_pars)) {
     
     # Get parameter length here
-    par_length <- length(unlist(input$parameters[names(input$parameters) == fix_pars[i]]))
+    par_length <- length(unlist(pars[names(pars) == fix_pars[i]]))
     
     # Now, stick the map parameter into a list
     map_par <- list( factor(rep(NA, par_length)) )
