@@ -15,3 +15,20 @@ To investigate best practices for the treatment of fishery fleet structure and s
 |input| Excel files for different life history types (EBS Walleye pollock and Sablefish) |
 |src| Contains source code for TMB model, which is compiled through R|
 |test| R scripts testing the development of the TMB model. To see examples of running the OM and EM see [here](https://github.com/chengmatt/State_Space_Selex_Sim/blob/master/test/tmb_estimation_test.R)|
+
+
+### Operating Model Options
+The OM is able to be specified for multiple fishery and survey fleets, as well as multiple sexes. 
+| OM Component  | Options |
+| --------| --------|
+|Recruitment| Beverton Holt Recruitment, Mean Recruitment |
+|Fishing mortality pattern| Contrast, Constant, Increase, Decrease, Increase_Plat, Const_Inc, Const_Ramp_Const, Contrast_Const  |
+|Selectivity| Logistic, Gamma, Uniform, Exponential Logistic, Double Logistic, Double Normal |
+
+### Estimation Model Options
+The EM is able to be specified for multiple fishery and survey fleets, as well as multiple sexes. Note that catchability parameters are estiamted in logit space. 
+| EM Component  | Options |
+| --------| --------|
+|Recruitment| Beverton Holt Recruitment, Mean Recruitment |
+|Selectivity| Logistic, Gamma, Exponential Logistic, Double Logistic |
+|Time-varying selectivity| Random walk, 1DAR1_Year, Time-blocks during any period|
