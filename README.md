@@ -1,5 +1,11 @@
 # Fleet Structure Simulations
 
+## Purpose
+To investigate best practices for the treatment of fishery fleet structure and selectivity processes under differential shifts in fishery dynamics. Specifically, we aim to address how considerations of fleet structure and selectivity parameterizations depend on: 
+1)	The rate at which fishery fleet structure changes
+2)	Differences in selectivity forms among fleets
+
+
 ### Repository Structure
 | Folder  | Items |
 | --------| --------|
