@@ -15,8 +15,8 @@
     compile_tmb(wd = here("src"), cpp = "EM.cpp")
     
     # Path to general input biological parameters
-    # spreadsheet_path <- here("input", "EBS_Pollock_Inputs.xlsx")
-    spreadsheet_path <- here("input", "Sablefish_Inputs.xlsx")
+    spreadsheet_path <- here("input", "EBS_Pollock_Inputs.xlsx")
+    # spreadsheet_path <- here("input", "Sablefish_Inputs.xlsx")
     
     # simulate data
     simulate_data(fxn_path = fxn_path, 
@@ -46,12 +46,12 @@
                   # if switching to a single sex, be sure to change the nrow to the number of sexes,
                   # and to make sure the selex parameters for the fleets align n_pars * n_sexes
                   # e.g., (7, 0.8, 4, 0.3) for a logistic with two sexes, nrow = 2
-                  fish_pars = list(Fleet_1_L = matrix(data = c(7, 0.8, 4, 0.8), 
-                                                      nrow = 2, byrow = TRUE), # fish fleet 1
-                                   Fleet_2_EL = matrix(data = c(7, 0.8, 4, 0.8), 
-                                                       nrow = 2, byrow = TRUE)), # fish fleet 2
-                  srv_pars = list(Fleet_3_SL = matrix(data = c(3,0.8, 5, 0.4), 
-                                                      nrow = 2, byrow = TRUE)), # survey fleet 1
+                  fish_pars = list(Fleet_1_L = matrix(data = c(4, 0.8), 
+                                                      nrow = 1, byrow = TRUE), # fish fleet 1
+                                   Fleet_2_EL = matrix(data = c(4, 0.8), 
+                                                       nrow = 1, byrow = TRUE)), # fish fleet 2
+                  srv_pars = list(Fleet_3_SL = matrix(data = c(2,0.8), 
+                                                      nrow = 1, byrow = TRUE)), # survey fleet 1
                   f_ratio = 0.5, m_ratio = 0.5)
     
     plot_OM(path = here("figs", "Base_OM_Figs"), file_name = "OM_Check.pdf")
@@ -93,7 +93,7 @@
                      S_Slx_Model_Input = c("logistic"), 
                      time_selex = "None",
                      n_time_selex_pars = NULL,
-                     fix_pars = c("ln_SigmaRec", "ln_q_fish"),
+                     fix_pars = c("ln_SigmaRec", "logit_q_fish"),
                      sim = sim)
     
       # input$parameters$fixed_sel_re_fish[] <- c(0.35, 0.3)
@@ -102,9 +102,9 @@
 
     # Run EM model here and get sdrep
     model <- run_EM(data = input$data, parameters = input$parameters, 
-                    map = input$map, n.newton = 3, 
+                    map = input$map, n.newton = 5, 
                     # random = "ln_fish_selpars_re",
-                    silent = F, getsdrep = TRUE)
+                    silent = T, getsdrep = TRUE)
     
     plot(model$model_fxn$rep$NAA[1,,1], type = "l")
     lines(N_at_age[70,,1,sim], col = "red")
@@ -144,16 +144,25 @@
     # Get parameter estimates
     M_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_M", trans = "log") %>% 
       mutate(t = mean(Mort_at_age), type = "mortality", sim = sim, conv = conv[sim])
-    q_srv_df <- extract_parameter_vals(sd_rep = model$sd_rep,   par = "ln_q_srv", trans = "log") %>% 
+    q_srv_df <- extract_parameter_vals(sd_rep = model$sd_rep,   par = "logit_q_srv", trans = "logit", logit_bounds = c(0, 1)) %>% 
       mutate(t = mean(q_Surv), type = "q_surv", sim = sim, conv = conv[sim])
     meanrec_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_RecPars", trans = "log") %>% 
-      mutate(t = 15.64263, type = "r0/meanrec", sim = sim, conv = conv[sim])
-    fish_sel_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_fish_selpars", trans = "log") %>% 
-      mutate(t = c(7, 4, 0.8, 0.8), type = c("f1", "f2", "f1d", "f2d"), sim = sim, conv = conv[sim])
-
+      mutate(t = r0, type = "r0/meanrec", sim = sim, conv = conv[sim])
+    # fish_sel_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_fish_selpars", trans = "log") %>% 
+    #   mutate(t = c(7, 4, 0.8, 0.8), type = c("f1", "f2", "f1d", "f2d"), sim = sim, conv = conv[sim])
+    # 
     # Bind parameter estimates
-    par_all <- rbind(M_df, q_srv_df, meanrec_df, par_all, fish_sel_df)
-  
+    par_all <- rbind(M_df, q_srv_df, meanrec_df, par_all)
+    
+
+    if(sim > 3) {
+      rec_stuff <- par_all %>% filter(type == "r0/meanrec",  conv == "Converged")
+      plot(density((rec_stuff$mle_val - rec_stuff$t) / rec_stuff$mle_val), zero.line = TRUE)
+      abline(v = 0, col = "red")
+      median_rec <- median((rec_stuff$mle_val - rec_stuff$t) / rec_stuff$mle_val)
+      abline(v = median_rec)
+    }
+
     # Recruitment
     rec_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "Total_Rec") %>% 
       mutate(t = rec_total[70:(n_years-1),sim], sim = sim, conv = conv[sim],

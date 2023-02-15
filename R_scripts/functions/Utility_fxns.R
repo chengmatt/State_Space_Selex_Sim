@@ -33,11 +33,11 @@ compile_tmb <- function(wd, cpp) {
 add_newton <- function(n.newton, ad_model, mle_optim) {
   
   tryCatch(expr = for(i in 1:n.newton) {
-                              g = as.numeric(ad_model$gr(mle_optim$par))
-                              h = optimHess(mle_optim$par, fn = ad_model$fn, gr = ad_model$gr)
-                              mle_optim$par = mle_optim$par - solve(h,g)
-                              mle_optim$objective = ad_model$fn(mle_optim$par)
-                            }, error = function(e){e})
+    g = as.numeric(ad_model$gr(mle_optim$par))
+    h = optimHess(mle_optim$par, fn = ad_model$fn, gr = ad_model$gr)
+    mle_optim$par = mle_optim$par - solve(h,g)
+    mle_optim$objective = ad_model$fn(mle_optim$par)
+  }, error = function(e){e})
   
 }
 
@@ -69,8 +69,8 @@ run_EM <- function(data, parameters, map, n.newton, random = NULL,
   
   # Optimize model here w/ nlminb
   mle_optim <- stats::nlminb(model_fxn$par, model_fxn$fn, model_fxn$gr, 
-                     control = list(iter.max = iter.max, eval.max = eval.max),
-                     lower = -15, upper = 15)
+                             control = list(iter.max = iter.max, eval.max = eval.max),
+                             lower = -15, upper = 15)
   
   # Take additional newton steps
   add_newton(n.newton = n.newton, ad_model = model_fxn, mle_optim = mle_optim)
@@ -83,7 +83,7 @@ run_EM <- function(data, parameters, map, n.newton, random = NULL,
   } # if get sdrep = TRUE
   
   return(list(model_fxn = model_fxn, mle_optim = mle_optim, sd_rep = sd_rep))
-
+  
 }
 
 
@@ -140,8 +140,8 @@ extract_ADREP_vals <- function(sd_rep, par) {
   
   # Put this into a dataframe
   mle_df <- data.frame(mle_val = mle_val, mle_se = mle_se,
-             lwr_95 = mle_val - (1.96 * mle_se ),
-             upr_95 = mle_val + (1.96 * mle_se ))
+                       lwr_95 = mle_val - (1.96 * mle_se ),
+                       upr_95 = mle_val + (1.96 * mle_se ))
   
   return(mle_df)
   
@@ -165,7 +165,7 @@ extract_parameter_vals <- function(sd_rep, par, trans = NA, logit_bounds = NA) {
   
   # Get parameter variance estimates
   par_var_vals <- diag(sd_rep$cov.fixed)[names(diag(sd_rep$cov.fixed)) == par]
-    
+  
   # Put these values into a dataframe
   if(trans == "log") { # log transformation
     mle_df <- data.frame(trans_mle_val = par_vals, mle_val = exp(par_vals), 
@@ -199,7 +199,7 @@ extract_parameter_vals <- function(sd_rep, par, trans = NA, logit_bounds = NA) {
                          lwr_95 = par_vals - (1.96 * sqrt(par_var_vals)),
                          upr_95 = par_vals + (1.96 * sqrt(par_var_vals)))
   }
-
+  
   return(mle_df)
 }
 
@@ -233,10 +233,10 @@ extract_mean_age_vals <- function(mod_rep, comp_name, bins, comp_start_yr,
     dplyr::summarize(pred_mean_age = sum(value * bins)) %>% 
     mutate(sim = sim)
   
-
+  
   # Create global objects for use in loops
   n_years <- length(Fish_Start_yr[1]:(Fish_Start_yr[1] + max(pred_mean_ages$year) - 1))
-    
+  
   # Get number of modelled fleets
   n_mod_fleets <- length(unique(pred_mean_ages$fleet))
   
@@ -311,7 +311,7 @@ extract_mean_age_vals <- function(mod_rep, comp_name, bins, comp_start_yr,
       
     } # if statement
     
-} # else statement
+  } # else statement
   
   # Rename and bind to the predicted dataframe
   molten_true_ages <- reshape2::melt(true_ages)
@@ -367,7 +367,6 @@ get_RE_precentiles <- function(df, est_val_col = 1, true_val_col = 5, par_name =
     # Drop grouped columns (2nd and 3rd column - fleet and sex)
     df <- df[,-c(2:3)]
   }
-    
+  
   return(df)
 }
-

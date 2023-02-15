@@ -27,22 +27,22 @@
 #' @examples
 #' Note that n_years here refers to the all the rows of the array
 prepare_EM_input <- function(years,
-                          n_fleets, 
-                          catch_cv,
-                          F_Slx_Blocks_Input,
-                          S_Slx_Blocks_Input,
-                          use_catch = TRUE,
-                          use_fish_index = TRUE,
-                          use_srv_index = TRUE, 
-                          use_fish_comps = TRUE,
-                          use_srv_comps = TRUE,
-                          F_Slx_Model_Input,
-                          S_Slx_Model_Input,
-                          rec_model = 0,
-                          time_selex = "None",
-                          n_time_selex_pars = 1,
-                          fix_pars = NA,
-                          sim) {
+                             n_fleets, 
+                             catch_cv,
+                             F_Slx_Blocks_Input,
+                             S_Slx_Blocks_Input,
+                             use_catch = TRUE,
+                             use_fish_index = TRUE,
+                             use_srv_index = TRUE, 
+                             use_fish_comps = TRUE,
+                             use_srv_comps = TRUE,
+                             F_Slx_Model_Input,
+                             S_Slx_Model_Input,
+                             rec_model = 0,
+                             time_selex = "None",
+                             n_time_selex_pars = 1,
+                             fix_pars = NA,
+                             sim) {
   
   # Make data into a list 
   data <- list()
@@ -63,8 +63,8 @@ prepare_EM_input <- function(years,
   n_srv_indices <- dim(Survey_Index_Agg)[2] # 2nd dimension of this array = number of survey fleets
   
   
-# Catch -------------------------------------------------------------------
-
+  # Catch -------------------------------------------------------------------
+  
   if(n_fleets == 1) { # if single fleet - sum across or leave as is
     obs_catches <- as.matrix(apply( as.matrix(Catch_agg[(Fish_Start_yr[1]:(n_years-1)),,sim]), 1, FUN = sum),
                              ncol = 1)
@@ -75,14 +75,14 @@ prepare_EM_input <- function(years,
       catch_sum <- rowSums(as.matrix(Catch_agg[(Fish_Start_yr[1]:(n_years-1)),,sim]))
       catch_weight <- as.matrix(Catch_agg[(Fish_Start_yr[1]:(n_years-1)),,sim]) / catch_sum
     } # if catch weighting
-
+    
   } else{ # multi fleet - leave as is
     obs_catches <- matrix(Catch_agg[(Fish_Start_yr[1]:(n_years-1)),,sim], nrow = length(years), ncol = n_fleets)
   } # end else
   
-
-# Fishery Age Comps -------------------------------------------------------
-
+  
+  # Fishery Age Comps -------------------------------------------------------
+  
   obs_fish_age_comps <- array(data = 0, dim = c(length(years), length(ages), n_fleets, n_sexes))
   
   if(n_fleets == 1) { # one fleet = sum across
@@ -100,7 +100,7 @@ prepare_EM_input <- function(years,
     # Empty array to store values in
     obs_fish_age_Neff <- array(data = NA, dim = c(length(years), n_fleets, n_sexes))
     
-      # Effective sample size
+    # Effective sample size
     for(s in 1:n_sexes) {
       obs_fish_age_Neff[,1,s] <- rowSums(floor(obs_fish_age_comps[,,,s]))
     } # s loop
@@ -124,30 +124,30 @@ prepare_EM_input <- function(years,
     
     # Effective Sample Sizes
     obs_fish_age_Neff <- array(fish_Neff[Fish_Start_yr[1]:(n_years - 1),], 
-                                    dim = c(length(years), 2, n_sexes))
+                               dim = c(length(years), 2, n_sexes))
     
   } # end else
   
-
-# Survey Age Comps --------------------------------------------------------
-# Right now, this is only able to accomdate one single survey fleet
+  
+  # Survey Age Comps --------------------------------------------------------
+  # Right now, this is only able to accomdate one single survey fleet
   
   obs_srv_age_comps <- array(data = NA, dim = c(length(years), length(ages), n_srv_comps, n_sexes))
-
+  
   # Apply function to get proportions and munge into matrix
   # Now, apply the proportion function over a single fleet
   for(s in 1:n_sexes) {
     obs_srv_age_comps[,,,s] <- t(apply(Survey_Age_Comps[Fish_Start_yr[1]:(n_years - 1),,,s,sim],
-                                        MARGIN = 1, FUN=function(x) { x/sum(x) }))
+                                       MARGIN = 1, FUN=function(x) { x/sum(x) }))
   } # s loop
-
+  
   # Get survey age neffs
   obs_srv_age_Neff <- array(srv_Neff[Fish_Start_yr[1]:(n_years - 1),], 
-                             dim = c(length(years), n_srv_comps, n_sexes))
+                            dim = c(length(years), n_srv_comps, n_sexes))
   
-
-# Abundance Indices -------------------------------------------------------
-
+  
+  # Abundance Indices -------------------------------------------------------
+  
   # Fishery index
   if(n_fish_indices == 1) { # if single fleet index, we need to do some munging
     # basically, we are going to take the average of the two fleets, if there are multiple 
@@ -158,7 +158,7 @@ prepare_EM_input <- function(years,
     # Loop through matrix to average across rows
     for(i in 1:length(years))
       obs_fish_indices[i, 1] <- mean(Fishery_Index_Agg[(Fish_Start_yr[1]-1) + i,,sim])
-
+    
   } else{
     obs_fish_indices <-as.matrix( Fishery_Index_Agg[Fish_Start_yr[1]:(n_years - 1),,sim], 
                                   nrow = length(years), ncol = n_fish_indices)
@@ -169,8 +169,8 @@ prepare_EM_input <- function(years,
                                nrow = length(years), ncol = n_srv_indices)
   
   
-# Biological inputs -------------------------------------------------------
-
+  # Biological inputs -------------------------------------------------------
+  
   WAA <- array(data = NA, dim = c(length(Fish_Start_yr[1]:(n_years)), 
                                   length(ages), n_sexes))
   # Weight at age
@@ -186,14 +186,14 @@ prepare_EM_input <- function(years,
   # Sex Ratios
   Sex_Ratio <- sex_ratio[1,]
   
-# CV inputs ---------------------------------------------------------------
+  # CV inputs ---------------------------------------------------------------
   
   # Fishery, survey, and catch CV
   fish_cv <- as.vector(fish_CV)
   srv_cv <- as.vector(srv_CV)
   catch_cv <- as.vector(catch_cv)
-
-# Selectivity options ------------------------------------------------------
+  
+  # Selectivity options ------------------------------------------------------
   
   F_Slx_model <- vector()
   S_Slx_model <- vector()
@@ -217,8 +217,8 @@ prepare_EM_input <- function(years,
   # Specify selectivity blocks here
   F_Slx_Blocks <- F_Slx_Blocks_Input # fishery blocks
   S_Slx_Blocks <- S_Slx_Blocks_Input # survey blocks
-
-# Data Indicators ---------------------------------------------------------
+  
+  # Data Indicators ---------------------------------------------------------
   
   # Catch data
   if(use_catch == TRUE) {
@@ -254,7 +254,7 @@ prepare_EM_input <- function(years,
   } else{
     use_srv_comps <- array(0, dim = c(length(years), n_srv_comps, n_sexes))
   }
-
+  
   # Input these data into a list object
   data$ages <- ages
   data$years <- years
@@ -287,18 +287,18 @@ prepare_EM_input <- function(years,
   data$S_Slx_model <- S_Slx_model
   data$F_Slx_model <- F_Slx_model
   
-
-# Parameter specifications ------------------------------------------------
-
+  
+  # Parameter specifications ------------------------------------------------
+  
   # Set up parameters
   pars$ln_SigmaRec <- sigma_rec # recruitment variability
   pars$ln_RecDevs <- rnorm(length(years) -1, 0, 0.0) # rec devs
-pars$ln_N1_Devs <- rnorm(length(ages) - 1, 0, 0.0) # intial recruitment deviaates
+  pars$ln_N1_Devs <- rnorm(length(ages) - 1, 0, 0.0) # intial recruitment deviaates
   pars$ln_M <- log(mean(Mort_at_age)) # natural mortality
   pars$ln_Fy <- matrix(rnorm(n_fleets * length(years), 0.0, 0.0), 
-                          ncol = n_fleets, nrow = length(years)) # fishing mortality
-  pars$ln_q_fish <- rnorm(n_fish_indices, 0, 0.0) # catchability for fishery
-  pars$ln_q_srv <- rnorm(n_srv_indices, 0, 0.0) # catchability for survey
+                       ncol = n_fleets, nrow = length(years)) # fishing mortality
+  pars$logit_q_fish <- rnorm(n_fish_indices, 0, 0.0) # catchability for fishery
+  pars$logit_q_srv <- rnorm(n_srv_indices, 0, 0.0) # catchability for survey
   
   if(rec_model == "mean_rec") {
     pars$ln_RecPars <- as.vector(c(mu_rec)) # Mean Recruitment (1 parameter)
@@ -340,36 +340,36 @@ pars$ln_N1_Devs <- rnorm(length(ages) - 1, 0, 0.0) # intial recruitment deviaate
   
   # put array into our parameter list
   pars$ln_fish_selpars <- array(log(0.5), dim = c(n_fish_comps, n_sexes, n_fish_blocks, max(n_fish_pars)))
-
-  # Time-Varying Selectivity Options (Fishery)
-    if(time_selex == "None") { # No time-varying
-      data$F_Slx_re_model <- matrix(10000, nrow = n_fish_comps, ncol = n_sexes)
-      pars$ln_fish_selpars_re <- array(rnorm(1, 0, 0.05),
-                                       dim = c((length(years)), n_time_selex_pars, n_fish_comps, n_sexes))
-      pars$fixed_sel_re_fish <- array(rnorm(1,0,1), dim = c(1, n_fish_comps, n_sexes))
-      
-      # Set mapping here for random effects (no random effects)
-      map$ln_fish_selpars_re <- factor(rep(NA, length(pars$ln_fish_selpars_re))) # Fix random effects
-      map$fixed_sel_re_fish <- factor(rep(NA, length(pars$fixed_sel_re_fish))) # fixed deivation parameters/don't estimate
-
-    } # none if statement
-    
-    if(time_selex == "RW") { # Random Walk
-      data$F_Slx_re_model <- matrix(0, nrow = n_fish_comps, ncol = n_sexes)
-      pars$ln_fish_selpars_re <- array(rnorm(1, 0, 0.05),
-                                       dim = c((length(years)), n_time_selex_pars, n_fish_comps, n_sexes))
-      pars$fixed_sel_re_fish <- array(rnorm(1,0,1), dim = c(n_time_selex_pars, n_fish_comps, n_sexes))
-    } # random walk if statement
-    
-    if(time_selex == "AR1_y") { # Autoregressive 1 by year
-      data$F_Slx_re_model <- matrix(0, nrow = n_fish_comps, ncol = n_sexes)
-      pars$ln_fish_selpars_re <- array(rnorm(1, 1, 0.05),
-                                       dim = c((length(years)), n_time_selex_pars, n_fish_comps, n_sexes))
-      pars$fixed_sel_re_fish <- array(rnorm(1, 1 ,0.05), dim = c(2 * n_time_selex_pars, n_fish_comps, n_sexes))
-    } # AR1_y if statement
   
-
-# Parameter mapping -------------------------------------------------------
+  # Time-Varying Selectivity Options (Fishery)
+  if(time_selex == "None") { # No time-varying
+    data$F_Slx_re_model <- matrix(10000, nrow = n_fish_comps, ncol = n_sexes)
+    pars$ln_fish_selpars_re <- array(rnorm(1, 0, 0.05),
+                                     dim = c((length(years)), n_time_selex_pars, n_fish_comps, n_sexes))
+    pars$fixed_sel_re_fish <- array(rnorm(1,0,1), dim = c(1, n_fish_comps, n_sexes))
+    
+    # Set mapping here for random effects (no random effects)
+    map$ln_fish_selpars_re <- factor(rep(NA, length(pars$ln_fish_selpars_re))) # Fix random effects
+    map$fixed_sel_re_fish <- factor(rep(NA, length(pars$fixed_sel_re_fish))) # fixed deivation parameters/don't estimate
+    
+  } # none if statement
+  
+  if(time_selex == "RW") { # Random Walk
+    data$F_Slx_re_model <- matrix(0, nrow = n_fish_comps, ncol = n_sexes)
+    pars$ln_fish_selpars_re <- array(rnorm(1, 0, 0.05),
+                                     dim = c((length(years)), n_time_selex_pars, n_fish_comps, n_sexes))
+    pars$fixed_sel_re_fish <- array(rnorm(1,0,1), dim = c(n_time_selex_pars, n_fish_comps, n_sexes))
+  } # random walk if statement
+  
+  if(time_selex == "AR1_y") { # Autoregressive 1 by year
+    data$F_Slx_re_model <- matrix(0, nrow = n_fish_comps, ncol = n_sexes)
+    pars$ln_fish_selpars_re <- array(rnorm(1, 1, 0.05),
+                                     dim = c((length(years)), n_time_selex_pars, n_fish_comps, n_sexes))
+    pars$fixed_sel_re_fish <- array(rnorm(1, 1 ,0.05), dim = c(2 * n_time_selex_pars, n_fish_comps, n_sexes))
+  } # AR1_y if statement
+  
+  
+  # Parameter mapping -------------------------------------------------------
   if(sum(fix_pars %in% c("ln_h")) == 1) {
     map$ln_RecPars <- factor(c(1, NA)) # fixing steepness
     # Remove steepness from fix_pars vector so it goes through the next loop properly
@@ -389,10 +389,9 @@ pars$ln_N1_Devs <- rnorm(length(ages) - 1, 0, 0.0) # intial recruitment deviaate
     map <- c(map_par, map)
     
   } # end i
-
+  
   return(list(data = data, parameters = pars, map = map))
   
 } # end function
-
 
 
