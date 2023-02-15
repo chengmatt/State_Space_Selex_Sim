@@ -292,16 +292,16 @@ prepare_EM_input <- function(years,
 
   # Set up parameters
   pars$ln_SigmaRec <- sigma_rec # recruitment variability
-  pars$ln_RecDevs <- rnorm(length(years)-1, -0.5, 0.05) # rec devs
-  pars$ln_N1_Devs <- rnorm(length(ages), -0.5, 0.05) # intial recruitment deviaates
+  pars$ln_RecDevs <- rnorm(length(years) -1, 0, 0.0) # rec devs
+pars$ln_N1_Devs <- rnorm(length(ages) - 1, 0, 0.0) # intial recruitment deviaates
   pars$ln_M <- log(mean(Mort_at_age)) # natural mortality
-  pars$ln_Fy <- matrix(rnorm(n_fleets * length(years), -1, 0.1), 
+  pars$ln_Fy <- matrix(rnorm(n_fleets * length(years), 0.0, 0.0), 
                           ncol = n_fleets, nrow = length(years)) # fishing mortality
-  pars$logit_q_fish <- rnorm(n_fish_indices, -3, 0.01) # catchability for fishery
-  pars$logit_q_srv <- rnorm(n_srv_indices, -3, 0.01) # catchability for survey
+  pars$ln_q_fish <- rnorm(n_fish_indices, 0, 0.0) # catchability for fishery
+  pars$ln_q_srv <- rnorm(n_srv_indices, 0, 0.0) # catchability for survey
   
   if(rec_model == "mean_rec") {
-    pars$ln_RecPars <- as.vector(rnorm(1, 0.1)) # Mean Recruitment (1 parameter)
+    pars$ln_RecPars <- as.vector(c(mu_rec)) # Mean Recruitment (1 parameter)
     data$rec_model <- 0
   }
   if(rec_model == "BH") {
@@ -325,7 +325,7 @@ prepare_EM_input <- function(years,
     if(S_Slx_Model_Input[i] == "double_logistic") n_srv_pars[i] <- 4
   } # end i loop
   # Put array into our list
-  pars$ln_srv_selpars <- array(rnorm(1, 0, 1), dim = c(n_srv_comps, n_sexes, n_srv_blocks, max(n_srv_pars)))
+  pars$ln_srv_selpars <- array(rnorm(1, 3, 1), dim = c(n_srv_comps, n_sexes, n_srv_blocks, max(n_srv_pars)))
   
   # Do the same, but for the fishery
   n_fish_blocks <- length(unique(as.vector(F_Slx_Blocks_Input))) # unique numbers (max fish blocks)

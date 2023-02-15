@@ -14,14 +14,21 @@ beverton_holt_recruit <- function(ssb, h, r0) {
   
   for(a in 1:length(ages)) {
     SPR_SSB0[a] = exp(-Mort_at_age[1,a,1] * (a - 1)) * wt_at_age[1, a, 1, 1] * mat_at_age[1, a, 1, 1]
-  } # end a loop
-
+  }
+  
   # Now, get SPR rate
   SPR0 <- sum(SPR_SSB0)
   ssb0 <- SPR0 * r0
   
-  # Now calculate BH parameterization
-  rec <- 4* h * r0 * ssb  / ( ssb0*(1-h) + ssb *(5*h-1) ) 
+  # Output to environemnt
+  SPR_SSB0 <<- SPR_SSB0
   
+  # Get alpha and beta for BH
+  alpha <- ((1 - h) * ssb0 )/ (4 * h * r0 )
+  beta <- ((5 * h - 1) ) / (4 * h * r0)
+  
+  # Now calculate BH parameterization
+  rec <- ssb / (alpha + (beta * ssb))
+
   return( rec )
 }
