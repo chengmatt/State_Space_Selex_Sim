@@ -50,7 +50,7 @@
                                                       nrow = 2, byrow = TRUE), # fish fleet 1
                                    Fleet_2_EL = matrix(data = c(4, 0.8, 4, 0.8), 
                                                        nrow = 2, byrow = TRUE)), # fish fleet 2
-                  srv_pars = list(Fleet_3_SL = matrix(data = c(2,0.8, 4, 0.8), 
+                  srv_pars = list(Fleet_3_SL = matrix(data = c(3,0.8, 4, 0.8), 
                                                       nrow = 2, byrow = TRUE)), # survey fleet 1
                   f_ratio = 0.5, m_ratio = 0.5)
     
@@ -145,7 +145,7 @@
     # Get parameter estimates
     M_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_M", trans = "log") %>% 
       mutate(t = mean(Mort_at_age), type = "mortality", sim = sim, conv = conv[sim])
-    q_srv_df <- extract_parameter_vals(sd_rep = model$sd_rep,   par = "logit_q_srv", trans = "logit", logit_bounds = c(0, 1)) %>% 
+    q_srv_df <- extract_parameter_vals(sd_rep = model$sd_rep,   par = "logit_q_srv", trans = "logit", logit_bounds = c(0, 5)) %>% 
       mutate(t = mean(q_Surv), type = "q_surv", sim = sim, conv = conv[sim])
     meanrec_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_RecPars", trans = "log") %>% 
       mutate(t = r0, type = "r0/meanrec", sim = sim, conv = conv[sim])
@@ -158,7 +158,7 @@
     par_all <- rbind(M_df, q_srv_df, meanrec_df, par_all)
     
 
-    if(sim > 3) {
+    if(sim > 10) {
       rec_stuff <- par_all %>% filter(type == "r0/meanrec",  conv == "Converged")
       plot(density((rec_stuff$mle_val - rec_stuff$t) / rec_stuff$mle_val), zero.line = TRUE)
       abline(v = 0, col = "red")

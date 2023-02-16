@@ -101,7 +101,7 @@ Type objective_function<Type>::operator() ()
   // Parameter Transformations ----------------------------------------------
   
   Type M = exp(ln_M); // Natural Mortality
-  Type ln_SigmaRec2 = ln_SigmaRec * ln_SigmaRec; // Variance of recruitment sigma
+  Type ln_SigmaRec2 = pow(ln_SigmaRec, 2); // Variance of recruitment sigma
   
   // Predicted Quantities
   array<Type> pred_fish_age_comps(obs_fish_age_comps.dim); // Predicted Fishery Age Comps
@@ -308,7 +308,7 @@ Type objective_function<Type>::operator() ()
       
       // Fill in initial age-structure
       if(a < n_ages - 1) {
-        NAA(0, a, s) = exp(ln_RecInit + ln_N1_Devs(a) -(0.5 * ln_SigmaRec2) -M * Type(a) ) * Sex_Ratio(s);
+        NAA(0, a, s) = exp(ln_RecInit + ln_N1_Devs(a) -M * Type(a) ) * exp(-(ln_SigmaRec2/Type(2)))  * Sex_Ratio(s);
       } else{
         NAA(0, a, s) = exp(ln_RecInit -M * Type(a)) / (Type(1) - exp(-M)) * Sex_Ratio(s);
       }
@@ -331,8 +331,7 @@ Type objective_function<Type>::operator() ()
         
         if(rec_model == 0) { // Mean Recruitment
           Type ln_MeanRec = ln_RecPars(0); // Mean Recruitment parameter
-          NAA(y, 0, s) = exp( ln_MeanRec + ln_RecDevs(y - 1) 
-                                - Type(0.5) * ln_SigmaRec2) * Sex_Ratio(s);
+          NAA(y, 0, s) = exp( ln_MeanRec + ln_RecDevs(y - 1) ) * exp(-(ln_SigmaRec2/Type(2)))  * Sex_Ratio(s);
         } // if for rec_model == 0
         
         if(rec_model == 1) { // Beverton Holt Recruitment
@@ -346,7 +345,7 @@ Type objective_function<Type>::operator() ()
             ( ssb0*(Type(1)-h) + SSB(y - 1) * (Type(5)*h-Type(1)) );
           
           // Get recruitment with process error here
-          NAA(y, 0, s) =  det_BH_rec * exp(ln_RecDevs(y-1) - Type(0.5) * ln_SigmaRec2 )  * Sex_Ratio(s);
+          NAA(y, 0, s) =  det_BH_rec * exp(ln_RecDevs(y-1)) * exp(-(ln_SigmaRec2/Type(2)))  * Sex_Ratio(s);
           
         } // if Beverton Holt Recruitment
       } // only estimate recruitment if y >= 1
@@ -419,7 +418,7 @@ Type objective_function<Type>::operator() ()
       } // s loop
       
       // Inverse logit transform
-      Type tmp_q_fish = Type(0) + (Type(1) - Type(0))/(1 + exp(-logit_q_fish(fi))); 
+      Type tmp_q_fish = Type(0) + (Type(5) - Type(0))/(1 + exp(-logit_q_fish(fi))); 
       // Scale index by catchability here
       pred_fish_indices(y, fi) = tmp_q_fish  * pred_fish_indices(y, fi); 
       
@@ -437,7 +436,7 @@ Type objective_function<Type>::operator() ()
       } // s loop
       
       // Inverse logit transform here
-      Type tmp_q_srv = Type(0) + (Type(1) - Type(0))/(1 + exp(-logit_q_srv(si))); 
+      Type tmp_q_srv = Type(0) + (Type(5) - Type(0))/(1 + exp(-logit_q_srv(si))); 
       // Scale index by catchability
       pred_srv_indices(y, si) = tmp_q_srv * pred_srv_indices(y, si); 
       
@@ -500,8 +499,7 @@ Type objective_function<Type>::operator() ()
       
       // Get likelihood here
       catch_nLL(y, f) -= use_catch(y, f) * dnorm(log(obs_catches(y, f)),
-                log(pred_catches(y, f)) -(Type(0.5)* exp(2 * log(catch_sd(f))) ), 
-                catch_sd(f), true);
+                log(pred_catches(y, f)), catch_sd(f), true);
       
       SIMULATE{ // Simulate catch
         obs_catches(y, f) = exp(rnorm(log(pred_catches(y, f)),  catch_sd(f) ));
@@ -524,8 +522,7 @@ Type objective_function<Type>::operator() ()
       
       // Likelihood calculations
       fish_index_nLL(y, fi) -= use_fish_index(y, fi) * dnorm(log(obs_fish_indices(y, fi)), 
-                     log(pred_fish_indices(y, fi))- (Type(0.5) * exp(2 * log(fish_sd(fi)) )),
-                     fish_sd(fi), true);
+                     log(pred_fish_indices(y, fi)), fish_sd(fi), true);
       
       SIMULATE{ // Simulate Fishery Index
         obs_fish_indices(y, fi) = exp(rnorm(log(pred_fish_indices(y, fi)), fish_sd(fi))); 
@@ -540,8 +537,7 @@ Type objective_function<Type>::operator() ()
       
       // Likelihood calculations
       srv_index_nLL(y, si) -= use_srv_index(y, si) * dnorm(log(obs_srv_indices(y, si)), 
-                    log(pred_srv_indices(y, si))- (Type(0.5) * exp(2*log(srv_sd(si)) )), 
-                    srv_sd(si), true); 
+                    log(pred_srv_indices(y, si)), srv_sd(si), true); 
       
       SIMULATE{ // Simulate Survey Index
         obs_srv_indices(y, si) = exp(rnorm(log(pred_srv_indices(y, si)), srv_sd(si))); 
@@ -599,11 +595,11 @@ Type objective_function<Type>::operator() ()
   // Recruitment related stuff (likelihoods + derived quantites) ----------------------------------------------
   
   for(int y = 0; y < ln_N1_Devs.size(); y++) { // Mean = log-normal correction
-    rec_nLL -= dnorm(ln_N1_Devs(y), Type(0), exp(ln_SigmaRec), true);
+    rec_nLL -= dnorm(ln_N1_Devs(y), Type(0), ln_SigmaRec, true);
   } // Penalty for initial recruitment
   
   for(int y = 0; y < ln_RecDevs.size(); y++) { // Mean = log-normal correction
-    rec_nLL -= dnorm(ln_RecDevs(y), Type(0), exp(ln_SigmaRec), true);
+    rec_nLL -= dnorm(ln_RecDevs(y), Type(0), ln_SigmaRec, true);
   } // Penalty for recruitment (mean should be 0)
   
   // Add to joint nLL   
@@ -624,7 +620,7 @@ Type objective_function<Type>::operator() ()
   REPORT(pred_srv_age_comps); // Predicted survey age comps
   REPORT(ln_fish_selpars_re); // Selectivity random effects
   REPORT(SBPR0); // Spawning biomass per recruit
-
+  
   //  Likelihoods
   REPORT(catch_nLL);
   REPORT(srv_index_nLL);
