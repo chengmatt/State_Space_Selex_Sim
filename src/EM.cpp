@@ -161,8 +161,7 @@ Type objective_function<Type>::operator() ()
         for(int p = 0; p < n_re_pars; p++) {
           for(int y = 0; y < n_re_years; y++) {
             // penalize deviations
-            fish_sel_re_nLL -= dnorm(ln_fish_selpars_re(y, p, f, s), Type(0.0), 
-                                     fixed_sel_re_fish(p, f, s), true);
+            fish_sel_re_nLL -= dnorm(ln_fish_selpars_re(y, p, f, s), Type(0.0), fixed_sel_re_fish(p, f, s), true);
           } // y loop
         } // p loop
         
@@ -296,10 +295,6 @@ Type objective_function<Type>::operator() ()
   } // y loop
   
   // Initialization ----------------------------------------------
-  Type SBPR0 = 0; // Spawning Biomass Per recruit container
-  for(int a = 0; a < n_ages; a++) SBPR0 += exp(-M * Type(a)) * WAA(0, a, 0) * MatAA(0, a, 0); // Calculate SBPR0 here
-  Type ssb0 = SBPR0 * exp(ln_RecPars(0)); // SSB0 
-  
   for(int s = 0; s < n_sexes; s++) {
     for(int a = 0; a < n_ages; a++){
       
@@ -316,13 +311,16 @@ Type objective_function<Type>::operator() ()
     } //  a loop
   } // s loop
   
+  Type SBPR0 = 0; // Spawning Biomass Per recruit container
+  for(int a = 0; a < n_ages; a++) SBPR0 += exp(-M * Type(a)) * WAA(0, a, 0) * MatAA(0, a, 0); // Calculate SBPR0 here
   // Calculate SSB at time 1 here
   for(int a = 0; a < n_ages; a++) SSB(0) += NAA(0, a, 0) * WAA(0, a, 0) * MatAA(0, a, 0);
+  Type ssb0 = SBPR0 * exp(ln_RecPars(0)); // SSB0 
+  Depletion(0) = SSB(0)/ssb0; // Depletion
   
-  // Now, get depletion at time point 0
-  Depletion(0) = SSB(0)/ssb0; 
-  
+
   // Population Dynamics Equations ----------------------------------------------
+  
   for(int y = 0; y < n_years; y++) {
     for(int s = 0; s < n_sexes; s++) {
       
@@ -382,8 +380,8 @@ Type objective_function<Type>::operator() ()
   } // end year loop
   
   // Catch ----------------------------------------------
-  pred_catches.setZero(); // set zero
   
+  pred_catches.setZero(); // set zero
   for(int f = 0; f < n_fleets; f++) {
     for(int y = 0; y < n_years; y++) {
       for(int s = 0; s < n_sexes; s++) {
@@ -403,6 +401,7 @@ Type objective_function<Type>::operator() ()
   } // f loop
   
   // Indices of Abundance ----------------------------------------------
+  
   // (Assumes that indices are observed at the start of each year)
   pred_fish_indices.setZero(); // set zero
   pred_srv_indices.setZero(); // set zero
@@ -416,9 +415,9 @@ Type objective_function<Type>::operator() ()
           pred_fish_indices(y, fi) += NAA(y, a, s) * WAA(y, a, s) *  F_Slx(y, a, fi, s);
         } // a loop
       } // s loop
-      
+ 
       // Inverse logit transform
-      Type tmp_q_fish = Type(0) + (Type(5) - Type(0))/(1 + exp(-logit_q_fish(fi))); 
+      Type tmp_q_fish = Type(0) + (Type(1) - Type(0))/(1 + exp(-logit_q_fish(fi))); 
       // Scale index by catchability here
       pred_fish_indices(y, fi) = tmp_q_fish  * pred_fish_indices(y, fi); 
       
@@ -436,7 +435,7 @@ Type objective_function<Type>::operator() ()
       } // s loop
       
       // Inverse logit transform here
-      Type tmp_q_srv = Type(0) + (Type(5) - Type(0))/(1 + exp(-logit_q_srv(si))); 
+      Type tmp_q_srv = Type(0) + (Type(1) - Type(0))/(1 + exp(-logit_q_srv(si))); 
       // Scale index by catchability
       pred_srv_indices(y, si) = tmp_q_srv * pred_srv_indices(y, si); 
       
@@ -510,7 +509,6 @@ Type objective_function<Type>::operator() ()
   
   
   // Index likelihood (Log-normal likelihood) ----------------------------------------------
-  
   vector<Type> fish_sd(n_fish_indices);   // Convert fishery index CV to standard deviation
   vector<Type> srv_sd(n_srv_indices);   // Convert survey index CV to standard deviation
   for(int si = 0; si < n_srv_indices; si ++) srv_sd(si) = sqrt(log( (srv_cv(si)*srv_cv(si)) + 1));
@@ -547,7 +545,6 @@ Type objective_function<Type>::operator() ()
   } // si loop
   
   // Composition likelihoods (Multinomial likelihood) ----------------------------------------------
-  
   Type c = 1e-10; // Constant to add to multinomial
   
   // Fishery Compositions
@@ -592,8 +589,7 @@ Type objective_function<Type>::operator() ()
     } // y loop
   } // sc loop
   
-  // Recruitment related stuff (likelihoods + derived quantites) ----------------------------------------------
-  
+  // Recruitment related stuff (likelihoods + derived quantities) ----------------------------------------------
   for(int y = 0; y < ln_N1_Devs.size(); y++) { // Mean = log-normal correction
     rec_nLL -= dnorm(ln_N1_Devs(y), Type(0), ln_SigmaRec, true);
   } // Penalty for initial recruitment

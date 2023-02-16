@@ -325,7 +325,7 @@ prepare_EM_input <- function(years,
     if(S_Slx_Model_Input[i] == "double_logistic") n_srv_pars[i] <- 4
   } # end i loop
   # Put array into our list
-  pars$ln_srv_selpars <- array(rnorm(1, 3, 1), dim = c(n_srv_comps, n_sexes, n_srv_blocks, max(n_srv_pars)))
+  pars$ln_srv_selpars <- array(rnorm(1, 3, 0.05), dim = c(n_srv_comps, n_sexes, n_srv_blocks, max(n_srv_pars)))
   
   # Do the same, but for the fishery
   n_fish_blocks <- length(unique(as.vector(F_Slx_Blocks_Input))) # unique numbers (max fish blocks)
@@ -339,7 +339,7 @@ prepare_EM_input <- function(years,
   } # end i loop
   
   # put array into our parameter list
-  pars$ln_fish_selpars <- array(log(0.5), dim = c(n_fish_comps, n_sexes, n_fish_blocks, max(n_fish_pars)))
+  pars$ln_fish_selpars <- array(rnorm(1, 3, 0.05), dim = c(n_fish_comps, n_sexes, n_fish_blocks, max(n_fish_pars)))
   
   # Time-Varying Selectivity Options (Fishery)
   if(time_selex == "None") { # No time-varying

@@ -46,11 +46,11 @@
                   # if switching to a single sex, be sure to change the nrow to the number of sexes,
                   # and to make sure the selex parameters for the fleets align n_pars * n_sexes
                   # e.g., (7, 0.8, 4, 0.3) for a logistic with two sexes, nrow = 2
-                  fish_pars = list(Fleet_1_L = matrix(data = c(4, 0.8, 4, 0.8), 
+                  fish_pars = list(Fleet_1_L = matrix(data = c(4, 0.8, 6, 1.5), 
                                                       nrow = 2, byrow = TRUE), # fish fleet 1
-                                   Fleet_2_EL = matrix(data = c(4, 0.8, 4, 0.8), 
+                                   Fleet_2_EL = matrix(data = c(4, 0.8, 6, 1.5), 
                                                        nrow = 2, byrow = TRUE)), # fish fleet 2
-                  srv_pars = list(Fleet_3_SL = matrix(data = c(3,0.8, 4, 0.8), 
+                  srv_pars = list(Fleet_3_SL = matrix(data = c(4,0.8, 5, 0.8), 
                                                       nrow = 2, byrow = TRUE)), # survey fleet 1
                   f_ratio = 0.5, m_ratio = 0.5)
     
@@ -81,7 +81,7 @@
     # Prepare inputs here
     input <- prepare_EM_input(years = years,
                      n_fleets = 1, 
-                     catch_cv = c(0.01),
+                     catch_cv = c(0.005),
                      F_Slx_Blocks_Input = matrix(c(rep(0)),
                                           nrow = length(years),
                                           ncol = 1), # fishery blocks
@@ -145,7 +145,8 @@
     # Get parameter estimates
     M_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_M", trans = "log") %>% 
       mutate(t = mean(Mort_at_age), type = "mortality", sim = sim, conv = conv[sim])
-    q_srv_df <- extract_parameter_vals(sd_rep = model$sd_rep,   par = "logit_q_srv", trans = "logit", logit_bounds = c(0, 5)) %>% 
+    q_srv_df <- extract_parameter_vals(sd_rep = model$sd_rep,   par = "logit_q_srv", trans = "logit",
+                                       logit_bounds = c(0, 1)) %>% 
       mutate(t = mean(q_Surv), type = "q_surv", sim = sim, conv = conv[sim])
     meanrec_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_RecPars", trans = "log") %>% 
       mutate(t = r0, type = "r0/meanrec", sim = sim, conv = conv[sim])
@@ -158,12 +159,12 @@
     par_all <- rbind(M_df, q_srv_df, meanrec_df, par_all)
     
 
-    if(sim > 10) {
+    if(sim > 3) {
       rec_stuff <- par_all %>% filter(type == "r0/meanrec",  conv == "Converged")
-      plot(density((rec_stuff$mle_val - rec_stuff$t) / rec_stuff$mle_val), zero.line = TRUE)
-      abline(v = 0, col = "red")
+      hist((rec_stuff$mle_val - rec_stuff$t) / rec_stuff$mle_val, xlim = c(-1, 1))
+      abline(v = 0, col = "red", lwd = 5)
       median_rec <- median((rec_stuff$mle_val - rec_stuff$t) / rec_stuff$mle_val)
-      abline(v = median_rec)
+      abline(v = median_rec, lwd = 5)
     }
 
     # Recruitment
@@ -185,10 +186,10 @@
     f_all <- rbind(f_all, f_df)
     
     # Check depletion rates
-    depletion_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "Depletion") %>%
-      mutate(t = (SSB[Fish_Start_yr[1]:(n_years-1),sim]/ssb0),
-             sim = sim, conv = conv[sim], year = Fish_Start_yr[1]:(n_years-1))
-    depletion_all <- rbind(depletion_df, depletion_all)
+    # depletion_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "Depletion") %>%
+      # mutate(t = (SSB[Fish_Start_yr[1]:(n_years-1),sim]/ssb0),
+             # sim = sim, conv = conv[sim], year = Fish_Start_yr[1]:(n_years-1))
+    # depletion_all <- rbind(depletion_df, depletion_all)
 
     # # Check survey mean age
     srv_mean_ages <- extract_mean_age_vals(mod_rep = model$model_fxn, comp_name = "pred_srv_age_comps",
@@ -233,11 +234,11 @@ srv_mu_age_sum <- get_RE_precentiles(df = srv_mu_age %>% filter(conv == "Converg
                                      par_name = "Mean Predicted Survey Age", 
                                      group_vars = c("year","fleet", "sex"))
 
-depletion_sum <-  get_RE_precentiles(df = depletion_all %>% filter(conv == "Converged"), 
-                                     est_val_col = 1, true_val_col = 5, 
-                                     par_name = "Depletion (SSB / SSB0)", group_vars = "year")
+# depletion_sum <-  get_RE_precentiles(df = depletion_all %>% filter(conv == "Converged"), 
+#                                      est_val_col = 1, true_val_col = 5, 
+#                                      par_name = "Depletion (SSB / SSB0)", group_vars = "year")
 
-all <- rbind(rec_sum, ssb_sum, f_sum, depletion_sum, srv_mu_age_sum, fish_mu_age_sum) 
+all <- rbind(rec_sum, ssb_sum, f_sum, srv_mu_age_sum, fish_mu_age_sum) 
   
 
 # Get relative error time series
@@ -265,7 +266,7 @@ geom_point(inherit.aes = FALSE, data = par_sum,
            aes(x= median, y = 0, color = type), size = 5, alpha = 0.95) +
   geom_vline(aes(xintercept = 0), linetype = 2,
              size = 0.85, col = "black", alpha = 1) +
-# coord_cartesian(xlim = c(-1, 1)) +
+coord_cartesian(xlim = c(-0.5, 0.5)) +
 ggsci::scale_color_jco() +
 ggsci::scale_fill_jco() +
   labs(x = "Relative Error", y = "Probability Density", linetype = "", color = "") +
