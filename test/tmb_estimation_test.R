@@ -15,14 +15,14 @@
     compile_tmb(wd = here("src"), cpp = "EM.cpp")
     
     # Path to general input biological parameters
-    spreadsheet_path <- here("input", "EBS_Pollock_Inputs.xlsx")
-    # spreadsheet_path <- here("input", "Sablefish_Inputs.xlsx")
+    # spreadsheet_path <- here("input", "EBS_Pollock_Inputs.xlsx")
+    spreadsheet_path <- here("input", "Sablefish_Inputs.xlsx")
     
     # simulate data
     simulate_data(fxn_path = fxn_path, 
                   check_equil = FALSE,
                   spreadsheet_path = spreadsheet_path, 
-                  rec_type = "mean_rec",
+                  rec_type = "BH",
                   Start_F = c(0.01, 0.01), 
                   Fish_Start_yr = c(70, 70), 
                   Surv_Start_yr = c(70), 
@@ -46,12 +46,12 @@
                   # if switching to a single sex, be sure to change the nrow to the number of sexes,
                   # and to make sure the selex parameters for the fleets align n_pars * n_sexes
                   # e.g., (7, 0.8, 4, 0.3) for a logistic with two sexes, nrow = 2
-                  fish_pars = list(Fleet_1_L = matrix(data = c(4, 0.8), 
-                                                      nrow = 1, byrow = TRUE), # fish fleet 1
-                                   Fleet_2_EL = matrix(data = c(4, 0.8), 
-                                                       nrow = 1, byrow = TRUE)), # fish fleet 2
-                  srv_pars = list(Fleet_3_SL = matrix(data = c(2,0.8), 
-                                                      nrow = 1, byrow = TRUE)), # survey fleet 1
+                  fish_pars = list(Fleet_1_L = matrix(data = c(4, 0.8, 4, 0.8), 
+                                                      nrow = 2, byrow = TRUE), # fish fleet 1
+                                   Fleet_2_EL = matrix(data = c(4, 0.8, 4, 0.8), 
+                                                       nrow = 2, byrow = TRUE)), # fish fleet 2
+                  srv_pars = list(Fleet_3_SL = matrix(data = c(2,0.8, 4, 0.8), 
+                                                      nrow = 2, byrow = TRUE)), # survey fleet 1
                   f_ratio = 0.5, m_ratio = 0.5)
     
     plot_OM(path = here("figs", "Base_OM_Figs"), file_name = "OM_Check.pdf")
@@ -69,6 +69,7 @@
     all_harv_rates <- data.frame()
     conv <- vector()
     depletion_all <- data.frame()
+    ssb0_all <- data.frame()
     
     # Specify years here
     years <- Fish_Start_yr[1]:(n_years - 1)
@@ -88,12 +89,12 @@
                                           nrow = length(years), 
                                           ncol = 1),
                      use_fish_index = FALSE,
-                     rec_model = "mean_rec", 
+                     rec_model = "BH", 
                      F_Slx_Model_Input = c("logistic"),
                      S_Slx_Model_Input = c("logistic"), 
                      time_selex = "None",
                      n_time_selex_pars = NULL,
-                     fix_pars = c("ln_SigmaRec", "logit_q_fish"),
+                     fix_pars = c("ln_SigmaRec", "logit_q_fish", "ln_h"),
                      sim = sim)
     
       # input$parameters$fixed_sel_re_fish[] <- c(0.35, 0.3)
@@ -150,7 +151,9 @@
       mutate(t = r0, type = "r0/meanrec", sim = sim, conv = conv[sim])
     # fish_sel_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_fish_selpars", trans = "log") %>% 
     #   mutate(t = c(7, 4, 0.8, 0.8), type = c("f1", "f2", "f1d", "f2d"), sim = sim, conv = conv[sim])
-    # 
+    ssb0_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "ssb0") %>% 
+      mutate(t = ssb0, type = "ssb0", sim = sim, conv = conv[sim])
+    ssb0_all <- rbind(ssb0_df, ssb0_all)
     # Bind parameter estimates
     par_all <- rbind(M_df, q_srv_df, meanrec_df, par_all)
     
@@ -183,7 +186,7 @@
     
     # Check depletion rates
     depletion_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "Depletion") %>%
-      mutate(t = (SSB[Fish_Start_yr[1]:(n_years-1),sim]/SSB[Fish_Start_yr[1],sim]),
+      mutate(t = (SSB[Fish_Start_yr[1]:(n_years-1),sim]/ssb0),
              sim = sim, conv = conv[sim], year = Fish_Start_yr[1]:(n_years-1))
     depletion_all <- rbind(depletion_df, depletion_all)
 
@@ -271,6 +274,35 @@ theme(strip.text = element_text(size = 13),
       axis.title = element_text(size = 15),
       axis.text = element_text(size = 13, color = "black"),
       legend.position = "none", legend.text = element_text(size = 15)))
+
+# ssb0 par sums
+ssb0_par_sum <- get_RE_precentiles(df = ssb0_all %>% filter(conv == "Converged"), 
+                              est_val_col = 1, true_val_col = 5, 
+                              par_name = "", group_vars = "type")
+
+ssb0_all <- ssb0_all %>% mutate(RE = (mle_val - t ) / t) %>% 
+  filter(conv == "Converged")
+
+ggplot(ssb0_all, aes(x = RE, fill = type)) +
+  geom_density(alpha = 0.2) +
+  facet_wrap(~type, scales = "free", nrow = 2) +
+  geom_errorbarh(inherit.aes = FALSE, data = ssb0_par_sum, 
+                 aes(xmin = lwr_95, xmax = upr_95, y = 0, color = type),
+                 height = 0, size = 2.5, alpha = 0.55, linetype = 1) +
+  geom_point(inherit.aes = FALSE, data = ssb0_par_sum, 
+             aes(x= median, y = 0, color = type), size = 5, alpha = 0.95) +
+  geom_vline(aes(xintercept = 0), linetype = 2,
+             size = 0.85, col = "black", alpha = 1) +
+  # coord_cartesian(xlim = c(-1, 1)) +
+  ggsci::scale_color_jco() +
+  ggsci::scale_fill_jco() +
+  labs(x = "Relative Error", y = "Probability Density", linetype = "", color = "") +
+  theme_bw() + 
+  theme(strip.text = element_text(size = 13),
+        axis.title = element_text(size = 15),
+        axis.text = element_text(size = 13, color = "black"),
+        legend.position = "none", legend.text = element_text(size = 15))
+
 
 plot_grid(par_plot, est_plot, ncol = 1, align = "hv", axis = "bl",
           rel_heights = c(0.70, 1))

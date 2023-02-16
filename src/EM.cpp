@@ -146,7 +146,7 @@ Type objective_function<Type>::operator() ()
   srv_index_nLL.setZero();
   fish_comp_nLL.setZero();
   srv_comp_nLL.setZero();
-
+  
   // MODEL STRUCTURE ----------------------------------------------
   // y = year, a = age, s = sex, f = fishery fleet, sf = survey fleet
   
@@ -298,8 +298,7 @@ Type objective_function<Type>::operator() ()
   // Initialization ----------------------------------------------
   Type SBPR0 = 0; // Spawning Biomass Per recruit container
   for(int a = 0; a < n_ages; a++) SBPR0 += exp(-M * Type(a)) * WAA(0, a, 0) * MatAA(0, a, 0); // Calculate SBPR0 here
-  Type ssb0 = SBPR0 * exp(ln_RecPars(0)); // SSB0
-  
+  Type ssb0 = SBPR0 * exp(ln_RecPars(0)); // SSB0 
   
   for(int s = 0; s < n_sexes; s++) {
     for(int a = 0; a < n_ages; a++){
@@ -314,14 +313,14 @@ Type objective_function<Type>::operator() ()
         NAA(0, a, s) = exp(ln_RecInit -M * Type(a)) / (Type(1) - exp(-M)) * Sex_Ratio(s);
       }
       
-      // Calculate SSB, Depletion and SBPR0 at first time point here
-      if(s == 0) {
-        SSB(0) += NAA(0, a, 0) * WAA(0, a, 0) * MatAA(0, a, 0);
-        Depletion(0) = Type(1); 
-      } // if for sex == 0 (females)
-      
     } //  a loop
   } // s loop
+  
+  // Calculate SSB at time 1 here
+  for(int a = 0; a < n_ages; a++) SSB(0) += NAA(0, a, 0) * WAA(0, a, 0) * MatAA(0, a, 0);
+  
+  // Now, get depletion at time point 0
+  Depletion(0) = SSB(0)/ssb0; 
   
   // Population Dynamics Equations ----------------------------------------------
   for(int y = 0; y < n_years; y++) {
@@ -341,13 +340,13 @@ Type objective_function<Type>::operator() ()
           // Define parameters 
           Type R0 = exp(ln_RecPars(0)); // Virgin Recruitment
           Type h = exp(ln_RecPars(1)); // Steepness
-
+          
           // Get determininstic BH rec
-          Type ln_det_BH_rec = log( (Type(4) * h * R0 * SSB(y - 1))  / 
-                            ( ssb0*(Type(1)-h) + SSB(y - 1) * (Type(5)*h-Type(1)) ));
+          Type det_BH_rec = (Type(4) * h * R0 * SSB(y - 1))  / 
+            ( ssb0*(Type(1)-h) + SSB(y - 1) * (Type(5)*h-Type(1)) );
           
           // Get recruitment with process error here
-          NAA(y, 0, s) =  exp( ln_det_BH_rec + ln_RecDevs(y-1) - Type(0.5) * ln_SigmaRec2 )  * Sex_Ratio(s);
+          NAA(y, 0, s) =  det_BH_rec * exp(ln_RecDevs(y-1) - Type(0.5) * ln_SigmaRec2 )  * Sex_Ratio(s);
           
         } // if Beverton Holt Recruitment
       } // only estimate recruitment if y >= 1
@@ -372,7 +371,7 @@ Type objective_function<Type>::operator() ()
         if(y >= 1 && s == 0) {
           SSB(y) += NAA(y, a, 0) * WAA(y, a, 0) * MatAA(y, a, 0); 
           if(a == n_ages - 1) { // Get depletion
-            Depletion(y) = SSB(y) / SSB(0); 
+            Depletion(y) = SSB(y) / ssb0; 
           } // if statement
         } // y >= 1
         
@@ -625,8 +624,7 @@ Type objective_function<Type>::operator() ()
   REPORT(pred_srv_age_comps); // Predicted survey age comps
   REPORT(ln_fish_selpars_re); // Selectivity random effects
   REPORT(SBPR0); // Spawning biomass per recruit
-  REPORT(ssb0); // SSB0
-  
+
   //  Likelihoods
   REPORT(catch_nLL);
   REPORT(srv_index_nLL);
@@ -643,6 +641,7 @@ Type objective_function<Type>::operator() ()
   ADREPORT(Total_Fy);
   ADREPORT(Total_Rec);
   ADREPORT(Total_Biom);
+  ADREPORT(ssb0);
   
   return jnLL;
   

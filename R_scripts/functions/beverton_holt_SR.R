@@ -18,7 +18,7 @@ beverton_holt_recruit <- function(ssb, h, r0) {
   
   # Now, get SPR rate
   SPR0 <- sum(SPR_SSB0)
-  ssb0 <- SPR0 * r0
+  ssb0 <<- SPR0 * r0
   
   # Output to environemnt
   SPR_SSB0 <<- SPR_SSB0

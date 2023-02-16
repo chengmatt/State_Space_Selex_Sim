@@ -147,7 +147,7 @@ simulate_data <- function(fxn_path,
           ### Sexes loop --------------------------------------------------------------
           
           for(s in 1:n_sex) {
-            
+
             if(a == 1) {
               # Now, add in the recruits, assigned with the sex ratio
               N_at_age[y,1,s,sim] <- rec_total[y,sim] * sex_ratio[y-1,s]
