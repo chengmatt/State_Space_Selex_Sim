@@ -65,6 +65,7 @@ print(
 print(
   # Biomass at age across sexes
   ggplot(biom_df %>% 
+           drop_na() %>% 
            filter(Sim %in% c("Sim 1", "Sim 2", "Sim 3")), 
          aes(x = as.numeric(Year), y = Biomass, fill = Age, group = Sim)) +
     geom_col(position = "stack") +
@@ -78,6 +79,7 @@ print(
 print(
   # Biomass at age differntiated by sex
   ggplot(biom_df %>% 
+           drop_na() %>% 
            filter(Sim %in% c("Sim 1", "Sim 2", "Sim 3")), 
          aes(x = as.numeric(Year), y = Biomass, fill = Age, group = Sim)) +
     geom_col(position = "stack") +
@@ -90,6 +92,7 @@ print(
 print(
   # Biomass aggregated
   biom_df %>% 
+    drop_na() %>% 
     group_by(Year, Sim) %>% 
     summarize(Biomass = sum(Biomass, na.rm = TRUE)) %>% 
     ggplot(aes(x = as.numeric(Year), y = Biomass,  group = Sim)) +

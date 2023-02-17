@@ -10,10 +10,16 @@
 beverton_holt_recruit <- function(ssb, h, r0) {
   
   # Get SPR
+  SPR_N <- vector()
   SPR_SSB0 <- vector()
   
   for(a in 1:length(ages)) {
-    SPR_SSB0[a] = exp(-Mort_at_age[1,a,1] * (a - 1)) * wt_at_age[1, a, 1, 1] * mat_at_age[1, a, 1, 1]
+    if(a < length(ages)) {
+      SPR_N[a] = exp(-Mort_at_age[1,a,1] * a) 
+    } else{
+      SPR_N[a] = exp(-Mort_at_age[1,a,1] * a) / (1 - exp(-Mort_at_age[1,a,1]))
+    }
+    SPR_SSB0[a] = SPR_N[a] * wt_at_age[1, a, 1, 1] * mat_at_age[1, a, 1, 1]
   }
   
   # Now, get SPR rate
@@ -23,12 +29,12 @@ beverton_holt_recruit <- function(ssb, h, r0) {
   # Output to environemnt
   SPR_SSB0 <<- SPR_SSB0
   
-  # Get alpha and beta for BH
-  alpha <- ((1 - h) * ssb0 )/ (4 * h * r0 )
-  beta <- ((5 * h - 1) ) / (4 * h * r0)
+  # Get BH components
+  BH_first_part <- 4 * h * r0 * ssb
+  BH_sec_part <- (ssb0 * (1 - h)) + ssb * ((5*h) - 1)
   
   # Now calculate BH parameterization
-  rec <- ssb / (alpha + (beta * ssb))
+  rec <- BH_first_part / BH_sec_part
 
   return( rec )
 }

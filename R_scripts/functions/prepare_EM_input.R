@@ -69,13 +69,10 @@ prepare_EM_input <- function(years,
     obs_catches <- as.matrix(apply( as.matrix(Catch_agg[(Fish_Start_yr[1]:(n_years-1)),,sim]), 1, FUN = sum),
                              ncol = 1)
     
-    # Get catch weighting if there is more than one fleet
-    if(dim(Catch_agg)[2] > 1) {
-      # sum across rows
-      catch_sum <- rowSums(as.matrix(Catch_agg[(Fish_Start_yr[1]:(n_years-1)),,sim]))
-      catch_weight <- as.matrix(Catch_agg[(Fish_Start_yr[1]:(n_years-1)),,sim]) / catch_sum
-    } # if catch weighting
-    
+    # Catch weighting here
+    catch_sum <- rowSums(as.matrix(Catch_agg[(Fish_Start_yr[1]:(n_years-1)),,sim]))
+    catch_weight <- as.matrix(Catch_agg[(Fish_Start_yr[1]:(n_years-1)),,sim]) / catch_sum
+
   } else{ # multi fleet - leave as is
     obs_catches <- matrix(Catch_agg[(Fish_Start_yr[1]:(n_years-1)),,sim], nrow = length(years), ncol = n_fleets)
   } # end else
@@ -295,8 +292,23 @@ prepare_EM_input <- function(years,
   pars$ln_RecDevs <- rnorm(length(years) -1, 0, 0.0) # rec devs
   pars$ln_N1_Devs <- rnorm(length(ages) - 1, 0, 0.0) # intial recruitment deviaates
   pars$ln_M <- log(mean(Mort_at_age)) # natural mortality
-  pars$ln_Fy <- matrix(rnorm(n_fleets * length(years), 0.0, 0.0), 
-                       ncol = n_fleets, nrow = length(years)) # fishing mortality
+  
+  # row sums for fish mort
+  if(n_fleets == 1 & dim(Fish_Age_Comps)[3] == 1) { # 1 fleet model and truth = multiple
+    pars$ln_Fy <- matrix(log(fish_mort[Fish_Start_yr[1]:(n_years - 1),,sim]),
+                         ncol = n_fleets, nrow = length(years))
+  }
+  
+  if(n_fleets == 1 & dim(Fish_Age_Comps)[3] > 1) { # 1 fleet model, but truth = multiple
+    pars$ln_Fy <- matrix(log(rowSums(fish_mort[Fish_Start_yr[1]:(n_years - 1),,sim])),
+                         ncol = n_fleets, nrow = length(years))
+  }
+  
+  if(n_fleets > 1 & dim(Fish_Age_Comps)[3] > 1) { # more tha one fleet for both OM and EM
+    pars$ln_Fy <- matrix(log(fish_mort[Fish_Start_yr[1]:(n_years - 1),,sim]),
+                         ncol = n_fleets, nrow = length(years))
+  }
+
   pars$logit_q_fish <- rnorm(n_fish_indices, 0, 0.0) # catchability for fishery
   pars$logit_q_srv <- rnorm(n_srv_indices, 0, 0.0) # catchability for survey
   
@@ -325,7 +337,7 @@ prepare_EM_input <- function(years,
     if(S_Slx_Model_Input[i] == "double_logistic") n_srv_pars[i] <- 4
   } # end i loop
   # Put array into our list
-  pars$ln_srv_selpars <- array(rnorm(1, 3, 0.05), dim = c(n_srv_comps, n_sexes, n_srv_blocks, max(n_srv_pars)))
+  pars$ln_srv_selpars <- array(rnorm(1, 3, 0), dim = c(n_srv_comps, n_sexes, n_srv_blocks, max(n_srv_pars)))
   
   # Do the same, but for the fishery
   n_fish_blocks <- length(unique(as.vector(F_Slx_Blocks_Input))) # unique numbers (max fish blocks)
@@ -339,14 +351,14 @@ prepare_EM_input <- function(years,
   } # end i loop
   
   # put array into our parameter list
-  pars$ln_fish_selpars <- array(rnorm(1, 3, 0.05), dim = c(n_fish_comps, n_sexes, n_fish_blocks, max(n_fish_pars)))
+  pars$ln_fish_selpars <- array(rnorm(1, 3, 0), dim = c(n_fish_comps, n_sexes, n_fish_blocks, max(n_fish_pars)))
   
   # Time-Varying Selectivity Options (Fishery)
   if(time_selex == "None") { # No time-varying
     data$F_Slx_re_model <- matrix(10000, nrow = n_fish_comps, ncol = n_sexes)
-    pars$ln_fish_selpars_re <- array(rnorm(1, 0, 0.05),
+    pars$ln_fish_selpars_re <- array(rnorm(1, 0, 0),
                                      dim = c((length(years)), n_time_selex_pars, n_fish_comps, n_sexes))
-    pars$fixed_sel_re_fish <- array(rnorm(1,0,1), dim = c(1, n_fish_comps, n_sexes))
+    pars$fixed_sel_re_fish <- array(rnorm(1,0,0), dim = c(1, n_fish_comps, n_sexes))
     
     # Set mapping here for random effects (no random effects)
     map$ln_fish_selpars_re <- factor(rep(NA, length(pars$ln_fish_selpars_re))) # Fix random effects
@@ -356,16 +368,16 @@ prepare_EM_input <- function(years,
   
   if(time_selex == "RW") { # Random Walk
     data$F_Slx_re_model <- matrix(0, nrow = n_fish_comps, ncol = n_sexes)
-    pars$ln_fish_selpars_re <- array(rnorm(1, 0, 0.05),
+    pars$ln_fish_selpars_re <- array(rnorm(1, 0, 0),
                                      dim = c((length(years)), n_time_selex_pars, n_fish_comps, n_sexes))
     pars$fixed_sel_re_fish <- array(rnorm(1,0,1), dim = c(n_time_selex_pars, n_fish_comps, n_sexes))
   } # random walk if statement
   
   if(time_selex == "AR1_y") { # Autoregressive 1 by year
     data$F_Slx_re_model <- matrix(0, nrow = n_fish_comps, ncol = n_sexes)
-    pars$ln_fish_selpars_re <- array(rnorm(1, 1, 0.05),
+    pars$ln_fish_selpars_re <- array(rnorm(1, 1, 0),
                                      dim = c((length(years)), n_time_selex_pars, n_fish_comps, n_sexes))
-    pars$fixed_sel_re_fish <- array(rnorm(1, 1 ,0.05), dim = c(2 * n_time_selex_pars, n_fish_comps, n_sexes))
+    pars$fixed_sel_re_fish <- array(rnorm(1, 1 ,0), dim = c(2 * n_time_selex_pars, n_fish_comps, n_sexes))
   } # AR1_y if statement
   
   

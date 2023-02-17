@@ -295,6 +295,22 @@ Type objective_function<Type>::operator() ()
   } // y loop
   
   // Initialization ----------------------------------------------
+  vector<Type> SBPR_N(n_ages); // Numbers Per recruit container
+  vector<Type> SBPR_SSB0(n_ages); // Spawning Biomass Per recruit container
+  
+  // Loop through spawning biomass per recruit calculations
+  for(int a = 0; a < n_ages; a++) {
+    if(a < n_ages - 1) {
+      SBPR_N(a) = exp(-M * Type(ages(a) ));
+    } else{
+      SBPR_N(a) = exp(-M * Type(ages(a) )) / (1 - exp(-M)); 
+    }
+    SBPR_SSB0(a) = SBPR_N(a) * WAA(0, a, 0) * MatAA(0, a, 0); // Calculate SBPR here
+  } // a loop
+
+  Type ssb0 = sum(SBPR_SSB0) * exp(ln_RecPars(0)); // SSB0 
+  
+  // Abundance at Model Start Year
   for(int s = 0; s < n_sexes; s++) {
     for(int a = 0; a < n_ages; a++){
       
@@ -307,23 +323,31 @@ Type objective_function<Type>::operator() ()
       } else{
         NAA(0, a, s) = exp(ln_RecInit -M * Type(a)) / (Type(1) - exp(-M)) * Sex_Ratio(s);
       }
-      
+
     } //  a loop
   } // s loop
   
-  Type SBPR0 = 0; // Spawning Biomass Per recruit container
-  for(int a = 0; a < n_ages; a++) SBPR0 += exp(-M * Type(a)) * WAA(0, a, 0) * MatAA(0, a, 0); // Calculate SBPR0 here
-  // Calculate SSB at time 1 here
-  for(int a = 0; a < n_ages; a++) SSB(0) += NAA(0, a, 0) * WAA(0, a, 0) * MatAA(0, a, 0);
-  Type ssb0 = SBPR0 * exp(ln_RecPars(0)); // SSB0 
-  Depletion(0) = SSB(0)/ssb0; // Depletion
-  
+  // Calculate SSB and Depletion at time 0
+  for(int a = 0; a < n_ages; a++){
+    SSB(0) += NAA(0, a, 0) * MatAA(0, a, 0) * WAA(0, a, 0);
+    if(a == n_ages - 1) Depletion(0) = SSB(0)/ssb0;
+  } // a loop
 
   // Population Dynamics Equations ----------------------------------------------
-  
+ 
   for(int y = 0; y < n_years; y++) {
     for(int s = 0; s < n_sexes; s++) {
-      
+
+      // Calculate SSB
+      if(s == 0 && y >= 1) {
+        for(int a = 0; a < n_ages; a++) {
+          SSB(y) += NAA(y, a, 0) * WAA(y, a, 0) * MatAA(y, a, 0); 
+          if(a == n_ages - 1) { // Get depletion
+            Depletion(y) = SSB(y) / ssb0; 
+          } // if statement
+        } // a loop
+      } // if s == 0
+
       // Recruitment ----------------------------------------------
       if(y >= 1) { 
         
@@ -338,12 +362,13 @@ Type objective_function<Type>::operator() ()
           Type R0 = exp(ln_RecPars(0)); // Virgin Recruitment
           Type h = exp(ln_RecPars(1)); // Steepness
           
-          // Get determininstic BH rec
-          Type det_BH_rec = (Type(4) * h * R0 * SSB(y - 1))  / 
-            ( ssb0*(Type(1)-h) + SSB(y - 1) * (Type(5)*h-Type(1)) );
-          
+          // Define BH components
+          Type BH_first_part = Type(4) * h * R0 * SSB(y - 1);
+          Type BH_sec_part = (ssb0 * (Type(1) - h)) + SSB(y - 1) * ((Type(5)*h) - 1);
+
           // Get recruitment with process error here
-          NAA(y, 0, s) =  det_BH_rec * exp(ln_RecDevs(y-1)) * exp(-(ln_SigmaRec2/Type(2)))  * Sex_Ratio(s);
+          NAA(y, 0, s) =  ( (BH_first_part / BH_sec_part) * exp(ln_RecDevs(y-1)) * 
+                          exp(-(ln_SigmaRec2/Type(2))) ) * Sex_Ratio(s);
           
         } // if Beverton Holt Recruitment
       } // only estimate recruitment if y >= 1
@@ -361,20 +386,13 @@ Type objective_function<Type>::operator() ()
         } 
         
         if(a == n_ages - 1){ // Increment previous year's plus group back in 
-          NAA(y + 1, n_ages - 1, s) += (NAA(y, n_ages - 1, s) * SAA(y, n_ages - 1, s));
+          NAA(y + 1, n_ages - 1, s) = (NAA(y, n_ages - 1, s) * SAA(y, n_ages - 1, s)) +
+                                       NAA(y + 1, n_ages - 1, s);
         } 
-        
-        // Calculate SSB
-        if(y >= 1 && s == 0) {
-          SSB(y) += NAA(y, a, 0) * WAA(y, a, 0) * MatAA(y, a, 0); 
-          if(a == n_ages - 1) { // Get depletion
-            Depletion(y) = SSB(y) / ssb0; 
-          } // if statement
-        } // y >= 1
         
         // Increment Numbers at age to get total biomass
         Total_Biom(y) += NAA(y, a, s) * WAA(y, a, s);
-        
+         
       } // end ages loop
     } // end sex loop
   } // end year loop
@@ -545,7 +563,7 @@ Type objective_function<Type>::operator() ()
   } // si loop
   
   // Composition likelihoods (Multinomial likelihood) ----------------------------------------------
-  Type c = 1e-10; // Constant to add to multinomial
+  Type c = 1e-20; // Constant to add to multinomial
   
   // Fishery Compositions
   vector<Type> obs_fish_age_vec(n_ages); // Obs fishery vector to hold and pass values to nLL
@@ -556,7 +574,7 @@ Type objective_function<Type>::operator() ()
       for(int s = 0; s < n_sexes; s++) { 
         
         // Pull out observed age vector and multiply by the effective sample size
-        obs_fish_age_vec = obs_fish_age_comps.col(s).col(fc).transpose().col(y) * obs_fish_age_Neff(y, fc, s);
+        obs_fish_age_vec = (obs_fish_age_comps.col(s).col(fc).transpose().col(y) + c) * obs_fish_age_Neff(y, fc, s);
         
         // Pull out predicted age vector
         pred_fish_age_vec = (pred_fish_age_comps.col(s).col(fc).transpose().col(y) + c);
@@ -576,7 +594,7 @@ Type objective_function<Type>::operator() ()
       for(int s = 0; s < n_sexes; s++) {
         
         // Pull out observed age vector and multiply by the effective sample size
-        obs_srv_age_vec = obs_srv_age_comps.col(s).col(sc).transpose().col(y) * obs_srv_age_Neff(y, sc, s);
+        obs_srv_age_vec = (obs_srv_age_comps.col(s).col(sc).transpose().col(y) + c) * obs_srv_age_Neff(y, sc, s);
         
         // Pull out predicted age vector
         pred_srv_age_vec = (pred_srv_age_comps.col(s).col(sc).transpose().col(y) + c);
@@ -590,12 +608,12 @@ Type objective_function<Type>::operator() ()
   } // sc loop
   
   // Recruitment related stuff (likelihoods + derived quantities) ----------------------------------------------
-  for(int y = 0; y < ln_N1_Devs.size(); y++) { // Mean = log-normal correction
-    rec_nLL -= dnorm(ln_N1_Devs(y), Type(0), ln_SigmaRec, true);
+  for(int y = 0; y < ln_N1_Devs.size(); y++) { 
+    rec_nLL -= dnorm(ln_N1_Devs(y), Type(0), exp(ln_SigmaRec), true);
   } // Penalty for initial recruitment
   
-  for(int y = 0; y < ln_RecDevs.size(); y++) { // Mean = log-normal correction
-    rec_nLL -= dnorm(ln_RecDevs(y), Type(0), ln_SigmaRec, true);
+  for(int y = 0; y < ln_RecDevs.size(); y++) { 
+    rec_nLL -= dnorm(ln_RecDevs(y), Type(0), exp(ln_SigmaRec), true);
   } // Penalty for recruitment (mean should be 0)
   
   // Add to joint nLL   
@@ -615,7 +633,7 @@ Type objective_function<Type>::operator() ()
   REPORT(pred_fish_age_comps); // Predicted fishery age comps
   REPORT(pred_srv_age_comps); // Predicted survey age comps
   REPORT(ln_fish_selpars_re); // Selectivity random effects
-  REPORT(SBPR0); // Spawning biomass per recruit
+  REPORT(SBPR_SSB0); // Spawning biomass per recruit
   
   //  Likelihoods
   REPORT(catch_nLL);

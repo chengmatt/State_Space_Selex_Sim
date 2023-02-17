@@ -147,20 +147,20 @@ simulate_data <- function(fxn_path,
           ### Sexes loop --------------------------------------------------------------
           
           for(s in 1:n_sex) {
-
+            
             if(a == 1) {
               # Now, add in the recruits, assigned with the sex ratio
               N_at_age[y,1,s,sim] <- rec_total[y,sim] * sex_ratio[y-1,s]
             } # add recruits in at age-1 
             
-            if(a > 0 & a < length(ages)) { # if we are not in the plus group nor are we in the recruit age
+            if(a < length(ages)) { # if we are not in the plus group nor are we in the recruit age
               
               # Calculate age, fleet, and sex specific mortality (returns vector fo fleet specific mortalities)
               fleet_mort <- sum(fish_mort[y-1,,sim] * Fish_selex_at_age[y-1,a,,s,sim], na.rm = TRUE)
               
               # Decrement population with Z = M + F
               N_at_age[y,a+1,s,sim] <- N_at_age[y-1,a,s,sim] * exp(-(Mort_at_age[y-1,a,sim] + fleet_mort))
-              
+
             } # if we are not in the plus group
             
             ### Decrement population for our + group ---------------------------------------
