@@ -35,6 +35,6 @@ beverton_holt_recruit <- function(ssb, h, r0) {
   
   # Now calculate BH parameterization
   rec <- BH_first_part / BH_sec_part
-
+  
   return( rec )
 }

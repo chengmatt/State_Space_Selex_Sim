@@ -15,8 +15,8 @@
       compile_tmb(wd = here("src"), cpp = "EM.cpp")
       
       # Path to general input biological parameters
-      spreadsheet_path <- here("input", "EBS_Pollock_Inputs.xlsx")
-      # spreadsheet_path <- here("input", "Sablefish_Inputs.xlsx")
+      # spreadsheet_path <- here("input", "EBS_Pollock_Inputs.xlsx")
+      spreadsheet_path <- here("input", "Sablefish_Inputs.xlsx")
       
       # simulate data
       simulate_data(fxn_path = fxn_path, 
@@ -46,10 +46,10 @@
                     # if switching to a single sex, be sure to change the nrow to the number of sexes,
                     # and to make sure the selex parameters for the fleets align n_pars * n_sexes
                     # e.g., (7, 0.8, 4, 0.3) for a logistic with two sexes, nrow = 2
-                    fish_pars = list(Fleet_1_L = matrix(data = c(4, 0.8 ), 
-                                                        nrow = 1, byrow = TRUE)), # fish fleet 2
-                    srv_pars = list(Fleet_3_SL = matrix(data = c(4,0.8 ), 
-                                                        nrow = 1, byrow = TRUE)), # survey fleet 1
+                    fish_pars = list(Fleet_1_L = matrix(data = c(4, 0.8, 7, 0.8), 
+                                                        nrow = 2, byrow = TRUE)), # fish fleet 2
+                    srv_pars = list(Fleet_3_SL = matrix(data = c(4,0.8, 5, 0.8), 
+                                                        nrow = 2, byrow = TRUE)), # survey fleet 1
                     f_ratio = 0.5, m_ratio = 0.5)
       
       plot_OM(path = here("figs", "Base_OM_Figs"), file_name = "OM_Check.pdf")
@@ -189,7 +189,7 @@
     # depletion_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "Depletion") %>%
     # mutate(t = (SSB[Fish_Start_yr[1]:(n_years-1),sim]/ssb0),
     # sim = sim, conv = conv[sim], year = Fish_Start_yr[1]:(n_years-1))
-    # depletion_all <- rbind(depletion_df, depletion_all)
+    # depletion_all <- rbind(depletion_df, depletion_all) 
     
     # # Check survey mean age
     srv_mean_ages <- extract_mean_age_vals(mod_rep = model$model_fxn, comp_name = "pred_srv_age_comps",

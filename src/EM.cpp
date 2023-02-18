@@ -361,6 +361,8 @@ Type objective_function<Type>::operator() ()
           // Define parameters 
           Type R0 = exp(ln_RecPars(0)); // Virgin Recruitment
           Type h = exp(ln_RecPars(1)); // Steepness
+          // if(s == 0) std::cout<<"sex f = " <<h<<"\n";
+          // if(s == 1) std::cout<<"sex m = " <<h<<"\n";
           
           // Define BH components
           Type BH_first_part = Type(4) * h * R0 * SSB(y - 1);
@@ -563,8 +565,7 @@ Type objective_function<Type>::operator() ()
   } // si loop
   
   // Composition likelihoods (Multinomial likelihood) ----------------------------------------------
-  Type c = 1e-20; // Constant to add to multinomial
-  
+
   // Fishery Compositions
   vector<Type> obs_fish_age_vec(n_ages); // Obs fishery vector to hold and pass values to nLL
   vector<Type> pred_fish_age_vec(n_ages); // Pred fishery vector to hold and pass values to nLL
@@ -574,10 +575,10 @@ Type objective_function<Type>::operator() ()
       for(int s = 0; s < n_sexes; s++) { 
         
         // Pull out observed age vector and multiply by the effective sample size
-        obs_fish_age_vec = (obs_fish_age_comps.col(s).col(fc).transpose().col(y) + c) * obs_fish_age_Neff(y, fc, s);
+        obs_fish_age_vec = obs_fish_age_comps.col(s).col(fc).transpose().col(y) * obs_fish_age_Neff(y, fc, s);
         
         // Pull out predicted age vector
-        pred_fish_age_vec = (pred_fish_age_comps.col(s).col(fc).transpose().col(y) + c);
+        pred_fish_age_vec = (pred_fish_age_comps.col(s).col(fc).transpose().col(y));
         
         // Evaluate log-likelihood
         fish_comp_nLL(y, fc, s) -= use_fish_comps(y, fc, s) * dmultinom(obs_fish_age_vec.vec(), 
@@ -594,10 +595,10 @@ Type objective_function<Type>::operator() ()
       for(int s = 0; s < n_sexes; s++) {
         
         // Pull out observed age vector and multiply by the effective sample size
-        obs_srv_age_vec = (obs_srv_age_comps.col(s).col(sc).transpose().col(y) + c) * obs_srv_age_Neff(y, sc, s);
+        obs_srv_age_vec = obs_srv_age_comps.col(s).col(sc).transpose().col(y) * obs_srv_age_Neff(y, sc, s);
         
         // Pull out predicted age vector
-        pred_srv_age_vec = (pred_srv_age_comps.col(s).col(sc).transpose().col(y) + c);
+        pred_srv_age_vec = (pred_srv_age_comps.col(s).col(sc).transpose().col(y));
         
         // Evaluate log-likelihood
         srv_comp_nLL(y, sc, s) -=  use_srv_comps(y, sc, s) * dmultinom(obs_srv_age_vec.vec(), 
