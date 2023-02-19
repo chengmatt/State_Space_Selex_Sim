@@ -107,7 +107,7 @@ simulate_data <- function(fxn_path,
     
     # Years loop  -------------------------------------------------------------
     
-    for(y in 1:n_years) {
+    for(y in 1:(n_years-1)) {
       
       if(y == 1) { 
         
@@ -125,7 +125,7 @@ simulate_data <- function(fxn_path,
         SSB[y,sim] <- sum(mat_at_age[y,,1,sim] * Biom_at_age[y,,1,sim], na.rm = TRUE)
         
         # Recruitment at first year = 0
-        rec_total[y, sim] <- 0
+        rec_total[y, sim] <- 100 # seed it with 50 to get it started
         
       }  # end if statement for if we are in the first year of the simulation
       
@@ -156,10 +156,10 @@ simulate_data <- function(fxn_path,
             if(a < length(ages)) { # if we are not in the plus group nor are we in the recruit age
               
               # Calculate age, fleet, and sex specific mortality (returns vector fo fleet specific mortalities)
-              fleet_mort <- sum(fish_mort[y-1,,sim] * Fish_selex_at_age[y-1,a,,s,sim], na.rm = TRUE)
+              fleet_mort <- sum(fish_mort[y,,sim] * Fish_selex_at_age[y,a,,s,sim], na.rm = TRUE)
               
               # Decrement population with Z = M + F
-              N_at_age[y,a+1,s,sim] <- N_at_age[y-1,a,s,sim] * exp(-(Mort_at_age[y-1,a,sim] + fleet_mort))
+              N_at_age[y+1,a+1,s,sim] <- N_at_age[y,a,s,sim] * exp(-(Mort_at_age[y,a,sim] + fleet_mort))
 
             } # if we are not in the plus group
             
@@ -168,10 +168,10 @@ simulate_data <- function(fxn_path,
             if(a == length(ages) & !is.na(N_at_age[y-1,length(ages),s,sim])) {
               
               # Calculate fishing mortality for the plus group
-              fleet_mort_plus <- sum(fish_mort[y-1,,sim] * Fish_selex_at_age[y-1,a,,s,sim], na.rm = TRUE)
+              fleet_mort_plus <- sum(fish_mort[y,,sim] * Fish_selex_at_age[y,a,,s,sim], na.rm = TRUE)
               
               # Applying mortality to plus group individuals last year, and add in recently recruited indviduals into the plus group
-              N_at_age[y,a,s,sim] <-  N_at_age[y-1,a,s,sim] * exp(-(Mort_at_age[y-1,a,sim] + fleet_mort_plus)) +  N_at_age[y,a,s,sim] 
+              N_at_age[y+1,a,s,sim] <-  N_at_age[y,a,s,sim] * exp(-(Mort_at_age[y,a,sim] + fleet_mort_plus)) +  N_at_age[y+1,a,s,sim] 
               
             } # if we are in the plus group 
             
@@ -199,38 +199,38 @@ simulate_data <- function(fxn_path,
               
               # Calculate total mortality here
               if(n_fish_fleets > 1) { # If > 1 fishery fleet
-                Z_s <- rowSums(fish_mort[y-1,,sim] * Fish_selex_at_age[y-1,,,s,sim]) + Mort_at_age[y-1,,sim]
+                Z_s <- rowSums(fish_mort[y,,sim] * Fish_selex_at_age[y,,,s,sim]) + Mort_at_age[y,,sim]
               } else{
-                Z_s <- (fish_mort[y-1,f,sim] * Fish_selex_at_age[y-1,,f,s,sim]) +  Mort_at_age[y-1,,sim]
+                Z_s <- (fish_mort[y,f,sim] * Fish_selex_at_age[y,,f,s,sim]) +  Mort_at_age[y,,sim]
               } # if only 1 fishery fleet
               
               ###  Get Catch at Age (Only F to C for now) -----------------------------------
               
               # Calculate instantaneous fishing mortality for a given fleet, sex, and age
-              Fish_Fleet_Mort <- fish_mort[y-1,f,sim] * Fish_selex_at_age[y-1,,f,s,sim]
+              Fish_Fleet_Mort <- fish_mort[y,f,sim] * Fish_selex_at_age[y,,f,s,sim]
               
               # Now, get catch at age in weight
-              Catch_at_age[y-1,,f,s,sim] <- Fish_Fleet_Mort * N_at_age[y-1,,s,sim] * (1-exp(-Z_s)) / Z_s
+              Catch_at_age[y,,f,s,sim] <- Fish_Fleet_Mort * N_at_age[y,,s,sim] * (1-exp(-Z_s)) / Z_s
               
               if(s == n_sex) { # Get catch aggregated across ages and sexes, and add lognormal errors
-                Catch_agg[y-1, f, sim] <- sum(Catch_at_age[y-1,,f,,sim] * wt_at_age[y,,,sim]) * 
+                Catch_agg[y, f, sim] <- sum(Catch_at_age[y,,f,,sim] * wt_at_age[y,,,sim]) * 
                   exp( rnorm(1, 0, sqrt(log(catch_CV^2 + 1))) )
               } # if we are done w/ looping through sexes
 
               ### Sample Fishery Index and Comps ------------------------------------------
               
               # Only start sampling if y > Fish start year. 
-              if(y > Fish_Start_yr[f]) { # Observation Model for Fishery
+              if(y >= Fish_Start_yr[f]) { # Observation Model for Fishery
                 
                 # Generate a fishery index structured by fleet and sex (numbers based)
-                Fishery_Index[y-1,f,s,sim] <- q_Fish[y-1,f,sim]  * 
-                                              sum(N_at_age[y-1,,s,sim] * wt_at_age[y-1,,s,sim] *  Fish_selex_at_age[y-1,,f,s,sim])
+                Fishery_Index[y,f,s,sim] <- q_Fish[y-1,f,sim]  * 
+                                              sum(N_at_age[y,,s,sim] * wt_at_age[y,,s,sim] *  Fish_selex_at_age[y,,f,s,sim])
                 
                 # Probability for fishery age comps, using CAA as probability
-                Prob_Fish_Comps <- Catch_at_age[y-1,,f,s,sim]
+                Prob_Fish_Comps <- Catch_at_age[y,,f,s,sim]
                 
                 # Generate comps based 
-                Fish_Age_Comps[y-1,,f,s,sim] <- sample_comps(Comp_Fleet = "Fishery",
+                Fish_Age_Comps[y,,f,s,sim] <- sample_comps(Comp_Fleet = "Fishery",
                                                              error = "multinomial",
                                                              N_eff = fish_Neff[y,f], 
                                                              prob = Prob_Fish_Comps / sum(Prob_Fish_Comps))
@@ -240,11 +240,11 @@ simulate_data <- function(fxn_path,
             } # end sex index
             
             # Summarize this fishery index aggregated by sex and applying some error
-            Fishery_Index_Agg[y-1,f,sim] <- sum(melt(Fishery_Index[y-1,f,,sim]), na.rm = TRUE) # Aggregate
+            Fishery_Index_Agg[y,f,sim] <- sum(melt(Fishery_Index[y,f,,sim]), na.rm = TRUE) # Aggregate
             
             # Apply error here, index fish_CV vector
-            Fishery_Index_Agg[y-1,f,sim] <- idx_obs_error(error = "log_normal", 
-                                                          true_index = Fishery_Index_Agg[y-1,f,sim],
+            Fishery_Index_Agg[y,f,sim] <- idx_obs_error(error = "log_normal", 
+                                                          true_index = Fishery_Index_Agg[y,f,sim],
                                                           CV = fish_CV[f])
           } # end fishery fleet index and loop
           
@@ -257,17 +257,17 @@ simulate_data <- function(fxn_path,
             for(s in 1:n_sex) {
               
               # Only start sampling if y > Survey Start Year.
-              if(y > Surv_Start_yr[sf]) { 
+              if(y >= Surv_Start_yr[sf]) { 
                 
                 # Get survey index here (numbers based)
-                Survey_Index[y-1,sf,s,sim] <- q_Surv[y-1,sf,sim]  * sum(N_at_age[y-1,,s,sim] *
-                                                                           Surv_selex_at_age[y-1,,sf,s,sim])
+                Survey_Index[y,sf,s,sim] <- q_Surv[y,sf,sim]  * sum(N_at_age[y,,s,sim] *
+                                                                           Surv_selex_at_age[y,,sf,s,sim])
                 
                 # Get probability of sampling a given age class for use in multinomial
-                Prob_Surv_at_age <- (N_at_age[y-1,,s,sim] * Surv_selex_at_age[y-1,,sf,s,sim])
+                Prob_Surv_at_age <- (N_at_age[y,,s,sim] * Surv_selex_at_age[y,,sf,s,sim])
                 
                 # Generate comps based on the expected CPUE at age
-                Survey_Age_Comps[y-1,,sf,s,sim] <- sample_comps(Comp_Fleet = "Survey", 
+                Survey_Age_Comps[y,,sf,s,sim] <- sample_comps(Comp_Fleet = "Survey", 
                                                                 error = "multinomial",
                                                                 N_eff = srv_Neff[y,sf], 
                                                                 prob = Prob_Surv_at_age / sum(Prob_Surv_at_age))
@@ -277,11 +277,11 @@ simulate_data <- function(fxn_path,
             } # end sex loop for survey here
             
             # Summarize this fishery index aggregated by sex and applying some error
-            Survey_Index_Agg[y-1,sf,sim] <- sum(melt(Survey_Index[y-1,sf,,sim]), na.rm = TRUE) # Aggregate
+            Survey_Index_Agg[y,sf,sim] <- sum(melt(Survey_Index[y,sf,,sim]), na.rm = TRUE) # Aggregate
             
             # Apply error here, index srv_CV vector
-            Survey_Index_Agg[y-1,sf,sim] <- idx_obs_error(error = "log_normal", 
-                                                          true_index = Survey_Index_Agg[y-1,sf,sim],
+            Survey_Index_Agg[y,sf,sim] <- idx_obs_error(error = "log_normal", 
+                                                          true_index = Survey_Index_Agg[y,sf,sim],
                                                           CV = srv_CV[sf])
             
           } # end sf loop
