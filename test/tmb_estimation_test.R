@@ -15,8 +15,8 @@
   compile_tmb(wd = here("src"), cpp = "EM.cpp")
   
   # Path to general input biological parameters
-  spreadsheet_path <- here("input", "EBS_Pollock_Inputs.xlsx")
-  # spreadsheet_path <- here("input", "Sablefish_Inputs.xlsx")
+  # spreadsheet_path <- here("input", "EBS_Pollock_Inputs.xlsx")
+  spreadsheet_path <- here("input", "Sablefish_Inputs.xlsx")
   
   # simulate data
   simulate_data(fxn_path = fxn_path, 
@@ -46,10 +46,10 @@
                 # if switching to a single sex, be sure to change the nrow to the number of sexes,
                 # and to make sure the selex parameters for the fleets align n_pars * n_sexes
                 # e.g., (7, 0.8, 4, 0.3) for a logistic with two sexes, nrow = 2
-                fish_pars = list(Fleet_1_L = matrix(data = c(4, 0.8), 
-                                                    nrow = 1, byrow = TRUE)), # fish fleet 2
-                srv_pars = list(Fleet_3_SL = matrix(data = c(4, 0.8), 
-                                                    nrow = 1, byrow = TRUE)), # survey fleet 1
+                fish_pars = list(Fleet_1_L = matrix(data = c(4, 0.8, 5, 0.8), 
+                                                    nrow = 2, byrow = TRUE)), # fish fleet 2
+                srv_pars = list(Fleet_3_SL = matrix(data = c(4, 0.8, 5, 0.8), 
+                                                    nrow = 2, byrow = TRUE)), # survey fleet 1
                 f_ratio = 0.5, m_ratio = 0.5)
   
   plot_OM(path = here("figs", "Base_OM_Figs"), file_name = "OM_Check.pdf")
@@ -76,7 +76,7 @@
   
   compile_tmb(wd = here("src"), cpp = "EM.cpp")
   
-  for(sim in 1:n_sims){
+  for(sim in 5:n_sims){
   
   # Prepare inputs here
   input <- prepare_EM_input(years = years,
@@ -107,7 +107,7 @@
   
   # Run EM model here and get sdrep
   tryCatch(expr = model <- run_EM(data = input$data, parameters = input$parameters, 
-                                map = input$map, n.newton = 5, 
+                                map = input$map, n.newton = 3, 
                                 # random = "ln_fish_selpars_re",
                                 silent = T, getsdrep = TRUE), error = function(e){e})
   
@@ -154,13 +154,13 @@
   mutate(t = mean(q_Surv), type = "q_surv", sim = sim, conv = conv[sim])
   meanrec_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_RecPars", trans = "log") %>% 
   mutate(t = r0, type = "r0/meanrec", sim = sim, conv = conv[sim])
-  # fish_sel_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_fish_selpars", trans = "log") %>%
-  # mutate(t = c(4, 5, 0.8, 0.8), type = c("f1", "f2", "f1d", "f2d"), sim = sim, conv = conv[sim])
+  fish_sel_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_fish_selpars", trans = "log") %>%
+  mutate(t = c(4, 5, 0.8, 0.8), type = c("f1", "f2", "f1d", "f2d"), sim = sim, conv = conv[sim])
   ssb0_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "ssb0") %>%
   mutate(t = ssb0, type = "ssb0", sim = sim, conv = conv[sim])
   ssb0_all <- rbind(ssb0_df, ssb0_all)
   # Bind parameter estimates
-  par_all <- rbind(M_df, q_srv_df, meanrec_df, par_all)
+  par_all <- rbind(M_df, q_srv_df, meanrec_df, par_all, fish_sel_df)
   
 
   if(sim > 3) {
@@ -256,7 +256,7 @@
   }
    
   
-  # Summary Checks ----------------------------------------------------------
+   # Summary Checks ----------------------------------------------------------
   
   # Get percentiles
   f_sum <- get_RE_precentiles(df = f_all %>% filter(conv == "Converged"), 

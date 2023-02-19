@@ -308,7 +308,7 @@ Type objective_function<Type>::operator() ()
   // Loop through spawning biomass per recruit calculations
   for(int a = 0; a < n_ages; a++) {
     if(a < n_ages - 1) {
-      SBPR_N(a) = exp(-M * Type(ages(a)));
+      SBPR_N(a) = exp(-M * Type(ages(a) ));
     } else{
       SBPR_N(a) = exp(-M * Type(ages(a) )) / (1 - exp(-M)); 
     }
@@ -325,8 +325,8 @@ Type objective_function<Type>::operator() ()
       Type ln_RecInit = ln_RecPars(0); 
        
       // Fill in initial age-structure
-      NAA(0, a, s) = exp(ln_RecInit) * exp(-M * Type(a)) * 
-                     exp(ln_N1_Devs(a) - (ln_SigmaRec2/Type(2))) * Sex_Ratio(s);
+      NAA(0, a, s) = exp(ln_RecInit + ln_N1_Devs(a) - 
+                     (ln_SigmaRec2/Type(2))) * exp(-M * Type(a)) * Sex_Ratio(s);
       
       // Calculate SSB and Depletion at time 0 for sex 0 (Females)
       if(s == 0) {
@@ -566,8 +566,6 @@ Type objective_function<Type>::operator() ()
   } // si loop
   
   // Composition likelihoods (Multinomial likelihood) ----------------------------------------------
-  Type c = 1e-10; // Constant to add to multinomial
-  
   // Fishery Compositions
   vector<Type> obs_fish_age_vec(n_ages); // Obs fishery vector to hold and pass values to nLL
   vector<Type> pred_fish_age_vec(n_ages); // Pred fishery vector to hold and pass values to nLL
@@ -577,10 +575,10 @@ Type objective_function<Type>::operator() ()
       for(int s = 0; s < n_sexes; s++) { 
         
         // Pull out observed age vector and multiply by the effective sample size
-        obs_fish_age_vec = (obs_fish_age_comps.col(s).col(fc).transpose().col(y) + c) * obs_fish_age_Neff(y, fc, s);
+        obs_fish_age_vec = obs_fish_age_comps.col(s).col(fc).transpose().col(y)  * obs_fish_age_Neff(y, fc, s);
         
         // Pull out predicted age vector
-        pred_fish_age_vec = (pred_fish_age_comps.col(s).col(fc).transpose().col(y) + c);
+        pred_fish_age_vec = pred_fish_age_comps.col(s).col(fc).transpose().col(y);
         
         // Evaluate log-likelihood
         fish_comp_nLL(y, fc, s) -= use_fish_comps(y, fc, s) * dmultinom(obs_fish_age_vec.vec(), 
@@ -597,10 +595,10 @@ Type objective_function<Type>::operator() ()
       for(int s = 0; s < n_sexes; s++) {
         
         // Pull out observed age vector and multiply by the effective sample size
-        obs_srv_age_vec = (obs_srv_age_comps.col(s).col(sc).transpose().col(y) + c) * obs_srv_age_Neff(y, sc, s);
+        obs_srv_age_vec = obs_srv_age_comps.col(s).col(sc).transpose().col(y) * obs_srv_age_Neff(y, sc, s);
         
         // Pull out predicted age vector
-        pred_srv_age_vec = (pred_srv_age_comps.col(s).col(sc).transpose().col(y) + c);
+        pred_srv_age_vec = pred_srv_age_comps.col(s).col(sc).transpose().col(y);
         
         // Evaluate log-likelihood
         srv_comp_nLL(y, sc, s) -=  use_srv_comps(y, sc, s) * dmultinom(obs_srv_age_vec.vec(), 
