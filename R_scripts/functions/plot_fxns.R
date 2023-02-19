@@ -19,7 +19,7 @@
 #' @export
 #'
 #' @examples
-plot_RE_ts <- function(data, x, y, ylim = c(NULL, NULL), lwr_1, upr_1,
+plot_RE_ts_ggplot <- function(data, x, y, ylim = c(NULL, NULL), lwr_1, upr_1,
                     lwr_2, upr_2, facet_name) {
   
   require(rlang)
@@ -38,5 +38,14 @@ plot_RE_ts <- function(data, x, y, ylim = c(NULL, NULL), lwr_1, upr_1,
           axis.text = element_text(size = 13, color = "black"))
     
     return(plot_RE)
+}
+
+plot_RE_ts_base <- function(data, x, y, ylim = c(NULL, NULL),
+                            lwr_1, upr_1 ,lwr_2, upr_2) {
+  
+  
+  
+  
+  
 }
 

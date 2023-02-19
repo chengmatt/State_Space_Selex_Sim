@@ -121,11 +121,11 @@ simulate_data <- function(fxn_path,
           
         } # end sex loop
         
+        # Recruitment at first year = 0
+        rec_total[y, sim] <- 50 # seed it with 50 to get it started
+        
         # Now, calculate our SSB in the first year (only females matter in this case for calculating SSB)
         SSB[y,sim] <- sum(mat_at_age[y,,1,sim] * Biom_at_age[y,,1,sim], na.rm = TRUE)
-        
-        # Recruitment at first year = 0
-        rec_total[y, sim] <- 100 # seed it with 50 to get it started
         
       }  # end if statement for if we are in the first year of the simulation
       
@@ -185,7 +185,7 @@ simulate_data <- function(fxn_path,
         Biom_at_age[y,,,sim] <- N_at_age[y,,,sim] * wt_at_age[y,,,sim]
         
         # Now, update SSB (only females matter so indexing 1 for the sex dimension)
-        SSB[y,sim] <- sum(mat_at_age[y,,1,sim] * Biom_at_age[y,,1,sim], na.rm = TRUE)
+        SSB[y,sim] <- sum(mat_at_age[y,,1,sim] * N_at_age[y,,1,sim] * wt_at_age[y,,1,sim], na.rm = TRUE)
         
         # Generate observations  ---------------------------------------------------
         
@@ -210,11 +210,11 @@ simulate_data <- function(fxn_path,
               Fish_Fleet_Mort <- fish_mort[y,f,sim] * Fish_selex_at_age[y,,f,s,sim]
               
               # Now, get catch at age in weight
-              Catch_at_age[y,,f,s,sim] <- Fish_Fleet_Mort * N_at_age[y,,s,sim] * (1-exp(-Z_s)) / Z_s
+              Catch_at_age[y,,f,s,sim] <- N_at_age[y,,s,sim] * (1-exp(-Z_s)) * (Fish_Fleet_Mort / Z_s)
               
               if(s == n_sex) { # Get catch aggregated across ages and sexes, and add lognormal errors
                 Catch_agg[y, f, sim] <- sum(Catch_at_age[y,,f,,sim] * wt_at_age[y,,,sim]) * 
-                  exp( rnorm(1, 0, sqrt(log(catch_CV^2 + 1))) )
+                                        exp( rnorm(1, 0, sqrt(log(catch_CV^2 + 1))) )
               } # if we are done w/ looping through sexes
 
               ### Sample Fishery Index and Comps ------------------------------------------

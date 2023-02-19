@@ -147,6 +147,9 @@ Type objective_function<Type>::operator() ()
   fish_comp_nLL.setZero();
   srv_comp_nLL.setZero();
   
+  // TESTING
+  DATA_MATRIX(N1_Sex_Test);
+  
   // MODEL STRUCTURE ----------------------------------------------
   // y = year, a = age, s = sex, f = fishery fleet, sf = survey fleet
   
@@ -232,7 +235,7 @@ Type objective_function<Type>::operator() ()
         for(int a = 0; a < n_ages; a++) {
           // a + 1 because TMB indexes starting at 0
           F_Slx(y,a,f,s) = Get_Selex(a + 1, F_Slx_model(f), tmp_ln_fish_selpars);
-          
+
         } // a loop
       } // s loop
     } // f loop
@@ -304,9 +307,9 @@ Type objective_function<Type>::operator() ()
   // Loop through spawning biomass per recruit calculations
   for(int a = 0; a < n_ages; a++) {
     if(a < n_ages - 1) {
-      SBPR_N(a) = exp(-M * Type(ages(a)-1 ));
+      SBPR_N(a) = exp(-M * Type(ages(a)));
     } else{
-      SBPR_N(a) = exp(-M * Type(ages(a)-1 )) / (1 - exp(-M)); 
+      SBPR_N(a) = exp(-M * Type(ages(a) )) / (1 - exp(-M)); 
     }
     SBPR_SSB0(a) = SBPR_N(a) * WAA(0, a, 0) * MatAA(0, a, 0); // Calculate SBPR here
   } // a loop
@@ -319,25 +322,20 @@ Type objective_function<Type>::operator() ()
       
       // Define initial recruitment parameter
       Type ln_RecInit = ln_RecPars(0); 
-      
+       
       // Fill in initial age-structure
-      if(a < n_ages - 1) {
-        NAA(0, a, s) = exp(ln_RecInit + ln_N1_Devs(a) -M * Type(a) ) * exp(-(ln_SigmaRec2/Type(2)))  * Sex_Ratio(s);
-      } else{
-        NAA(0, a, s) = exp(ln_RecInit) * (exp(-M * Type(a))/ (Type(1) - exp(-M))) * Sex_Ratio(s);
-      }
+      NAA(0, a, s) = exp(ln_RecInit) * exp(-M * Type(a)) * 
+                     exp(ln_N1_Devs(a)-(ln_SigmaRec2/Type(2))) * Sex_Ratio(s);
       
-      // TESTING
-      // NAA(0, a, s) = ln_N1_Devs(a);
+      // Calculate SSB and Depletion at time 0 for sex 0 (Females)
+      if(s == 0) {
+        SSB(0) += NAA(0, a, 0) * MatAA(0, a, 0) * WAA(0, a, 0);
+        if(a == n_ages - 1) Depletion(0) = SSB(0)/ssb0;
+      } // if sex == female/0
       
     } //  a loop
   } // s loop
   
-  // Calculate SSB and Depletion at time 0
-  for(int a = 0; a < n_ages; a++){
-    SSB(0) += NAA(0, a, 0) * MatAA(0, a, 0) * WAA(0, a, 0);
-    if(a == n_ages - 1) Depletion(0) = SSB(0)/ssb0;
-  } // a loop
   
   // Population Dynamics Equations ----------------------------------------------
   
@@ -612,9 +610,9 @@ Type objective_function<Type>::operator() ()
   } // sc loop
   
   // Recruitment related stuff (likelihoods + derived quantities) ----------------------------------------------
-  for(int y = 0; y < ln_N1_Devs.size(); y++) {
-    rec_nLL -= dnorm(ln_N1_Devs(y), Type(0), exp(ln_SigmaRec), true);
-  } // Penalty for initial recruitment
+  // for(int y = 0; y < ln_N1_Devs.size(); y++) {
+  //   rec_nLL -= dnorm(ln_N1_Devs(y), Type(0), exp(ln_SigmaRec), true);
+  // } // Penalty for initial recruitment
   
   for(int y = 0; y < ln_RecDevs.size(); y++) { 
     rec_nLL -= dnorm(ln_RecDevs(y), Type(0), exp(ln_SigmaRec), true);

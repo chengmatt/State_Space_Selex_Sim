@@ -15,9 +15,9 @@ beverton_holt_recruit <- function(ssb, h, r0) {
   
   for(a in 1:length(ages)) {
     if(a < length(ages)) {
-      SPR_N[a] = exp(-Mort_at_age[1,a,1] * (a - 1)) 
+      SPR_N[a] = exp(-Mort_at_age[1,a,1] * a) 
     } else{
-      SPR_N[a] = exp(-Mort_at_age[1,a,1] * (a - 1)) / (1 - exp(-Mort_at_age[1,a,1]))
+      SPR_N[a] = exp(-Mort_at_age[1,a,1] * a) / (1 - exp(-Mort_at_age[1,a,1]))
     }
     SPR_SSB0[a] = SPR_N[a] * wt_at_age[1, a, 1, 1] * mat_at_age[1, a, 1, 1]
   }
