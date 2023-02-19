@@ -148,7 +148,7 @@ Type objective_function<Type>::operator() ()
   srv_comp_nLL.setZero();
   
   // TESTING
-  DATA_MATRIX(N1_Sex_Test);
+  // DATA_MATRIX(N1_Sex_Test);
   
   // MODEL STRUCTURE ----------------------------------------------
   // y = year, a = age, s = sex, f = fishery fleet, sf = survey fleet
@@ -164,7 +164,8 @@ Type objective_function<Type>::operator() ()
         for(int p = 0; p < n_re_pars; p++) {
           for(int y = 0; y < n_re_years; y++) {
             // penalize deviations
-            fish_sel_re_nLL -= dnorm(ln_fish_selpars_re(y, p, f, s), Type(0.0), fixed_sel_re_fish(p, f, s), true);
+            fish_sel_re_nLL -= dnorm(ln_fish_selpars_re(y, p, f, s), 
+                               Type(0.0), fixed_sel_re_fish(p, f, s), true);
           } // y loop
         } // p loop
         
@@ -325,7 +326,7 @@ Type objective_function<Type>::operator() ()
        
       // Fill in initial age-structure
       NAA(0, a, s) = exp(ln_RecInit) * exp(-M * Type(a)) * 
-                     exp(ln_N1_Devs(a)-(ln_SigmaRec2/Type(2))) * Sex_Ratio(s);
+                     exp(ln_N1_Devs(a) - (ln_SigmaRec2/Type(2))) * Sex_Ratio(s);
       
       // Calculate SSB and Depletion at time 0 for sex 0 (Females)
       if(s == 0) {
@@ -565,7 +566,7 @@ Type objective_function<Type>::operator() ()
   } // si loop
   
   // Composition likelihoods (Multinomial likelihood) ----------------------------------------------
-  Type c = 1e-20; // Constant to add to multinomial
+  Type c = 1e-10; // Constant to add to multinomial
   
   // Fishery Compositions
   vector<Type> obs_fish_age_vec(n_ages); // Obs fishery vector to hold and pass values to nLL
@@ -610,9 +611,9 @@ Type objective_function<Type>::operator() ()
   } // sc loop
   
   // Recruitment related stuff (likelihoods + derived quantities) ----------------------------------------------
-  // for(int y = 0; y < ln_N1_Devs.size(); y++) {
-  //   rec_nLL -= dnorm(ln_N1_Devs(y), Type(0), exp(ln_SigmaRec), true);
-  // } // Penalty for initial recruitment
+  for(int y = 0; y < ln_N1_Devs.size(); y++) {
+    rec_nLL -= dnorm(ln_N1_Devs(y), Type(0), exp(ln_SigmaRec), true);
+  } // Penalty for initial recruitment
   
   for(int y = 0; y < ln_RecDevs.size(); y++) { 
     rec_nLL -= dnorm(ln_RecDevs(y), Type(0), exp(ln_SigmaRec), true);

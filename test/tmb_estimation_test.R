@@ -15,8 +15,8 @@
   compile_tmb(wd = here("src"), cpp = "EM.cpp")
   
   # Path to general input biological parameters
-  # spreadsheet_path <- here("input", "EBS_Pollock_Inputs.xlsx")
-  spreadsheet_path <- here("input", "Sablefish_Inputs.xlsx")
+  spreadsheet_path <- here("input", "EBS_Pollock_Inputs.xlsx")
+  # spreadsheet_path <- here("input", "Sablefish_Inputs.xlsx")
   
   # simulate data
   simulate_data(fxn_path = fxn_path, 
@@ -46,10 +46,10 @@
                 # if switching to a single sex, be sure to change the nrow to the number of sexes,
                 # and to make sure the selex parameters for the fleets align n_pars * n_sexes
                 # e.g., (7, 0.8, 4, 0.3) for a logistic with two sexes, nrow = 2
-                fish_pars = list(Fleet_1_L = matrix(data = c(4, 0.8, 5, 0.8), 
-                                                    nrow = 2, byrow = TRUE)), # fish fleet 2
-                srv_pars = list(Fleet_3_SL = matrix(data = c(4, 0.8, 5, 0.8), 
-                                                    nrow = 2, byrow = TRUE)), # survey fleet 1
+                fish_pars = list(Fleet_1_L = matrix(data = c(4, 0.8), 
+                                                    nrow = 1, byrow = TRUE)), # fish fleet 2
+                srv_pars = list(Fleet_3_SL = matrix(data = c(4, 0.8), 
+                                                    nrow = 1, byrow = TRUE)), # survey fleet 1
                 f_ratio = 0.5, m_ratio = 0.5)
   
   plot_OM(path = here("figs", "Base_OM_Figs"), file_name = "OM_Check.pdf")
@@ -97,10 +97,10 @@
                           fix_pars = c("ln_SigmaRec", "logit_q_fish", "ln_h"),
                           sim = sim)
   
-  input$parameters$ln_srv_selpars[] <- log(c(4, 5, 0.8, 0.8))
-  input$parameters$ln_fish_selpars[] <- log(c(4, 5, 0.8, 0.8))
-  input$parameters$logit_q_srv[] <- log(mean(q_Surv) / (1-mean(q_Surv)))
-  input$data$N1_Sex_Test <- matrix(N_at_age[70,,,sim], ncol = 2, nrow = 30)
+  # input$parameters$ln_srv_selpars[] <- log(c(4, 5, 0.8, 0.8))
+  # input$parameters$ln_fish_selpars[] <- log(c(4, 5, 0.8, 0.8))
+  # input$parameters$logit_q_srv[] <- log(mean(q_Surv) / (1-mean(q_Surv)))
+  # input$data$N1_Sex_Test <- matrix(N_at_age[70,,,sim], ncol = 2, nrow = 30)
   # input$parameters$fixed_sel_re_fish[] <- c(0.35, 0.3)
   
   # input$parameters$ln_M <- log(0.125)
@@ -142,7 +142,7 @@
   convergence_status <- check_model_convergence(mle_optim = model$mle_optim, 
                                               mod_rep = model$model_fxn,
                                               sd_rep = model$sd_rep, 
-                                              min_grad = 0.01)
+                                              min_grad = 0.001)
   conv[sim] <- convergence_status$Convergence
   max_par[sim] <- convergence_status$Max_Grad_Par
   
@@ -154,13 +154,13 @@
   mutate(t = mean(q_Surv), type = "q_surv", sim = sim, conv = conv[sim])
   meanrec_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_RecPars", trans = "log") %>% 
   mutate(t = r0, type = "r0/meanrec", sim = sim, conv = conv[sim])
-  fish_sel_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_fish_selpars", trans = "log") %>%
-  mutate(t = c(4, 5, 0.8, 0.8), type = c("f1", "f2", "f1d", "f2d"), sim = sim, conv = conv[sim])
+  # fish_sel_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_fish_selpars", trans = "log") %>%
+  # mutate(t = c(4, 5, 0.8, 0.8), type = c("f1", "f2", "f1d", "f2d"), sim = sim, conv = conv[sim])
   ssb0_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "ssb0") %>%
   mutate(t = ssb0, type = "ssb0", sim = sim, conv = conv[sim])
   ssb0_all <- rbind(ssb0_df, ssb0_all)
   # Bind parameter estimates
-  par_all <- rbind(M_df, q_srv_df, meanrec_df, par_all, fish_sel_df)
+  par_all <- rbind(M_df, q_srv_df, meanrec_df, par_all)
   
 
   if(sim > 3) {
@@ -292,7 +292,10 @@
 (est_plot <- plot_RE_ts_ggplot(data = all, x = year, y = median, 
            lwr_1 = lwr_80, upr_1 = upr_80,
            lwr_2 = lwr_95, upr_2 = upr_95, 
-           facet_name = par_name))
+           facet_name = par_name, ylim = c(-0.5, 0.5)))
+  
+plot_RE_ts_base(data = all, par_name = "Spawning Stock Biomass",
+                ylim = c(-1, 1))
 
 
 # Parameter estimates

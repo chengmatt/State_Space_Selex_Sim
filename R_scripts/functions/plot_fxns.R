@@ -40,11 +40,35 @@ plot_RE_ts_ggplot <- function(data, x, y, ylim = c(NULL, NULL), lwr_1, upr_1,
     return(plot_RE)
 }
 
-plot_RE_ts_base <- function(data, x, y, ylim = c(NULL, NULL),
-                            lwr_1, upr_1 ,lwr_2, upr_2) {
+plot_RE_ts_base <- function(data, par_name, ylim) {
   
+  # Filter for a particular parameter name
+  data<- data[data$par_name == par_name, ]
   
+  # Empty plot here
+  plot(1, type="n", ylim = ylim, xlim = c(min(data$year), max(data$year)),
+       xlab = "Year", ylab = "Relative Error", main = unique(data$par_name))
   
+  # Percentile intervals here
+  # 100% percentiles
+  polygon(x = c(data$year, rev(data$year)),  y = c(data$lwr_100, data$upr_100), 
+          col =  adjustcolor("red", alpha.f = 0.2), border = NA,
+          lty = 1, lwd = 3) 
+  
+  # 95% percentiles
+  polygon(x = c(data$year, rev(data$year)),  y = c(data$lwr_95, data$upr_95), 
+          col =  adjustcolor("red", alpha.f = 0.4), border = NA,
+          lty = 1, lwd = 3) 
+  
+  # 75% percentiles
+  polygon(x = c(data$year, rev(data$year)),  y = c(data$lwr_75, data$upr_75), 
+          col =  adjustcolor("red", alpha.f = 0.6), border = NA,
+          lty = 1, lwd = 3) 
+  
+  # Add median points
+  points(data$year, y = data$median, ylim = ylim, col = "black",
+         lwd = 1, pch = 21, cex = 2.5, bg = "white")
+  abline(h = 0, col = "black", lty = 2, lwd= 3) # 0 bias line
   
   
 }
