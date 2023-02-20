@@ -24,19 +24,19 @@
                 spreadsheet_path = spreadsheet_path, 
                 rec_type = "BH",
                 Start_F = c(0.01), 
-                Fish_Start_yr = c(70), 
-                Surv_Start_yr = c(70), 
+                Fish_Start_yr = c(150), 
+                Surv_Start_yr = c(150), 
                 max_rel_F_M = c(1), 
                 desc_rel_F_M = c(0.05), 
                 F_type = c("Contrast"),
-                yr_chng = 85, 
-                yr_chng_end = 100,
+                yr_chng = 170, 
+                yr_chng_end = 180,
                 fish_Neff_max = c(200), 
                 srv_Neff_max = c(200),
                 fish_CV = c(0.1, 0.1),
                 srv_CV = c(0.1), 
                 catch_CV = c(0.), 
-                Neff_Fish_Time = "Constant", 
+                Neff_Fish_Time = "F_Vary", 
                 fixed_Neff = c(30),
                 Mort_Time = "Constant", 
                 q_Mean_Fish = c(0.05), 
@@ -76,7 +76,7 @@
   
   compile_tmb(wd = here("src"), cpp = "EM.cpp")
   
-  for(sim in 5:n_sims){
+  for(sim in 99:n_sims){
   
   # Prepare inputs here
   input <- prepare_EM_input(years = years,
@@ -100,7 +100,7 @@
   # input$parameters$ln_srv_selpars[] <- log(c(4, 5, 0.8, 0.8))
   # input$parameters$ln_fish_selpars[] <- log(c(4, 5, 0.8, 0.8))
   # input$parameters$logit_q_srv[] <- log(mean(q_Surv) / (1-mean(q_Surv)))
-  # input$data$N1_Sex_Test <- matrix(N_at_age[70,,,sim], ncol = 2, nrow = 30)
+  input$data$N1_Sex_Test <- matrix(N_at_age[150,,,sim], ncol = 2, nrow = 30)
   # input$parameters$fixed_sel_re_fish[] <- c(0.35, 0.3)
   
   # input$parameters$ln_M <- log(0.125)
@@ -142,7 +142,7 @@
   convergence_status <- check_model_convergence(mle_optim = model$mle_optim, 
                                               mod_rep = model$model_fxn,
                                               sd_rep = model$sd_rep, 
-                                              min_grad = 0.001)
+                                              min_grad = 0.0001)
   conv[sim] <- convergence_status$Convergence
   max_par[sim] <- convergence_status$Max_Grad_Par
   
@@ -189,24 +189,28 @@
 #   plot(model$model_fxn$rep$SAA[31,,1], col = "red")
 #   lines(SAA_tmp, type = 'l')
 # # # # 
-  year <-1
+  year <-25
 # # # #   # Proproityon selected survey (selex is not correct)
 #   plot(N_at_age[70+year -1,,1,sim] * Surv_selex_at_age[70+year-1,,,1,sim], type = "l")
 #   lines(model$model_fxn$rep$NAA[year,,1] * model$model_fxn$rep$S_Slx[year,,1,1],
 #         col = "red")
 # # #
 # # #   # Numbers at age
-  plot(N_at_age[70+year -1,,1,sim], type = 'l')
-  lines(model$model_fxn$rep$NAA[year,,1], col = "red")
-# # #
-# # #
+#   plot(N_at_age[70+year -1,,1,sim], type = 'l')
+#   lines(model$model_fxn$rep$NAA[year,,1], col = "red")
+# # # #
+# # # #
 #   plot(N_at_age[70+year -1,,1,sim] * Fish_selex_at_age[70+year-1,,1,1,sim], type = "l")
 #   lines(model$model_fxn$rep$NAA[year,,1] * model$model_fxn$rep$F_Slx[year,,1,1],
 #         col = "red")
+#   
+#   plot(model$model_fxn$rep$F_Slx[year,,1,1])
+#   lines(Fish_selex_at_age[70+year-1,,1,1,sim], col = "red")
+  
 # # #
 # # #   # Catch at age
-#   plot(Catch_at_age[70+year -1,,1,1,sim], type = "l")
-#   lines(model$model_fxn$rep$CAA[year,,,1], col = "red")
+  plot(Catch_at_age[150+year -1,,1,1,sim], type = "l")
+  lines(model$model_fxn$rep$CAA[year,,,1], col = "red")
 # #
 #   # plot(model$model_fxn$rep$pred_srv_indices, type = "l")
 #   plot(input$data$obs_srv_indices, col = "red")
@@ -215,20 +219,20 @@
   
   # Recruitment
   rec_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "Total_Rec") %>% 
-  mutate(t = rec_total[70:(n_years-1),sim], sim = sim, conv = conv[sim],
-         year = 70:(n_years-1))
+  mutate(t = rec_total[150:(n_years-1),sim], sim = sim, conv = conv[sim],
+         year = 150:(n_years-1))
   rec_all <- rbind(rec_df, rec_all)
   
   # Check SSB
   ssb_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "SSB") %>% 
   mutate(t = SSB[Fish_Start_yr[1]:(n_years-1), sim], sim = sim, conv = conv[sim],
-         year = 70:(n_years-1))
+         year = 150:(n_years-1))
   ssb_all <- rbind(ssb_df, ssb_all)
   
   # Check F
   f_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "Total_Fy") %>% 
   mutate(t = fish_mort[Fish_Start_yr[1]:(n_years-1),,sim], sim = sim, conv = conv[sim],
-         year = 70:(n_years-1))
+         year = 150:(n_years-1))
   f_all <- rbind(f_all, f_df)
   
   # Check depletion rates
@@ -292,10 +296,10 @@
 (est_plot <- plot_RE_ts_ggplot(data = all, x = year, y = median, 
            lwr_1 = lwr_80, upr_1 = upr_80,
            lwr_2 = lwr_95, upr_2 = upr_95, 
-           facet_name = par_name, ylim = c(-0.5, 0.5)))
+           facet_name = par_name))
   
-plot_RE_ts_base(data = all, par_name = "Spawning Stock Biomass",
-                ylim = c(-1, 1))
+# plot_RE_ts_base(data = all, par_name = "Spawning Stock Biomass",
+#                 ylim = c(-1, 1))
 
 
 # Parameter estimates

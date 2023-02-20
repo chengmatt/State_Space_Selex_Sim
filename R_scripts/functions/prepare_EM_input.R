@@ -105,7 +105,7 @@ prepare_EM_input <- function(years,
     # Now, apply the proportion function over a single fleet
     for(s in 1:n_sexes) {
       obs_fish_age_comps[,,,s] <- t(apply(obs_fish_age_comps[,,,s], MARGIN = 1, 
-                                          FUN=function(x) { x/sum(x) }))
+                                          FUN=function(x) { x }))
     } # s loop
     
   } else{ # more than one fleet here
@@ -135,7 +135,7 @@ prepare_EM_input <- function(years,
   # Now, apply the proportion function over a single fleet
   for(s in 1:n_sexes) {
     obs_srv_age_comps[,,,s] <- t(apply(Survey_Age_Comps[Fish_Start_yr[1]:(n_years - 1),,,s,sim],
-                                       MARGIN = 1, FUN=function(x) { x/sum(x) }))
+                                       MARGIN = 1, FUN=function(x) { x }))
   } # s loop
   
   # Get survey age neffs
@@ -290,7 +290,7 @@ prepare_EM_input <- function(years,
   # Set up parameters
   pars$ln_SigmaRec <- sigma_rec # recruitment variability
   pars$ln_RecDevs <- rnorm(length(years) -1, 0, 0.0) # rec devs
-  pars$ln_N1_Devs <- rnorm(length(ages), 0, 0.0) # intial recruitment deviaates
+  pars$ln_N1_Devs <- rnorm(length(ages) -1, 0, 0.0) # intial recruitment deviaates
   pars$ln_M <- log(mean(Mort_at_age)) # natural mortality
   
   # row sums for fish mort
@@ -317,7 +317,7 @@ prepare_EM_input <- function(years,
     data$rec_model <- 0
   }
   if(rec_model == "BH") {
-    pars$ln_RecPars <- as.vector(c(log(r0), log(h))) # R0 and steepness
+    pars$ln_RecPars <- as.vector(c(log(r0), h)) # R0 and steepness
     data$rec_model <- 1
   }
   
