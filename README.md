@@ -26,7 +26,7 @@ The OM is able to be specified for multiple fishery and survey fleets, as well a
 |Selectivity| Logistic, Gamma, Uniform, Exponential Logistic, Double Logistic, Double Normal |
 
 ### Estimation Model Options
-The EM is able to be specified for multiple fishery and survey fleets, as well as multiple sexes. Note that catchability parameters are estiamted in logit space. 
+The EM is able to be specified for multiple fishery and survey fleets, as well as multiple sexes. 
 | EM Component  | Options |
 | --------| --------|
 |Recruitment| Beverton Holt Recruitment, Mean Recruitment |
