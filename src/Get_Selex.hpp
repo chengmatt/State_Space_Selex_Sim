@@ -16,7 +16,7 @@ Type Get_Selex(int age,
     // Extract out and exponentiate the parameters here
     Type a50 = exp(ln_selpars(0)); // a50
     Type k = exp(ln_selpars(1)); // slope
-    selex = Type(1.0) / (Type(1.0) + exp(-(age - a50 ) / k ));
+    selex = Type(1.0) / (Type(1) + exp(Type(-1) * (age - a50) / k));
   }
   
   if(sel_model == 1) { // gamma dome-shaped selectivity 

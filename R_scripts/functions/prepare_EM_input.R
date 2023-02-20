@@ -105,7 +105,7 @@ prepare_EM_input <- function(years,
     # Now, apply the proportion function over a single fleet
     for(s in 1:n_sexes) {
       obs_fish_age_comps[,,,s] <- t(apply(obs_fish_age_comps[,,,s], MARGIN = 1, 
-                                          FUN=function(x) { x }))
+                                          FUN=function(x) { x/sum(x) }))
     } # s loop
     
   } else{ # more than one fleet here
@@ -135,7 +135,7 @@ prepare_EM_input <- function(years,
   # Now, apply the proportion function over a single fleet
   for(s in 1:n_sexes) {
     obs_srv_age_comps[,,,s] <- t(apply(Survey_Age_Comps[Fish_Start_yr[1]:(n_years - 1),,,s,sim],
-                                       MARGIN = 1, FUN=function(x) { x }))
+                                       MARGIN = 1, FUN=function(x) { x/sum(x) }))
   } # s loop
   
   # Get survey age neffs
@@ -289,8 +289,7 @@ prepare_EM_input <- function(years,
   
   # Set up parameters
   pars$ln_SigmaRec <- sigma_rec # recruitment variability
-  pars$ln_RecDevs <- rnorm(length(years) -1, 0, 0.0) # rec devs
-  pars$ln_N1_Devs <- rnorm(length(ages) -1, 0, 0.0) # intial recruitment deviaates
+  pars$ln_RecDevs <- rnorm(length(years) -1 + length(ages), 0, 0.0) # rec devs
   pars$ln_M <- log(mean(Mort_at_age)) # natural mortality
   
   # row sums for fish mort
@@ -309,8 +308,8 @@ prepare_EM_input <- function(years,
                          ncol = n_fleets, nrow = length(years))
   }
 
-  pars$logit_q_fish <- rnorm(n_fish_indices, 0, 0.0) # catchability for fishery
-  pars$logit_q_srv <- rnorm(n_srv_indices, 0, 0.0) # catchability for survey
+  pars$ln_q_fish <- rnorm(n_fish_indices, 0, 0.0) # catchability for fishery
+  pars$ln_q_srv <- rnorm(n_srv_indices, 0, 0.0) # catchability for survey
   
   if(rec_model == "mean_rec") {
     pars$ln_RecPars <- as.vector(c(mu_rec)) # Mean Recruitment (1 parameter)

@@ -52,17 +52,17 @@ plot_RE_ts_base <- function(data, par_name, ylim) {
   # Percentile intervals here
   # 100% percentiles
   polygon(x = c(data$year, rev(data$year)),  y = c(data$lwr_100, data$upr_100), 
-          col =  adjustcolor("red", alpha.f = 0.2), border = NA,
+          col =  adjustcolor("blue", alpha.f = 0.2), border = NA,
           lty = 1, lwd = 3) 
   
   # 95% percentiles
   polygon(x = c(data$year, rev(data$year)),  y = c(data$lwr_95, data$upr_95), 
-          col =  adjustcolor("red", alpha.f = 0.4), border = NA,
+          col =  adjustcolor("blue", alpha.f = 0.4), border = NA,
           lty = 1, lwd = 3) 
   
   # 75% percentiles
   polygon(x = c(data$year, rev(data$year)),  y = c(data$lwr_75, data$upr_75), 
-          col =  adjustcolor("red", alpha.f = 0.6), border = NA,
+          col =  adjustcolor("blue", alpha.f = 0.6), border = NA,
           lty = 1, lwd = 3) 
   
   # Add median points

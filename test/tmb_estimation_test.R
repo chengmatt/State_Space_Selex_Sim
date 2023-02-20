@@ -46,9 +46,9 @@
                 # if switching to a single sex, be sure to change the nrow to the number of sexes,
                 # and to make sure the selex parameters for the fleets align n_pars * n_sexes
                 # e.g., (7, 0.8, 4, 0.3) for a logistic with two sexes, nrow = 2
-                fish_pars = list(Fleet_1_L = matrix(data = c(4, 0.8, 5, 0.8), 
+                fish_pars = list(Fleet_1_L = matrix(data = c(3, 0.8, 5, 0.8), 
                                                     nrow = 2, byrow = TRUE)), # fish fleet 2
-                srv_pars = list(Fleet_3_SL = matrix(data = c(4, 0.8, 5, 0.8), 
+                srv_pars = list(Fleet_3_SL = matrix(data = c(3, 0.8, 5, 0.8), 
                                                     nrow = 2, byrow = TRUE)), # survey fleet 1
                 f_ratio = 0.5, m_ratio = 0.5)
   
@@ -76,7 +76,7 @@
   
   compile_tmb(wd = here("src"), cpp = "EM.cpp")
   
-  for(sim in 99:n_sims){
+  for(sim in 1:n_sims){
   
   # Prepare inputs here
   input <- prepare_EM_input(years = years,
@@ -94,7 +94,7 @@
                           S_Slx_Model_Input = c("logistic"), 
                           time_selex = "None",
                           n_time_selex_pars = NULL,
-                          fix_pars = c("ln_SigmaRec", "logit_q_fish", "ln_h"),
+                          fix_pars = c("ln_SigmaRec", "ln_q_fish", "ln_h"),
                           sim = sim)
   
   # input$parameters$ln_srv_selpars[] <- log(c(4, 5, 0.8, 0.8))
@@ -107,7 +107,7 @@
   
   # Run EM model here and get sdrep
   tryCatch(expr = model <- run_EM(data = input$data, parameters = input$parameters, 
-                                map = input$map, n.newton = 3, 
+                                map = input$map, n.newton = 5, 
                                 # random = "ln_fish_selpars_re",
                                 silent = T, getsdrep = TRUE), error = function(e){e})
   
@@ -142,23 +142,19 @@
   convergence_status <- check_model_convergence(mle_optim = model$mle_optim, 
                                               mod_rep = model$model_fxn,
                                               sd_rep = model$sd_rep, 
-                                              min_grad = 0.0001)
+                                              min_grad = 0.001)
   conv[sim] <- convergence_status$Convergence
   max_par[sim] <- convergence_status$Max_Grad_Par
   
   # Get parameter estimates
   M_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_M", trans = "log") %>% 
   mutate(t = mean(Mort_at_age), type = "mortality", sim = sim, conv = conv[sim])
-  q_srv_df <- extract_parameter_vals(sd_rep = model$sd_rep,   par = "logit_q_srv", trans = "logit",
-                                   logit_bounds = c(0, 1)) %>% 
+  q_srv_df <- extract_parameter_vals(sd_rep = model$sd_rep,   par = "ln_q_srv", trans = "log") %>% 
   mutate(t = mean(q_Surv), type = "q_surv", sim = sim, conv = conv[sim])
   meanrec_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_RecPars", trans = "log") %>% 
   mutate(t = r0, type = "r0/meanrec", sim = sim, conv = conv[sim])
   fish_sel_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_fish_selpars", trans = "log") %>%
-  mutate(t = c(4, 5, 0.8, 0.8), type = c("f1", "f2", "f1d", "f2d"), sim = sim, conv = conv[sim])
-  ssb0_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "ssb0") %>%
-  mutate(t = ssb0, type = "ssb0", sim = sim, conv = conv[sim])
-  ssb0_all <- rbind(ssb0_df, ssb0_all)
+  mutate(t = c(3, 5, 0.8, 0.8), type = c("f1", "f2", "f1d", "f2d"), sim = sim, conv = conv[sim])
   # Bind parameter estimates
   par_all <- rbind(M_df, q_srv_df, meanrec_df, par_all, fish_sel_df)
   
@@ -260,7 +256,7 @@
   }
    
   
-   # Summary Checks ----------------------------------------------------------
+# Summary Checks ----------------------------------------------------------
   
   # Get percentiles
   f_sum <- get_RE_precentiles(df = f_all %>% filter(conv == "Converged"), 
@@ -300,11 +296,15 @@
   
 # plot_RE_ts_base(data = all, par_name = "Spawning Stock Biomass",
 #                 ylim = c(-1, 1))
-
+# 
+# plot_RE_ts_base(data = all, par_name = "Total Fishing Mortality",
+#                 ylim = c(-1, 1))
 
 # Parameter estimates
 par_df <- par_all %>% mutate(RE = (mle_val - t ) / t) %>% 
   filter(conv == "Converged")
+
+par_df %>% group_by(type) %>% summarize(mle_val = median(mle_val))
 
 # Quick summary stats
 par_sum <- get_RE_precentiles(df = par_all %>% filter(conv == "Converged"), 
@@ -321,7 +321,7 @@ geom_point(inherit.aes = FALSE, data = par_sum,
            aes(x= median, y = 0, color = type), size = 5, alpha = 0.95) +
   geom_vline(aes(xintercept = 0), linetype = 2,
              size = 0.85, col = "black", alpha = 1) +
-# coord_cartesian(xlim = c(-0.5, 0.5)) +
+# coord_cartesian(xlim = c(-0.3, 0.3)) +
 ggsci::scale_color_jco() +
 ggsci::scale_fill_jco() +
   labs(x = "Relative Error", y = "Probability Density", linetype = "", color = "") +
@@ -331,39 +331,11 @@ theme(strip.text = element_text(size = 13),
       axis.text = element_text(size = 13, color = "black"),
       legend.position = "none", legend.text = element_text(size = 15)))
 
-# ssb0 par sums
-ssb0_par_sum <- get_RE_precentiles(df = ssb0_all %>% filter(conv == "Converged"), 
-                              est_val_col = 1, true_val_col = 5, 
-                              par_name = "", group_vars = "type")
-
-ssb0_all <- ssb0_all %>% mutate(RE = (mle_val - t ) / t) %>% 
-  filter(conv == "Converged")
-
-ggplot(ssb0_all, aes(x = RE, fill = type)) +
-  geom_density(alpha = 0.2) +
-  facet_wrap(~type, scales = "free", nrow = 2) +
-  geom_errorbarh(inherit.aes = FALSE, data = ssb0_par_sum, 
-                 aes(xmin = lwr_95, xmax = upr_95, y = 0, color = type),
-                 height = 0, size = 2.5, alpha = 0.55, linetype = 1) +
-  geom_point(inherit.aes = FALSE, data = ssb0_par_sum, 
-             aes(x= median, y = 0, color = type), size = 5, alpha = 0.95) +
-  geom_vline(aes(xintercept = 0), linetype = 2,
-             size = 0.85, col = "black", alpha = 1) +
-  # coord_cartesian(xlim = c(-1, 1)) +
-  ggsci::scale_color_jco() +
-  ggsci::scale_fill_jco() +
-  labs(x = "Relative Error", y = "Probability Density", linetype = "", color = "") +
-  theme_bw() + 
-  theme(strip.text = element_text(size = 13),
-        axis.title = element_text(size = 15),
-        axis.text = element_text(size = 13, color = "black"),
-        legend.position = "none", legend.text = element_text(size = 15))
-
-
 plot_grid(par_plot, est_plot, ncol = 1, align = "hv", axis = "bl",
           rel_heights = c(0.70, 1))
 
 f_all %>% 
+  filter(conv == "Converged") %>% 
   ggplot(aes(x = year, y = mle_val, group = sim)) +
   geom_line(color = "grey", size = 1) +
   geom_line(aes(y = t), color = "red") +
