@@ -63,13 +63,14 @@ run_EM <- function(data, parameters, map, n.newton, random = NULL,
                    silent = TRUE, getsdrep = TRUE) {
   
   # Make AD Function here
-  model_fxn <- TMB::MakeADFun(data, parameters, map, random = random,
-                              DLL="EM", silent = silent, 
-                              checkParameterOrder = TRUE)
+  model_fxn <- TMB::MakeADFun(data, parameters, map, random = NULL,
+                              DLL="EM", silent = T, 
+                              checkParameterOrder = TRUE, tracepar = TRUE)
   
   # Optimize model here w/ nlminb
   mle_optim <- stats::nlminb(model_fxn$par, model_fxn$fn, model_fxn$gr, 
-                             control = list(iter.max = iter.max, eval.max = eval.max))
+                             control = list(iter.max = iter.max, eval.max = eval.max),
+                             lower = -15, upper = 15)
   
   # Take additional newton steps
   add_newton(n.newton = n.newton, ad_model = model_fxn, mle_optim = mle_optim)

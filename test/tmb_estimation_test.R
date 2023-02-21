@@ -23,30 +23,32 @@
                 check_equil = FALSE,
                 spreadsheet_path = spreadsheet_path, 
                 rec_type = "BH",
-                Start_F = c(0.01), 
-                Fish_Start_yr = c(150), 
-                Surv_Start_yr = c(150), 
-                max_rel_F_M = c(1), 
-                desc_rel_F_M = c(0.05), 
-                F_type = c("Contrast"),
-                yr_chng = 170, 
+                Start_F = c(0.01, 0.01), 
+                Fish_Start_yr = c(150, 150), 
+                Surv_Start_yr = c(150, 150), 
+                max_rel_F_M = c(1, 1), 
+                desc_rel_F_M = c(0.01, 0.01), 
+                F_type = c("Contrast", "Const_Inc"),
+                yr_chng = c(170), 
                 yr_chng_end = 180,
-                fish_Neff_max = c(200), 
+                fish_Neff_max = c(200, 200), 
                 srv_Neff_max = c(200),
                 fish_CV = c(0.1, 0.1),
                 srv_CV = c(0.1), 
-                catch_CV = c(0.), 
+                catch_CV = c(0., 0), 
                 Neff_Fish_Time = "F_Vary", 
-                fixed_Neff = c(30),
+                fixed_Neff = c(30, 30),
                 Mort_Time = "Constant", 
-                q_Mean_Fish = c(0.05), 
+                q_Mean_Fish = c(0.05, 0.05), 
                 q_Mean_Surv = 0.01, 
-                fish_selex = c("logistic"), 
+                fish_selex = c("logistic", "logistic"), 
                 srv_selex = c("logistic"), 
                 # if switching to a single sex, be sure to change the nrow to the number of sexes,
                 # and to make sure the selex parameters for the fleets align n_pars * n_sexes
                 # e.g., (7, 0.8, 4, 0.3) for a logistic with two sexes, nrow = 2
                 fish_pars = list(Fleet_1_L = matrix(data = c(3, 0.8, 5, 0.8), 
+                                                    nrow = 2, byrow = TRUE),
+                                 Fleet_2_L = matrix(data = c(3, 0.8, 5, 0.8), 
                                                     nrow = 2, byrow = TRUE)), # fish fleet 2
                 srv_pars = list(Fleet_3_SL = matrix(data = c(3, 0.8, 5, 0.8), 
                                                     nrow = 2, byrow = TRUE)), # survey fleet 1
@@ -84,13 +86,13 @@
                           catch_cv = c(0.01),
                           F_Slx_Blocks_Input = matrix(c(rep(0)),
                                                       nrow = length(years),
-                                                      ncol = 1), # fishery blocks
+                                                      ncol = 2), # fishery blocks
                           S_Slx_Blocks_Input = matrix(c(0), # selectivity blocks
                                                       nrow = length(years), 
-                                                      ncol = 1),
+                                                      ncol = 2),
                           use_fish_index = FALSE,
                           rec_model = "BH", 
-                          F_Slx_Model_Input = c("logistic"),
+                          F_Slx_Model_Input = c("logistic", "logistic"),
                           S_Slx_Model_Input = c("logistic"), 
                           time_selex = "None",
                           n_time_selex_pars = NULL,
@@ -205,8 +207,8 @@
   
 # # #
 # # #   # Catch at age
-  plot(Catch_at_age[150+year -1,,1,1,sim], type = "l")
-  lines(model$model_fxn$rep$CAA[year,,,1], col = "red")
+  # plot(Catch_at_age[150+year -1,,1,1,sim], type = "l")
+  # lines(model$model_fxn$rep$CAA[year,,,1], col = "red")
 # #
 #   # plot(model$model_fxn$rep$pred_srv_indices, type = "l")
 #   plot(input$data$obs_srv_indices, col = "red")
@@ -227,7 +229,7 @@
   
   # Check F
   f_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "Total_Fy") %>% 
-  mutate(t = fish_mort[Fish_Start_yr[1]:(n_years-1),,sim], sim = sim, conv = conv[sim],
+  mutate(t = rowSums(fish_mort[Fish_Start_yr[1]:(n_years-1),,sim]), sim = sim, conv = conv[sim],
          year = 150:(n_years-1))
   f_all <- rbind(f_all, f_df)
   
@@ -247,7 +249,7 @@
   # Check fishery mean age
   fish_mean_ages <- extract_mean_age_vals(mod_rep = model$model_fxn, comp_name = "pred_fish_age_comps",
                                         bins = ages, comp_start_yr = Fish_Start_yr[1], sim = sim,
-                                        n_fish_true_fleets = 1) %>% mutate(conv = conv[sim])
+                                        n_fish_true_fleets = 2) %>% mutate(conv = conv[sim])
   fish_mu_age <- rbind(fish_mu_age, fish_mean_ages)
   
   print(paste("done w/  sim = ", sim))
@@ -294,11 +296,11 @@
            lwr_2 = lwr_95, upr_2 = upr_95, 
            facet_name = par_name))
   
-# plot_RE_ts_base(data = all, par_name = "Spawning Stock Biomass",
-#                 ylim = c(-1, 1))
-# 
-# plot_RE_ts_base(data = all, par_name = "Total Fishing Mortality",
-#                 ylim = c(-1, 1))
+
+par(mfrow = c(3, 1))
+plot_RE_ts_base(data = all, par_name = "Spawning Stock Biomass", ylim = c(-0.3, 0.3))
+plot_RE_ts_base(data = all, par_name = "Total Fishing Mortality", ylim = c(-0.3, 0.3))
+plot_RE_ts_base(data = all, par_name = "Total Recruitment", ylim = c(-0.3, 0.3))
 
 # Parameter estimates
 par_df <- par_all %>% mutate(RE = (mle_val - t ) / t) %>% 

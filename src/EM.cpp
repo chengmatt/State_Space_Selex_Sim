@@ -146,7 +146,7 @@ Type objective_function<Type>::operator() ()
   srv_comp_nLL.setZero();
   
   // TESTING
-  DATA_MATRIX(N1_Sex_Test);
+  // DATA_MATRIX(N1_Sex_Test);
   
   // MODEL STRUCTURE ----------------------------------------------
   // y = year, a = age, s = sex, f = fishery fleet, sf = survey fleet
@@ -422,7 +422,7 @@ Type objective_function<Type>::operator() ()
         } // a loop
       } // s loop
       // Scale index by catchability here
-      pred_fish_indices(y, fi) = exp(ln_q_fish(fi))  * pred_fish_indices(y, fi); 
+      pred_fish_indices(y, fi) = exp(ln_q_fish(fi))  * pred_fish_indices(y, fi) ; 
     } // y loop
   } // fi loop
   
