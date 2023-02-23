@@ -50,14 +50,14 @@ fish_surv_data_scenarios <- function(Fish_Start_yr, Surv_Start_yr, fish_Neff_max
   
     for(f in 1:n_fish_fleets) {
       
-      # Caclulate scalar such that the max fish mort results in the desired Neff
-      F_scalar[f] <- fish_Neff_max[f] / (fish_Neff_max[f] * max(fish_mort[,f,])) 
+      # Calculate scalar such that the max fish mort results in the desired Neff
+      F_scalar[f] <- fish_Neff_max[f] / (fish_Neff_max[f] * max(fish_mort[,f,], na.rm = TRUE)) 
       
-      for(y in 1:n_years) {
+      for(y in 1:(n_years-1)) {
 
           # Scale N_effs by relative fishing mortality rates - fix sim index at 1,
           # because these will remain constant across simulations
-          fish_Neff_mat[y,f] <- round(fish_Neff_max[f] * F_scalar[f] * fish_mort[y,f,1])
+          fish_Neff_mat[y,f] <- floor(fish_Neff_max[f] * F_scalar[f] * fish_mort[y,f,1])
           
           # Fix Neff at a specified value for those that are < said specified value
           if(fish_Neff_mat[y,f] < fixed_Neff[f] &
@@ -75,7 +75,7 @@ fish_surv_data_scenarios <- function(Fish_Start_yr, Surv_Start_yr, fish_Neff_max
   # specify matrix for survey neff
   for(sf in 1:n_srv_fleets) {
     
-    for(y in 1:n_years) {
+    for(y in 1:(n_years-1)) {
       
       if(y < Surv_Start_yr[sf]) {
         srv_Neff_mat[y,sf] <- 0 # force neff to be 0 when fishing is not occuring

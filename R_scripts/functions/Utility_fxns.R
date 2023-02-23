@@ -314,7 +314,7 @@ extract_mean_age_vals <- function(mod_rep, comp_name, bins, comp_start_yr,
   } # else statement
   
   # Rename and bind to the predicted dataframe
-  molten_true_ages <- reshape2::melt(true_ages)
+  molten_true_ages <- reshape2::melt(true_ages) 
   colnames(molten_true_ages) <- c("year", "fleet", "sex", 'true_mean_ages')
   
   # Left join to complete dataframe

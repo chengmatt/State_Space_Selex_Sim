@@ -36,7 +36,7 @@ specify_F_pattern <- function(Start_F, Fish_Start_yr, F_type, n_years, max_rel_F
     # Now, decrease fihsing mortality (ramp down) - decrease to 0.75 of the mean natural mortality
     fish_mort_2 <- seq(((max_rel_F_M * mean_nat_mort)), 
                        (desc_rel_F_M * mean_nat_mort), 
-                       length.out = length(chngpoint:n_years))
+                       length.out = length(chngpoint:(n_years-1)))
     
     # Now bind all of these fish morts into a vector
     F_vec <- c(fish_mort_1, fish_mort_2[-1]) # Remove first element so it connects smoothly
@@ -46,19 +46,19 @@ specify_F_pattern <- function(Start_F, Fish_Start_yr, F_type, n_years, max_rel_F
   if(F_type == "Constant") { # Constant F type
     
     # Constant fishing mortality - 0.75 of natural mortality
-    F_vec <- rep(Start_F, times = length(Fish_Start_yr:n_years)) 
+    F_vec <- rep(Start_F, times = length(Fish_Start_yr:(n_years-1))) 
     
   } # if statement for F pattern that is Constant
   
   if(F_type == "Increase") { # Increasing F type
     
-    F_vec <- seq(Start_F, (max_rel_F_M * mean_nat_mort), length.out = length(Fish_Start_yr:n_years))
+    F_vec <- seq(Start_F, (max_rel_F_M * mean_nat_mort), length.out = length(Fish_Start_yr:(n_years-1)))
     
   } # if statement for F pattern that is increasing
   
   if(F_type == "Decrease") { # Decreasing F type
     
-    F_vec <- seq(Start_F, (max_rel_F_M * mean_nat_mort), length.out = length(Fish_Start_yr:n_years))
+    F_vec <- seq(Start_F, (max_rel_F_M * mean_nat_mort), length.out = length(Fish_Start_yr:(n_years-1)))
     
   } # if statement for F pattern that is decreasing
   
@@ -66,13 +66,13 @@ specify_F_pattern <- function(Start_F, Fish_Start_yr, F_type, n_years, max_rel_F
   if(F_type == "Increase_Plat") { # if increases and plateaus out
     
     # Calculate plateau year
-    plat_year <- round(0.95 * n_years)  # make it 0.5 of the number of years in the simulation
+    plat_year <- round(0.95 * (n_years-1))  # make it 0.5 of the number of years in the simulation
     
     # Calculate increasing f mort
     increasing <- seq(Start_F, (max_rel_F_M * mean_nat_mort), length.out = length(Fish_Start_yr:(plat_year-1))) 
     
     # Get vector of plateau fmorts
-    plat <- rep((max_rel_F_M * mean_nat_mort), length.out = length((plat_year):n_years))
+    plat <- rep((max_rel_F_M * mean_nat_mort), length.out = length((plat_year):(n_years-1)))
     
     F_vec <- c(increasing, plat)
     
@@ -85,7 +85,7 @@ specify_F_pattern <- function(Start_F, Fish_Start_yr, F_type, n_years, max_rel_F
     # F stays constant initially
     constant_F <- seq(Start_F, Start_F, length.out = length(Fish_Start_yr:chngpoint))
     # Change point for F
-    change_F <- seq(Start_F, (max_rel_F_M * mean_nat_mort), length.out = length(chngpoint:n_years))
+    change_F <- seq(Start_F, (max_rel_F_M * mean_nat_mort), length.out = length(chngpoint:(n_years-1)))
     # F vector 
     F_vec <- c(constant_F, change_F[-1]) # Removing the first year from this sequence
     
@@ -103,7 +103,7 @@ specify_F_pattern <- function(Start_F, Fish_Start_yr, F_type, n_years, max_rel_F
     change_F <- seq(Start_F, (max_rel_F_M * mean_nat_mort), length.out = length(chngpoint:chngpoint_end))
     # Change point end (plateaus/stays constant now)
     change_F_const <- seq((max_rel_F_M * mean_nat_mort), (max_rel_F_M * mean_nat_mort),
-                          length.out = length(chngpoint_end:n_years))
+                          length.out = length(chngpoint_end:(n_years-1)))
     
     # Make F vector here
     F_vec <- c(constant_F, change_F[-1], change_F_const[-1])
@@ -128,7 +128,7 @@ specify_F_pattern <- function(Start_F, Fish_Start_yr, F_type, n_years, max_rel_F
     # Finally, make this stay constant at a given rate
     fish_mort_3 <- seq(((desc_rel_F_M * mean_nat_mort)), 
                        (desc_rel_F_M * mean_nat_mort), 
-                       length.out = length(chngpoint_end:n_years))
+                       length.out = length(chngpoint_end:(n_years-1)))
     
     # Now bind all of these fish morts into a vector
     F_vec <- c(fish_mort_1, fish_mort_2[-1], fish_mort_3[-3]) # Remove first element so it connects smoothly
@@ -165,7 +165,7 @@ get_Fs <- function(Start_F, Fish_Start_yr, F_type, n_years, max_rel_F_M, desc_re
     fish_mort[1:(Fish_Start_yr-1)[f],f,] <- 0
     
     # Set F pattern to fishery - feed in inputs to arguments above
-    fish_mort[Fish_Start_yr[f]:n_years,f,] <- specify_F_pattern(Start_F = Start_F[f], # Starting F
+    fish_mort[Fish_Start_yr[f]:(n_years-1),f,] <- specify_F_pattern(Start_F = Start_F[f], # Starting F
                                               Fish_Start_yr = Fish_Start_yr[f], # When fishery starts
                                               F_type = F_type[f], # What type of F pattern
                                               n_years = n_years, # Number of model years

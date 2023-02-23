@@ -76,6 +76,7 @@ Type objective_function<Type>::operator() ()
   PARAMETER(ln_M); // log natural mortality
   PARAMETER_VECTOR(ln_RecPars); // Vector of recruitment parameters
   PARAMETER(ln_SigmaRec); // log sigma for recruitment
+  PARAMETER_VECTOR(ln_N1Devs); // log recruitment deviations for inital age structure
   PARAMETER_VECTOR(ln_RecDevs); // log recruitment deviations
   
   // Indices of abundance
@@ -146,7 +147,7 @@ Type objective_function<Type>::operator() ()
   srv_comp_nLL.setZero();
   
   // TESTING
-  // DATA_MATRIX(N1_Sex_Test);
+  DATA_MATRIX(N1_Sex_Test);
   
   // MODEL STRUCTURE ----------------------------------------------
   // y = year, a = age, s = sex, f = fishery fleet, sf = survey fleet
@@ -232,8 +233,9 @@ Type objective_function<Type>::operator() ()
         } // end if statement for AR1_y
         
         for(int a = 0; a < n_ages; a++) {
-          // a + 1 because TMB indexes starting at 0
-          F_Slx(y,a,f,s) = Get_Selex(a + 1, F_Slx_model(f), tmp_ln_fish_selpars);
+          
+          // Get selex value here
+          F_Slx(y,a,f,s) = Get_Selex(a+1, F_Slx_model(f), tmp_ln_fish_selpars);
           
         } // a loop
       } // s loop
@@ -253,8 +255,8 @@ Type objective_function<Type>::operator() ()
           // Coerce selectivity parameters to vector
           vector<Type> tmp_ln_srv_selpars = ln_srv_selpars.transpose().col(f).col(s).col(b).vec();
           
-          // a + 1 because TMB indexes starting at 0
-          S_Slx(y,a,f,s) = Get_Selex(a + 1, S_Slx_model(f), tmp_ln_srv_selpars);
+          // Get selex value here
+          S_Slx(y,a,f,s) = Get_Selex(a+1, S_Slx_model(f), tmp_ln_srv_selpars);
           
         } // a loop
       } // s loop
@@ -297,7 +299,8 @@ Type objective_function<Type>::operator() ()
   
   // Loop through spawning biomass per recruit calculations
   for(int a = 0; a < n_ages; a++) {
-      SBPR_N(a) = exp(-M * Type(a)); // SPBR in Numbers
+      if(a < n_ages - 1) SBPR_N(a) = exp(-M * Type(ages(a))); // not plus group
+      if(a == n_ages - 1) SBPR_N(a) = exp(-M * Type(ages(a))) / (1 - exp(-M)); // plus group
       SBPR_SSB0(a) = SBPR_N(a) * WAA(0, a, 0) * MatAA(0, a, 0); // SBPR in SSB
   } // a loop
   
@@ -311,10 +314,14 @@ Type objective_function<Type>::operator() ()
       Type ln_RecInit = ln_RecPars(0); 
       
       // Fill in initial age-structure
-      NAA(0, a, s) = ( exp(ln_RecInit + ln_RecDevs(a) -M * Type(a) ) * 
-                     exp(-(ln_SigmaRec2/Type(2))) )  * Sex_Ratio(s);
+      if(a < n_ages - 1) {
+        NAA(0, a, s) = exp(ln_RecInit + ln_N1Devs(a) -M * Type(a) ) * exp(-(ln_SigmaRec2/Type(2)))  * Sex_Ratio(s);
+      } else{
+        NAA(0, a, s) = (exp(ln_RecInit -M * Type(a)) / (Type(1) - exp(-M))) * Sex_Ratio(s);
+      }
       
-      // NAA(0,a, s) = N1_Sex_Test(a,s);
+      // TESTING
+      NAA(0,a, s) = N1_Sex_Test(a,s);
       
       // Calculate SSB and Depletion at time 0 for sex 0 (Females)
       if(s == 0) SSB(0) += NAA(0, a, 0) * MatAA(0, a, 0) * WAA(0, a, 0);
@@ -331,15 +338,9 @@ Type objective_function<Type>::operator() ()
       // Recruitment and SSB Calculations ----------------------------------------------
       if(y >= 1) { 
         
-        if(s == 0) { // Calculate SSB
-          for(int a = 0; a < n_ages; a++) {
-            SSB(y) += NAA(y, a, 0) * WAA(y, a, 0) * MatAA(y, a, 0); 
-          } // a loop
-        }  // if sex = 0/females
-        
         if(rec_model == 0) { // Mean Recruitment
           Type ln_MeanRec = ln_RecPars(0); // Mean Recruitment parameter
-          NAA(y, 0, s) = exp( ln_MeanRec + ln_RecDevs(y - 1 + n_ages) 
+          NAA(y, 0, s) = exp( ln_MeanRec + ln_RecDevs(y-1) 
                            -(ln_SigmaRec2/Type(2)) )  * Sex_Ratio(s);
         } // if for rec_model == 0
         
@@ -354,7 +355,7 @@ Type objective_function<Type>::operator() ()
           Type BH_sec_part = (ssb0 * (Type(1) - h)) + SSB(y - 1) * ((Type(5)*h) - 1);
           
           // Get recruitment with process error here
-          NAA(y, 0, s) =  ( (BH_first_part / BH_sec_part) * exp(ln_RecDevs(y - 1 + n_ages) 
+          NAA(y, 0, s) =  ( (BH_first_part / BH_sec_part) * exp(ln_RecDevs(y - 1) 
                            -(ln_SigmaRec2/Type(2)) ) ) * Sex_Ratio(s);
           
         } // if BH Recruitment
@@ -375,6 +376,9 @@ Type objective_function<Type>::operator() ()
           NAA(y + 1, n_ages - 1, s) += (NAA(y, n_ages - 1, s) * SAA(y, n_ages - 1, s));
         } 
         
+        // If sex = Female
+        if(s == 0 && y >= 1) SSB(y) += NAA(y, a, 0) * WAA(y, a, 0) * MatAA(y, a, 0); 
+
         // Increment Numbers at age to get total biomass
         Total_Biom(y) += NAA(y, a, s) * WAA(y, a, s);
         
@@ -394,8 +398,8 @@ Type objective_function<Type>::operator() ()
         for(int a = 0; a < n_ages; a++) {
           
           // Baranov's Catch Equation
-          CAA(y, a, f, s) = NAA(y, a, s) * FAA(y, a, f, s) *  
-            (Type(1.0) - SAA(y, a, s))  / ZAA(y, a, s);
+          CAA(y, a, f, s) = NAA(y, a, s) * (Type(1.0) - exp(-ZAA(y, a, s))) *
+                            (FAA(y, a, f, s) / ZAA(y, a, s));
           
           // Get Aggregated Catch - Increment catch in biomass
           pred_catches(y, f) += ( CAA(y, a, f, s) * WAA(y, a, s) );
@@ -598,6 +602,10 @@ Type objective_function<Type>::operator() ()
   } // sc loop
   
   // Recruitment related stuff (likelihoods + derived quantities) ---------------------------------------------
+  for(int y = 0; y < ln_N1Devs.size(); y++) {
+    rec_nLL -= dnorm(ln_N1Devs(y), Type(0), exp(ln_SigmaRec), true);
+  } // Penalty for initial recruitment
+  
   for(int y = 0; y < ln_RecDevs.size(); y++) { 
     rec_nLL -= dnorm(ln_RecDevs(y), Type(0), exp(ln_SigmaRec), true);
   } // Penalty for all recruitment deviations
@@ -638,6 +646,7 @@ Type objective_function<Type>::operator() ()
   ADREPORT(Total_Fy);
   ADREPORT(Total_Rec);
   ADREPORT(Total_Biom);
+  ADREPORT(ssb0)
 
   return jnLL;
   
