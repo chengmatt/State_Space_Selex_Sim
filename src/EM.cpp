@@ -361,6 +361,13 @@ Type objective_function<Type>::operator() ()
         } // if BH Recruitment
       } // only estimate recruitment if y >= 1
       
+      // If sex = Female
+      if(s == 0 && y >= 1) {
+        for(int a = 0; a < n_ages; a++) {
+          SSB(y) += NAA(y, a, 0) * WAA(y, a, 0) * MatAA(y, a, 0); 
+        } // end a loop
+      } // end if s = female
+
       // Increment total recruitment here
       Total_Rec(y) += NAA(y, 0, s);
       
@@ -376,9 +383,6 @@ Type objective_function<Type>::operator() ()
           NAA(y + 1, n_ages - 1, s) += (NAA(y, n_ages - 1, s) * SAA(y, n_ages - 1, s));
         } 
         
-        // If sex = Female
-        if(s == 0 && y >= 1) SSB(y) += NAA(y, a, 0) * WAA(y, a, 0) * MatAA(y, a, 0); 
-
         // Increment Numbers at age to get total biomass
         Total_Biom(y) += NAA(y, a, s) * WAA(y, a, s);
         

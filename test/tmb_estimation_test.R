@@ -92,14 +92,12 @@
                                                       nrow = length(years), 
                                                       ncol = 2),
                           use_fish_index = FALSE,
-                          rec_model = "mean_rec", 
+                          rec_model = "BH", 
                           F_Slx_Model_Input = c("logistic", "logistic"),
                           S_Slx_Model_Input = c("logistic"), 
                           time_selex = "None",
                           n_time_selex_pars = NULL,
-                          fix_pars = c("ln_SigmaRec", "ln_q_fish", "ln_RecPars",
-                                       "ln_M", "ln_srv_selpars", "ln_fish_selpars"
-                                       , "ln_Fy", "ln_N1Devs", "ln_RecDevs"),
+                          fix_pars = c("ln_SigmaRec", "ln_q_fish", "ln_h"),
                           sim = sim)
   
   # map <- list(ssb0 = factor(NA))
