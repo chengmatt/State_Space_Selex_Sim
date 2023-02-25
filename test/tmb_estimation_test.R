@@ -81,8 +81,7 @@
   
   for(sim in 1:n_sims){
     
-    sim=30
-  
+
   # Prepare inputs here
   input <- prepare_EM_input(years = years,
                           n_fleets = 1, 
@@ -128,7 +127,7 @@
   # par(mfrow = c(3, 1))
   year <- 31
   plot(model$model_fxn$rep$NAA[year,,1], type = "l", xlab ="Age",
-       ylab = "Numbers", title = paste("dataset 1", "run 2"))
+       ylab = "Numbers")
   lines(N_at_age[100+year-1,,1,sim], type = "l", col = "red")
 
   # Get parameter estimates

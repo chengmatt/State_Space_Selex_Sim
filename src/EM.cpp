@@ -322,13 +322,14 @@ Type objective_function<Type>::operator() ()
       
       // TESTING
       NAA(0,a, s) = N1_Sex_Test(a,s);
-      
-      // Calculate SSB and Depletion at time 0 for sex 0 (Females)
-      if(s == 0) SSB(0) += NAA(0, a, 0) * MatAA(0, a, 0) * WAA(0, a, 0);
-      
+
     } //  a loop
   } // s loop
   
+  // Calculate SSB at time 0
+  SSB(0) = sum(NAA.col(0).transpose().col(0) *
+               MatAA.col(0).transpose().col(0) *
+               WAA.col(0).transpose().col(0));  
   
   // Population Dynamics Equations ----------------------------------------------
   for(int y = 0; y < n_years; y++) {
