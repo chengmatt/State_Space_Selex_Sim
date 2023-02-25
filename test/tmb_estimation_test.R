@@ -31,7 +31,7 @@
                 F_type = c("Contrast"),
                 yr_chng = c(115), 
                 yr_chng_end = 130,
-                fish_Neff_max = c(500), 
+                fish_Neff_max = c(200), 
                 srv_Neff_max = c(200),
                 fish_CV = c(0.1),
                 srv_CV = c(0.1), 
@@ -80,6 +80,8 @@
   
   
   for(sim in 1:n_sims){
+    
+    sim=30
   
   # Prepare inputs here
   input <- prepare_EM_input(years = years,
@@ -97,8 +99,10 @@
                           S_Slx_Model_Input = c("logistic"), 
                           time_selex = "None",
                           n_time_selex_pars = NULL,
-                          fix_pars = c("ln_SigmaRec", "ln_q_fish",
-                                       "ln_RecDevs", "ln_N1Devs", "ln_M"),
+                          fix_pars = c("ln_SigmaRec", "ln_q_fish", "ln_RecPars",
+                                       "ln_N1Devs", "ln_RecDevs", 
+                                       "ln_M", "ln_fish_selpars", "ln_srv_selpars",
+                                       "ln_Fy"),
                           sim = sim)
   
   input$parameters$ln_srv_selpars[] <- log(c(2, 3, 0.5, 0.4))
@@ -114,20 +118,26 @@
                                 silent = T, getsdrep = TRUE), error = function(e){e})
   
   # Check model convergence
-  convergence_status <- check_model_convergence(mle_optim = model$mle_optim, 
-                                              mod_rep = model$model_fxn,
-                                              sd_rep = model$sd_rep, 
-                                              min_grad = 0.001)
+  # convergence_status <- check_model_convergence(mle_optim = model$mle_optim, 
+                                              # mod_rep = model$model_fxn,
+                                              # sd_rep = model$sd_rep, 
+                                              # min_grad = 0.001)
   conv[sim] <- convergence_status$Convergence
   max_par[sim] <- convergence_status$Max_Grad_Par
   
+  # par(mfrow = c(3, 1))
+  year <- 31
+  plot(model$model_fxn$rep$NAA[year,,1], type = "l", xlab ="Age",
+       ylab = "Numbers", title = paste("dataset 1", "run 2"))
+  lines(N_at_age[100+year-1,,1,sim], type = "l", col = "red")
+
   # Get parameter estimates
   M_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_M", trans = "log") %>%
   mutate(t = mean(Mort_at_age), type = "mortality", sim = sim, conv = conv[sim])
   q_srv_df <- extract_parameter_vals(sd_rep = model$sd_rep,   par = "ln_q_srv", trans = "log") %>%
   mutate(t = mean(q_Surv), type = "q_surv", sim = sim, conv = conv[sim])
   meanrec_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_RecPars", trans = "log") %>%
-  mutate(t = r0, type = "r0/meanrec", sim = sim, conv = conv[sim])
+  mutate(t = c(r0), type = c("r0"), sim = sim, conv = conv[sim])
   # fish_sel_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_fish_selpars", trans = "log") %>%
   # mutate(t = c(3, 5, 0.8, 0.8), type = c("f1", "f2", "f1d", "f2d"), sim = sim, conv = conv[sim])
   # Bind parameter estimates
@@ -152,10 +162,10 @@
   f_all <- rbind(f_all, f_df)
   
   # Check depletion rates
-  # depletion_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "Depletion") %>%
-  # mutate(t = (SSB[Fish_Start_yr[1]:(n_years-1),sim]/ssb0),
-  # sim = sim, conv = conv[sim], year = Fish_Start_yr[1]:(n_years-1))
-  # depletion_all <- rbind(depletion_df, depletion_all) 
+  depletion_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "Depletion") %>%
+  mutate(t = (SSB[Fish_Start_yr[1]:(n_years-1),sim]/ssb0),
+  sim = sim, conv = conv[sim], year = Fish_Start_yr[1]:(n_years-1))
+  depletion_all <- rbind(depletion_df, depletion_all)
   
   # # Check survey mean age
   srv_mean_ages <- extract_mean_age_vals(mod_rep = model$model_fxn, comp_name = "pred_srv_age_comps",
@@ -175,7 +185,7 @@
   
   }
    
-  
+
   # Summary Checks ----------------------------------------------------------
   
   # Get percentiles
@@ -201,11 +211,12 @@
                                  par_name = "Mean Predicted Survey Age",
                                  group_vars = c("year","fleet", "sex"))
 
-  # depletion_sum <-  get_RE_precentiles(df = depletion_all %>% filter(conv == "Converged"),
-  #                                      est_val_col = 1, true_val_col = 5,
-  #                                      par_name = "Depletion (SSB / SSB0)", group_vars = "year")
+depletion_sum <-  get_RE_precentiles(df = depletion_all %>% filter(conv == "Converged"),
+                                     est_val_col = 1, true_val_col = 5,
+                                     par_name = "Depletion (SSB / SSB0)", group_vars = "year")
   
-  all <- rbind(rec_sum, ssb_sum, f_sum,fish_mu_age_sum, srv_mu_age_sum ) 
+  all <- rbind(rec_sum, ssb_sum, f_sum,fish_mu_age_sum, srv_mu_age_sum,
+               depletion_sum) 
 
 
 # Get relative error time series
@@ -215,10 +226,10 @@
            facet_name = par_name))
   
 
-par(mfrow = c(3, 1))
-plot_RE_ts_base(data = all, par_name = "Spawning Stock Biomass", ylim = c(-0.3, 0.3))
-plot_RE_ts_base(data = all, par_name = "Total Fishing Mortality", ylim = c(-0.3, 0.3))
-plot_RE_ts_base(data = all, par_name = "Total Recruitment", ylim = c(-0.3, 0.3))
+# par(mfrow = c(3, 1))
+# plot_RE_ts_base(data = all, par_name = "Spawning Stock Biomass", ylim = c(-0.3, 0.3))
+# plot_RE_ts_base(data = all, par_name = "Total Fishing Mortality", ylim = c(-0.3, 0.3))
+# plot_RE_ts_base(data = all, par_name = "Total Recruitment", ylim = c(-0.3, 0.3))
 
 # Parameter estimates
 par_df <- par_all %>% mutate(RE = (mle_val - t ) / t) %>% 

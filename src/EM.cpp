@@ -331,7 +331,6 @@ Type objective_function<Type>::operator() ()
   
   
   // Population Dynamics Equations ----------------------------------------------
-  
   for(int y = 0; y < n_years; y++) {
     for(int s = 0; s < n_sexes; s++) {
       
@@ -356,7 +355,7 @@ Type objective_function<Type>::operator() ()
           
           // Get recruitment with process error here
           NAA(y, 0, s) =  ( (BH_first_part / BH_sec_part) * exp(ln_RecDevs(y - 1) 
-                                                                  -(ln_SigmaRec2/Type(2)) ) ) * Sex_Ratio(s);
+                          -(ln_SigmaRec2/Type(2)) ) ) * Sex_Ratio(s);
           
         } // if BH Recruitment
       } // only estimate recruitment if y >= 1
@@ -376,14 +375,18 @@ Type objective_function<Type>::operator() ()
           NAA(y + 1, n_ages - 1, s) += (NAA(y, n_ages - 1, s) * SAA(y, n_ages - 1, s));
         } 
         
-        // If sex = Female
-        if(s == 0 && y >= 1) SSB(y) += NAA(y, a, 0) * WAA(y, a, 0) * MatAA(y, a, 0); 
-        
         // Increment Numbers at age to get total biomass
         Total_Biom(y) += NAA(y, a, s) * WAA(y, a, s);
         
       } // end ages loop
     } // end sex loop
+    
+    if(y>=1) { // SSB calculations here
+      SSB(y) = sum(NAA.col(0).transpose().col(y) *
+                   MatAA.col(0).transpose().col(y) *
+                   WAA.col(0).transpose().col(y));     
+    } // end if y >= 1
+    
   } // end year loop
   
   // Get Depletion here
