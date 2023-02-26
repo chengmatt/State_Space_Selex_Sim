@@ -290,7 +290,7 @@ prepare_EM_input <- function(years,
   # Set up parameters
   pars$ln_SigmaRec <- sigma_rec # recruitment variability
   pars$ln_RecDevs <- rec_devs[years[-1],sim] # rec devs
-  pars$ln_N1Devs <- rnorm(length(years)-1, 0, 0.0) # rec devs
+  pars$ln_N1Devs <- rnorm(length(years), 0, 0.0) # rec devs
   pars$ln_M <- log(mean(Mort_at_age)) # natural mortality
   
   # row sums for fish mort

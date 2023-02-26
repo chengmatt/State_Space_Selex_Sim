@@ -35,7 +35,7 @@
                 srv_Neff_max = c(200),
                 fish_CV = c(0.1),
                 srv_CV = c(0.1), 
-                catch_CV = c(0.0), 
+                catch_CV = c(0.01), 
                 Neff_Fish_Time = "Constant", 
                 fixed_Neff = c(30),
                 Mort_Time = "Constant", 
@@ -78,14 +78,13 @@
   
   compile_tmb(wd = here("src"), cpp = "EM.cpp")
   
-  
-  for(sim in 1:n_sims){
+  for(sim in sim:n_sims){
     
 
   # Prepare inputs here
   input <- prepare_EM_input(years = years,
                           n_fleets = 1, 
-                          catch_cv = c(0.01),
+                          catch_cv = c(1e-2),
                           F_Slx_Blocks_Input = matrix(c(rep(0)),
                                                       nrow = length(years),
                                                       ncol = 1), # fishery blocks
@@ -98,10 +97,7 @@
                           S_Slx_Model_Input = c("logistic"), 
                           time_selex = "None",
                           n_time_selex_pars = NULL,
-                          fix_pars = c("ln_SigmaRec", "ln_q_fish", "ln_RecPars",
-                                       "ln_N1Devs", "ln_RecDevs", 
-                                       "ln_M", "ln_fish_selpars", "ln_srv_selpars",
-                                       "ln_Fy"),
+                          fix_pars = c("ln_SigmaRec", "ln_q_fish", "ln_h"),
                           sim = sim)
   
   input$parameters$ln_srv_selpars[] <- log(c(2, 3, 0.5, 0.4))
@@ -117,17 +113,17 @@
                                 silent = T, getsdrep = TRUE), error = function(e){e})
   
   # Check model convergence
-  # convergence_status <- check_model_convergence(mle_optim = model$mle_optim, 
-                                              # mod_rep = model$model_fxn,
-                                              # sd_rep = model$sd_rep, 
-                                              # min_grad = 0.001)
+  convergence_status <- check_model_convergence(mle_optim = model$mle_optim,
+                                                mod_rep = model$model_fxn,
+                                                sd_rep = model$sd_rep,
+                                                min_grad = 0.001)
   conv[sim] <- convergence_status$Convergence
   max_par[sim] <- convergence_status$Max_Grad_Par
   
   # par(mfrow = c(3, 1))
   year <- 31
   plot(model$model_fxn$rep$NAA[year,,1], type = "l", xlab ="Age",
-       ylab = "Numbers")
+       ylab = "Numbers", main = paste("dataset 1", "run 2"))
   lines(N_at_age[100+year-1,,1,sim], type = "l", col = "red")
 
   # Get parameter estimates
@@ -179,6 +175,11 @@
                                         n_fish_true_fleets = 1) %>% mutate(conv = conv[sim])
   fish_mu_age <- rbind(fish_mu_age, fish_mean_ages)
   
+  # Get SSB0
+  ssb0_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "ssb0") %>% 
+    mutate(t = ssb0, sim = sim, conv = conv[sim])
+  ssb0_all <- rbind(ssb0_all, ssb0_df)
+  
   print(paste("done w/  sim = ", sim))
   print(conv[sim])
   
@@ -210,7 +211,7 @@
                                  par_name = "Mean Predicted Survey Age",
                                  group_vars = c("year","fleet", "sex"))
 
-depletion_sum <-  get_RE_precentiles(df = depletion_all %>% filter(conv == "Converged"),
+  depletion_sum <-  get_RE_precentiles(df = depletion_all %>% filter(conv == "Converged"),
                                      est_val_col = 1, true_val_col = 5,
                                      par_name = "Depletion (SSB / SSB0)", group_vars = "year")
   
@@ -233,13 +234,16 @@ depletion_sum <-  get_RE_precentiles(df = depletion_all %>% filter(conv == "Conv
 # Parameter estimates
 par_df <- par_all %>% mutate(RE = (mle_val - t ) / t) %>% 
   filter(conv == "Converged")
+ssb0_all_df <- ssb0_all %>% mutate(RE = (mle_val - t ) / t) %>% 
+  filter(conv == "Converged")
 
-par_df %>% group_by(type) %>% summarize(mle_val = median(mle_val))
+# par_df %>% group_by(type) %>% summarize(mle_val = median(mle_val))
 
 # Quick summary stats
 par_sum <- get_RE_precentiles(df = par_all %>% filter(conv == "Converged"), 
                               est_val_col = 2, true_val_col = 7, 
                               par_name = "", group_vars = "type")
+
 
 (par_plot <- ggplot(par_df, aes(x = RE, fill = type)) +
 geom_density(alpha = 0.2) +
@@ -261,8 +265,24 @@ theme(strip.text = element_text(size = 13),
       axis.text = element_text(size = 13, color = "black"),
       legend.position = "none", legend.text = element_text(size = 15)))
 
+(ssb0_all_plot <- ggplot(ssb0_all_df, aes(x = RE)) +
+    geom_density(alpha = 0.2) +
+    geom_vline(aes(xintercept = median(RE)), linetype = 2,
+               size = 0.85, col = "red", alpha = 1) +
+    geom_vline(aes(xintercept = 0), linetype = 2,
+               size = 0.85, col = "black", alpha = 1) +
+    # coord_cartesian(xlim = c(-0.3, 0.3)) +
+    ggsci::scale_color_jco() +
+    ggsci::scale_fill_jco() +
+    labs(x = "Relative Error", y = "Probability Density", linetype = "", color = "") +
+    theme_bw() + 
+    theme(strip.text = element_text(size = 13),
+          axis.title = element_text(size = 15),
+          axis.text = element_text(size = 13, color = "black"),
+          legend.position = "none", legend.text = element_text(size = 15)))
+
 plot_grid(par_plot, est_plot, ncol = 1, align = "hv", axis = "bl",
-          rel_heights = c(0.100, 1))
+          rel_heights = c(0.3, 1))
 
 f_all %>% 
   filter(conv == "Converged") %>% 

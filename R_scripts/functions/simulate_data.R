@@ -122,7 +122,7 @@ simulate_data <- function(fxn_path,
         } # end sex loop
         
         # Recruitment at first year = 0
-        rec_total[y, sim] <- 50
+        rec_total[y, sim] <- 0
         
         # Now, calculate our SSB in the first year (only females matter in this case for calculating SSB)
         SSB[y,sim] <- sum(mat_at_age[y,,1,sim] * Biom_at_age[y,,1,sim], na.rm = TRUE)
