@@ -309,8 +309,8 @@ prepare_EM_input <- function(years,
                          ncol = n_fleets, nrow = length(years))
   }
   
-  pars$ln_q_fish <- rnorm(n_fish_indices, 0, 0.0) # catchability for fishery
-  pars$ln_q_srv <- rnorm(n_srv_indices, 0, 0.0) # catchability for survey
+  pars$logit_q_fish <- rnorm(n_fish_indices, 0, 0.0) # catchability for fishery
+  pars$logit_q_srv <- rnorm(n_srv_indices, 0, 0.0) # catchability for survey
   
   if(rec_model == "mean_rec") {
     pars$ln_RecPars <- as.vector(c(mu_rec)) # Mean Recruitment (1 parameter)
@@ -403,4 +403,3 @@ prepare_EM_input <- function(years,
   return(list(data = data, parameters = pars, map = map))
   
 } # end function
-

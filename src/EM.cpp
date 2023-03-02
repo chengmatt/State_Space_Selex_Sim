@@ -80,8 +80,8 @@ Type objective_function<Type>::operator() ()
   PARAMETER_VECTOR(ln_RecDevs); // log recruitment deviations
   
   // Indices of abundance
-  PARAMETER_VECTOR(ln_q_fish); // log catchability for fishery; n_fish_indices 
-  PARAMETER_VECTOR(ln_q_srv); // log catchability for survey; n_srv_indices 
+  PARAMETER_VECTOR(logit_q_fish); // log catchability for fishery; n_fish_indices 
+  PARAMETER_VECTOR(logit_q_srv); // log catchability for survey; n_srv_indices 
   
   // Fishery and selectivity parameters
   PARAMETER_MATRIX(ln_Fy); // Annual Fishing Mortality; n_years * n_fleets
@@ -299,8 +299,7 @@ Type objective_function<Type>::operator() ()
   
   // Loop through spawning biomass per recruit calculations
   for(int a = 0; a < n_ages; a++) {
-    if(a < n_ages - 1) SBPR_N(a) = exp(-M * Type(a)); // not plus group
-    if(a == n_ages - 1) SBPR_N(a) = exp(-M * Type(a)) / (1 - exp(-M)); // plus group
+    SBPR_N(a) = exp(-M * Type(a)); 
     SBPR_SSB0(a) = SBPR_N(a) * WAA(0, a, 0) * MatAA(0, a, 0); // SBPR in SSB
   } // a loop
   
@@ -314,57 +313,53 @@ Type objective_function<Type>::operator() ()
       Type ln_RecInit = ln_RecPars(0); 
       
       // Fill in initial age-structure
-      NAA(0, a, s) = exp(ln_RecInit + ln_N1Devs(a) -M * Type(a) 
-                       -(ln_SigmaRec2/Type(2))) * Sex_Ratio(s);
-
+      // if(a < n_ages - 1) {
+        NAA(0, a, s) = exp(ln_RecInit + ln_N1Devs(a) 
+                         -(ln_SigmaRec2/Type(2)) -Type(a) * M) * Sex_Ratio(s); 
+      // } else{
+        // NAA(0, a, s) = (exp(ln_RecInit) * (exp(ln_N1Devs(a) -M * Type(a)) /
+                       // ( 1 - exp(-M)))) * Sex_Ratio(s);
+      // }
+      
       // TESTING
       // NAA(0,a, s) = N1_Sex_Test(a,s);
-
+      
     } //  a loop
   } // s loop
-  
-  // Calculate SSB and depletion at time 0
-  SSB(0) = sum(NAA.col(0).transpose().col(0) *
-               MatAA.col(0).transpose().col(0) *
-               WAA.col(0).transpose().col(0));  
-  Depletion(0) = SSB(0)/ssb0; // Depletion
   
   // Population Dynamics Equations ----------------------------------------------
   for(int y = 0; y < n_years; y++) {
     for(int s = 0; s < n_sexes; s++) {
-      
-      // Recruitment and SSB Calculations ----------------------------------------------
-      if(y >= 1) { 
-        
-        if(rec_model == 0) { // Mean Recruitment
-          Type ln_MeanRec = ln_RecPars(0); // Mean Recruitment parameter
-          NAA(y, 0, s) = exp( ln_MeanRec + ln_RecDevs(y-1) 
-                             -(ln_SigmaRec2/Type(2)) )  * Sex_Ratio(s);
-        } // if for rec_model == 0
-        
-        if(rec_model == 1) { // Beverton Holt Recruitment
-          
-          // Define parameters 
-          Type R0 = exp(ln_RecPars(0)); // Virgin Recruitment
-          Type h = ln_RecPars(1); // Steepness in normal space
-          
-          // Define BH components
-          Type BH_first_part = Type(4) * h * R0 * SSB(y - 1);
-          Type BH_sec_part = (ssb0 * (Type(1) - h)) + SSB(y - 1) * ((Type(5)*h) - 1);
-          Type ln_BH_tmp_rec = log(BH_first_part/BH_sec_part); // Deterministic BH in log space
-          
-          // Get recruitment with process error here
-          NAA(y, 0, s) =  exp(ln_BH_tmp_rec + ln_RecDevs(y - 1) 
-                            -(ln_SigmaRec2/Type(2)) ) * Sex_Ratio(s);
-          
-        } // if BH Recruitment
-      } // only estimate recruitment if y >= 1
-      
-      // Increment total recruitment here
-      Total_Rec(y) += NAA(y, 0, s);
-      
+
       // Project Numbers At Age Forward ----------------------------------------
       for(int a = 0; a < n_ages; a++) {
+
+        // Recruitment ----------------------------------------------
+        if(y >= 1 && a == 0) { 
+          
+          if(rec_model == 0) { // Mean Recruitment
+            Type ln_MeanRec = ln_RecPars(0); // Mean Recruitment parameter
+            NAA(y, 0, s) = exp( ln_MeanRec + ln_RecDevs(y-1) 
+                                  -(ln_SigmaRec2/Type(2)) )  * Sex_Ratio(s);
+          } // if for rec_model == 0
+          
+          if(rec_model == 1) { // Beverton Holt Recruitment
+            
+            // Define parameters 
+            Type R0 = exp(ln_RecPars(0)); // Virgin Recruitment
+            Type h = ln_RecPars(1); // Steepness in normal space
+            
+            // Define BH components
+            Type BH_first_part = Type(4) * h * R0 * SSB(y - 1);
+            Type BH_sec_part = (ssb0 * (Type(1) - h)) + SSB(y - 1) * ((Type(5)*h) - 1);
+            Type ln_BH_tmp_rec = log(BH_first_part/BH_sec_part); // Deterministic BH in log space
+            
+            // Get recruitment with process error here
+            NAA(y, 0, s) =  exp(ln_BH_tmp_rec + ln_RecDevs(y - 1) 
+                                  -(ln_SigmaRec2/Type(2)) ) * Sex_Ratio(s);
+            
+          } // if BH Recruitment
+        } // only estimate recruitment if y >= 1
         
         // Project ages and years forward
         if(a < (n_ages - 1)) { // Not in Plus Group
@@ -380,18 +375,18 @@ Type objective_function<Type>::operator() ()
         Total_Biom(y) += NAA(y, a, s) * WAA(y, a, s);
         
       } // end ages loop
+      
+      // Increment total recruitment here
+      Total_Rec(y) += NAA(y, 0, s);
+      
     } // end sex loop
     
-    if(y >= 1) { // sum SSB calculations here for females only
-      SSB(y) = sum(NAA.col(0).transpose().col(y) *
-                   MatAA.col(0).transpose().col(y) *
-                   WAA.col(0).transpose().col(y)); 
-      // Get depletion here
-      Depletion(y) = SSB(y) / ssb0;
-    } // end if y >= 1
-    
+    // Calculate SSB here
+    SSB(y) = sum(NAA.col(0).transpose().col(y) * 
+                 MatAA.col(0).transpose().col(y) *
+                 WAA.col(0).transpose().col(y)); 
+
   } // end year loop
-  
   
   // Catch ----------------------------------------------
   
@@ -403,7 +398,7 @@ Type objective_function<Type>::operator() ()
           
           // Baranov's Catch Equation
           CAA(y, a, f, s) = NAA(y, a, s) * (Type(1.0) - exp(-ZAA(y, a, s))) *
-                            (FAA(y, a, f, s) / ZAA(y, a, s));
+            (FAA(y, a, f, s) / ZAA(y, a, s));
           
           // Get Aggregated Catch - Increment catch in biomass
           pred_catches(y, f) += ( CAA(y, a, f, s) * WAA(y, a, s) );
@@ -426,11 +421,13 @@ Type objective_function<Type>::operator() ()
       for(int s = 0; s < n_sexes; s++) {
         for(int a = 0; a < n_ages; a++) {
           // Increment to get total index, conditional on selectivity
-          pred_fish_indices(y, fi) += NAA(y, a, s) * WAA(y, a, s) *  F_Slx(y, a, fi, s);
+          pred_fish_indices(y, fi) +=  NAA(y, a, s) * WAA(y, a, s) *  F_Slx(y, a, fi, s);
         } // a loop
       } // s loop
-      // Scale index by catchability here
-      pred_fish_indices(y, fi) = exp(ln_q_fish(fi))  * pred_fish_indices(y, fi) ; 
+      // Inverse logit transformation
+      Type tmp_q_fish = Type(0) + (Type(1) - Type(0))/ (1 + exp(-logit_q_fish(fi)));
+      // Scale by catchability
+      pred_fish_indices(y, fi) *= tmp_q_fish; 
     } // y loop
   } // fi loop
   
@@ -440,11 +437,12 @@ Type objective_function<Type>::operator() ()
       for(int s = 0; s < n_sexes; s++) {
         for(int a = 0; a < n_ages; a++) {
           // Increment to get scale index conditional on selectivity
-          pred_srv_indices(y, si) +=  NAA(y, a, s) * S_Slx(y, a, si, s);
+          pred_srv_indices(y, si) += NAA(y, a, s) * S_Slx(y, a, si, s);
         } // a loop
       } // s loop
-      // Scale index by catchability here
-      pred_srv_indices(y, si) = exp(ln_q_srv(si)) * pred_srv_indices(y, si); 
+      // Inverse logit
+      Type tmp_q_srv = Type(0) + (Type(1) - Type(0))/ (1 + exp(-logit_q_srv(si))); 
+      pred_srv_indices(y, si) *= tmp_q_srv; // Scale by catchability
     } // y loop
   } // si loop  
   
@@ -510,11 +508,10 @@ Type objective_function<Type>::operator() ()
       
       // Get likelihood here
       catch_nLL(y, f) -= use_catch(y, f) * dnorm(log(obs_catches(y, f)),
-                         log(pred_catches(y, f)) - pow(catch_sd(f), 2), catch_sd(f), true);
+                         log(pred_catches(y, f)), catch_sd(f), true);
       
       SIMULATE{ // Simulate catch
-        obs_catches(y, f) = exp(rnorm(log(pred_catches(y, f)) 
-                           -pow(catch_sd(f), 2), catch_sd(f) ));
+        obs_catches(y, f) = exp(rnorm(log(pred_catches(y, f)), catch_sd(f) ));
       } // Simulation statement
       
     } // f loop
@@ -533,11 +530,10 @@ Type objective_function<Type>::operator() ()
       
       // Likelihood calculations
       fish_index_nLL(y, fi) -= use_fish_index(y, fi) * dnorm(log(obs_fish_indices(y, fi)), 
-                               log(pred_fish_indices(y, fi)) - pow(fish_sd(fi), 2), fish_sd(fi), true);
+                               log(pred_fish_indices(y, fi)), fish_sd(fi), true);
       
       SIMULATE{ // Simulate Fishery Index
-        obs_fish_indices(y, fi) = exp(rnorm(log(pred_fish_indices(y, fi))
-                                     -pow(fish_sd(fi), 2), fish_sd(fi))); 
+        obs_fish_indices(y, fi) = exp(rnorm(log(pred_fish_indices(y, fi)), fish_sd(fi))); 
       } // Simulation statement
       
     } // fi loop
@@ -549,11 +545,10 @@ Type objective_function<Type>::operator() ()
       
       // Likelihood calculations
       srv_index_nLL(y, si) -= use_srv_index(y, si) * dnorm(log(obs_srv_indices(y, si)), 
-                              log(pred_srv_indices(y, si)) - pow(srv_sd(si), 2), srv_sd(si), true); 
+                              log(pred_srv_indices(y, si)), srv_sd(si), true); 
       
       SIMULATE{ // Simulate Survey Index
-        obs_srv_indices(y, si) = exp(rnorm(log(pred_srv_indices(y, si))
-                                 - pow(srv_sd(si), 2), srv_sd(si))); 
+        obs_srv_indices(y, si) = exp(rnorm(log(pred_srv_indices(y, si)), srv_sd(si))); 
       } // Simulation statement
       
     } // y loop
@@ -602,7 +597,7 @@ Type objective_function<Type>::operator() ()
     } // y loop
   } // sc loop
   
-  // Recruitment related stuff (likelihoods + derived quantities) ---------------------------------------------
+  // Recruitment and derived quantities ---------------------------------------------
   for(int y = 0; y < ln_N1Devs.size(); y++) {
     rec_nLL -= dnorm(ln_N1Devs(y), Type(0), exp(ln_SigmaRec), true);
   } // Penalty for initial recruitment
@@ -610,6 +605,9 @@ Type objective_function<Type>::operator() ()
   for(int y = 0; y < ln_RecDevs.size(); y++) { 
     rec_nLL -= dnorm(ln_RecDevs(y), Type(0), exp(ln_SigmaRec), true);
   } // Penalty for all recruitment deviations
+  
+  // Calculate Depletion at time 0
+  Depletion = SSB/ssb0; 
   
   // Add to joint nLL   
   jnLL = rec_nLL + sum(srv_comp_nLL)+ sum(fish_comp_nLL) + 
