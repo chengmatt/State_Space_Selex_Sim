@@ -299,7 +299,8 @@ Type objective_function<Type>::operator() ()
   
   // Loop through spawning biomass per recruit calculations
   for(int a = 0; a < n_ages; a++) {
-    SBPR_N(a) = exp(-M * Type(a)); 
+    if(a < n_ages - 1) SBPR_N(a) = exp(-M * Type(a)); 
+    if(a == n_ages - 1) SBPR_N(a) = exp(-M * Type(a)) / (1 - exp(-M)); 
     SBPR_SSB0(a) = SBPR_N(a) * WAA(0, a, 0) * MatAA(0, a, 0); // SBPR in SSB
   } // a loop
   
@@ -312,15 +313,9 @@ Type objective_function<Type>::operator() ()
       // Define initial recruitment parameter
       Type ln_RecInit = ln_RecPars(0); 
       
-      // Fill in initial age-structure
-      // if(a < n_ages - 1) {
-        NAA(0, a, s) = exp(ln_RecInit + ln_N1Devs(a) 
-                         -(ln_SigmaRec2/Type(2)) -Type(a) * M) * Sex_Ratio(s); 
-      // } else{
-        // NAA(0, a, s) = (exp(ln_RecInit) * (exp(ln_N1Devs(a) -M * Type(a)) /
-                       // ( 1 - exp(-M)))) * Sex_Ratio(s);
-      // }
-      
+      // Fill in initial age-structure (independent parameters)
+      NAA(0, a, s) = exp(ln_N1Devs(a)) * Sex_Ratio(s);
+
       // TESTING
       // NAA(0,a, s) = N1_Sex_Test(a,s);
       
@@ -330,10 +325,10 @@ Type objective_function<Type>::operator() ()
   // Population Dynamics Equations ----------------------------------------------
   for(int y = 0; y < n_years; y++) {
     for(int s = 0; s < n_sexes; s++) {
-
+      
       // Project Numbers At Age Forward ----------------------------------------
       for(int a = 0; a < n_ages; a++) {
-
+        
         // Recruitment ----------------------------------------------
         if(y >= 1 && a == 0) { 
           
@@ -381,11 +376,11 @@ Type objective_function<Type>::operator() ()
       
     } // end sex loop
     
-    // Calculate SSB here
+    // Calculate SSB here (Indexing 0 for females)
     SSB(y) = sum(NAA.col(0).transpose().col(y) * 
-                 MatAA.col(0).transpose().col(y) *
-                 WAA.col(0).transpose().col(y)); 
-
+      MatAA.col(0).transpose().col(y) *
+      WAA.col(0).transpose().col(y)); 
+    
   } // end year loop
   
   // Catch ----------------------------------------------
@@ -398,7 +393,7 @@ Type objective_function<Type>::operator() ()
           
           // Baranov's Catch Equation
           CAA(y, a, f, s) = NAA(y, a, s) * (Type(1.0) - exp(-ZAA(y, a, s))) *
-            (FAA(y, a, f, s) / ZAA(y, a, s));
+                           (FAA(y, a, f, s) / ZAA(y, a, s));
           
           // Get Aggregated Catch - Increment catch in biomass
           pred_catches(y, f) += ( CAA(y, a, f, s) * WAA(y, a, s) );
@@ -508,7 +503,7 @@ Type objective_function<Type>::operator() ()
       
       // Get likelihood here
       catch_nLL(y, f) -= use_catch(y, f) * dnorm(log(obs_catches(y, f)),
-                         log(pred_catches(y, f)), catch_sd(f), true);
+                log(pred_catches(y, f)), catch_sd(f), true);
       
       SIMULATE{ // Simulate catch
         obs_catches(y, f) = exp(rnorm(log(pred_catches(y, f)), catch_sd(f) ));
@@ -530,7 +525,7 @@ Type objective_function<Type>::operator() ()
       
       // Likelihood calculations
       fish_index_nLL(y, fi) -= use_fish_index(y, fi) * dnorm(log(obs_fish_indices(y, fi)), 
-                               log(pred_fish_indices(y, fi)), fish_sd(fi), true);
+                     log(pred_fish_indices(y, fi)), fish_sd(fi), true);
       
       SIMULATE{ // Simulate Fishery Index
         obs_fish_indices(y, fi) = exp(rnorm(log(pred_fish_indices(y, fi)), fish_sd(fi))); 
@@ -545,7 +540,7 @@ Type objective_function<Type>::operator() ()
       
       // Likelihood calculations
       srv_index_nLL(y, si) -= use_srv_index(y, si) * dnorm(log(obs_srv_indices(y, si)), 
-                              log(pred_srv_indices(y, si)), srv_sd(si), true); 
+                    log(pred_srv_indices(y, si)), srv_sd(si), true); 
       
       SIMULATE{ // Simulate Survey Index
         obs_srv_indices(y, si) = exp(rnorm(log(pred_srv_indices(y, si)), srv_sd(si))); 
@@ -598,10 +593,6 @@ Type objective_function<Type>::operator() ()
   } // sc loop
   
   // Recruitment and derived quantities ---------------------------------------------
-  for(int y = 0; y < ln_N1Devs.size(); y++) {
-    rec_nLL -= dnorm(ln_N1Devs(y), Type(0), exp(ln_SigmaRec), true);
-  } // Penalty for initial recruitment
-  
   for(int y = 0; y < ln_RecDevs.size(); y++) { 
     rec_nLL -= dnorm(ln_RecDevs(y), Type(0), exp(ln_SigmaRec), true);
   } // Penalty for all recruitment deviations

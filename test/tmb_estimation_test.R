@@ -103,7 +103,7 @@ for(sim in 1:n_sims){
   input$parameters$ln_srv_selpars[] <- log(c(2, 3, 0.5, 0.4))
   input$parameters$ln_fish_selpars[] <- log(c(3, 5, 0.8, 0.8))
   input$data$N1_Sex_Test <- matrix(N_at_age[100,,,sim], ncol = 2, nrow = 30)
-  # input$parameters$ln_N1Devs <- rowSums(matrix(N_at_age[100,,,sim], ncol = 2, nrow = 30) )
+  input$parameters$ln_N1Devs <- log(rowSums(matrix(N_at_age[100,,,sim], ncol = 2, nrow = 30) ))
   # Run EM model here and get sdrep
   tryCatch(expr = model <- run_EM(data = input$data, parameters = input$parameters, 
                                   map = input$map, 
@@ -120,10 +120,12 @@ for(sim in 1:n_sims){
   max_par[sim] <- convergence_status$Max_Grad_Par
   
   # par(mfrow = c(3, 1))
-  year <- 31
-  plot(model$model_fxn$rep$NAA[year,,1], type = "l", xlab ="Age",
-       ylab = "Numbers", main = paste("dataset 1", "run 2"))
-  lines(N_at_age[100+year-1,,1,sim], type = "l", col = "red")
+  if(conv[sim] == "Converged") {
+    year <- 31
+    plot(model$model_fxn$rep$NAA[year,,1], type = "l", xlab ="Age",
+         ylab = "Numbers", main = paste("dataset 1", "run 2"))
+    lines(N_at_age[100+year-1,,1,sim], type = "l", col = "red")
+  }
   
   # Get parameter estimates
   M_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_M", trans = "log") %>%
