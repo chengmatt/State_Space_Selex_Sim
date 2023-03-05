@@ -6,8 +6,7 @@ template <class Type> // Function to call different selectivity parameterization
 // @param ln_selpars vector of log selectivity parameters.
 Type Get_Selex(int age, 
                int sel_model, 
-               vector<Type> ln_selpars
-                 ) {
+               vector<Type> ln_selpars) {
   
   // Create container to return predicted selectivity value
   Type selex = 0;
@@ -64,7 +63,5 @@ Type Get_Selex(int age,
 
   }
   
-  
-    
   return selex;
 } // end function

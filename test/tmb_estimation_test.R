@@ -48,7 +48,7 @@ simulate_data(fxn_path = fxn_path,
               # e.g., (7, 0.8, 4, 0.3) for a logistic with two sexes, nrow = 2
               fish_pars = list(Fleet_1_L = matrix(data = c(3, 0.8, 5, 0.8), 
                                                   nrow = 2, byrow = TRUE),
-                               Fleet_2_L = matrix(data = c(7, 0.8, 9, 0.8), 
+                               Fleet_2_L = matrix(data = c(5, 0.4, 7, 0.3), 
                                                   nrow = 2, byrow = TRUE)), # fish fleet 2
               srv_pars = list(Fleet_3_SL = matrix(data = c(2, 0.5, 3, 0.4), 
                                                   nrow = 2, byrow = TRUE)), # survey fleet 1
@@ -93,10 +93,10 @@ for(sim in 1:n_sims){
                                                         ncol = 1),
                             use_fish_index = FALSE,
                             rec_model = "BH", 
-                            F_Slx_Model_Input = c("logistic"),
+                            F_Slx_Model_Input = c("exp_logistic"),
                             S_Slx_Model_Input = c("logistic"), 
-                            time_selex = "RW",
-                            n_time_selex_pars = 1,
+                            time_selex = "None",
+                            n_time_selex_pars = NULL,
                             fix_pars = c("ln_SigmaRec", "logit_q_fish", "ln_h"),
                             sim = sim)
   
@@ -104,19 +104,21 @@ for(sim in 1:n_sims){
   # input$parameters$ln_fish_selpars[] <- log(c(3, 5, 0.8, 0.8))
   input$data$N1_Sex_Test <- matrix(N_at_age[100,,,sim], ncol = 2, nrow = 30)
   input$parameters$ln_N1Devs <- log(rowSums(matrix(N_at_age[100,,,sim], ncol = 2, nrow = 30) ))
-  input$parameters$fixed_sel_re_fish[] <- c(0.5, 0.5)
+  # input$parameters$fixed_sel_re_fish[] <- c(0.2, 0.2, 0.2, 0.2)
+  input$parameters$ln_fish_selpars[] <- log(c(0.5, 0.5, 3, 3, 0.1, 0.1))
+    
   # Run EM model here and get sdrep
   tryCatch(expr = model <- run_EM(data = input$data, parameters = input$parameters, 
-                                  map = rlist::list.append(input$map, fixed_sel_re_fish = factor(rep(NA, 2))), 
-                                  n.newton = 10, 
+                                  map = rlist::list.append(input$map), 
+                                  n.newton = 5, 
                                   # random = "ln_fish_selpars_re",
-                                  silent = T, getsdrep = TRUE), error = function(e){e})
+                                  silent = F, getsdrep = TRUE), error = function(e){e})
   
   # Check model convergence
   convergence_status <- check_model_convergence(mle_optim = model$mle_optim,
                                                 mod_rep = model$model_fxn,
                                                 sd_rep = model$sd_rep,
-                                                min_grad = 0.05)
+                                                min_grad = 0.1)
   conv[sim] <- convergence_status$Convergence
   max_par[sim] <- convergence_status$Max_Grad_Par
   
@@ -131,7 +133,7 @@ for(sim in 1:n_sims){
   # Get parameter estimates
   M_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_M", trans = "log") %>%
     mutate(t = mean(Mort_at_age), type = "mortality", sim = sim, conv = conv[sim])
-  q_srv_df <- extract_parameter_vals(sd_rep = model$sd_rep,   par = "logit_q_srv", trans = "logit", logit_bounds = c(0, 1)) %>%
+  q_srv_df <- extract_parameter_vals(sd_rep = model$sd_rep,   par = "logit_q_srv", trans = "logit", logit_bounds = c(0, 0.5)) %>%
     mutate(t = mean(q_Surv), type = "q_surv", sim = sim, conv = conv[sim])
   meanrec_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_RecPars", trans = "log") %>%
     mutate(t = c(r0), type = c("r0"), sim = sim, conv = conv[sim])
@@ -229,9 +231,9 @@ all <- rbind(rec_sum, ssb_sum, f_sum,fish_mu_age_sum, srv_mu_age_sum,
 
 
 # par(mfrow = c(3, 1))
-# plot_RE_ts_base(data = all, par_name = "Spawning Stock Biomass", ylim = c(-0.3, 0.3))
-# plot_RE_ts_base(data = all, par_name = "Total Fishing Mortality", ylim = c(-0.3, 0.3))
-# plot_RE_ts_base(data = all, par_name = "Total Recruitment", ylim = c(-0.3, 0.3))
+plot_RE_ts_base(data = all, par_name = "Spawning Stock Biomass", ylim = c(-0.9, 0.9))
+plot_RE_ts_base(data = all, par_name = "Total Fishing Mortality", ylim = c(-0.9, 0.9))
+plot_RE_ts_base(data = all, par_name = "Total Recruitment", ylim = c(-0.9, 0.9))
 
 # Parameter estimates
 par_df <- par_all %>% mutate(RE = (mle_val - t ) / t) %>% 
@@ -247,7 +249,7 @@ par_sum <- get_RE_precentiles(df = par_all %>% filter(conv == "Converged"),
                               par_name = "", group_vars = "type")
 
 
-(par_plot <- ggplot(par_df, aes(x = RE, fill = type)) +
+(par_plot <- ggplot(par_df %>% filter(RE < 1), aes(x = RE, fill = type)) +
     geom_density(alpha = 0.2) +
     facet_wrap(~type, scales = "free", nrow = 2) +
     geom_errorbarh(inherit.aes = FALSE, data = par_sum, 
@@ -267,7 +269,7 @@ par_sum <- get_RE_precentiles(df = par_all %>% filter(conv == "Converged"),
           axis.text = element_text(size = 13, color = "black"),
           legend.position = "none", legend.text = element_text(size = 15)))
 
-(ssb0_all_plot <- ggplot(ssb0_all_df, aes(x = RE)) +
+(ssb0_all_plot <- ggplot(ssb0_all_df %>% filter(RE < 1), aes(x = RE)) +
     geom_density(alpha = 0.2) +
     geom_vline(aes(xintercept = median(RE)), linetype = 2,
                size = 0.85, col = "red", alpha = 1) +
