@@ -18,7 +18,7 @@ To investigate best practices for the treatment of fishery fleet structure and s
 
 
 ### Operating Model Options
-The OM is able to be specified for multiple fishery and survey fleets, as well as multiple sexes. Note that for the sablefish life-history, the number of years for which the OM generates data needs to be extended, for the population to reach an unfished equilibrium state. 
+The OM is able to be specified for multiple fishery and survey fleets, as well as multiple sexes. 
 | OM Component  | Options |
 | --------| --------|
 |Recruitment| Beverton Holt Recruitment, Mean Recruitment |
