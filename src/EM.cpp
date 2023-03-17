@@ -209,7 +209,8 @@ Type objective_function<Type>::operator() ()
         // Define and extract selectivity parameters to feed into our Get_Selex function (our fixed selex parameters)
         vector<Type> tmp_ln_fish_selpars = ln_fish_selpars.transpose().col(f).col(s).col(b);
         
-        if(F_Slx_re_model(f, s) == 0) {  // random walk on parameters here
+        if(F_Slx_re_model(f, s) == 0 || // Random Walk process or
+           F_Slx_re_model(f, s) == 1) { // AR1 process by year
           
           // Temporary container object to store selectivity deviations
           array<Type> tmp_seldevs_vec(n_years, n_re_pars);
@@ -217,33 +218,15 @@ Type objective_function<Type>::operator() ()
           for(int p = 0; p < n_re_pars; p++) {
             if(y == 0) { // Year = 0 (Initial conditions) (Initial Condition)
               tmp_seldevs_vec(y, p) = tmp_ln_fish_selpars(p); // Fixed effect for first year 
-            } else{ // Random walk deviations after first year
+            } else{ // Random walk or AR1 deviations after first year
               tmp_seldevs_vec(y, p) = tmp_seldevs_vec(y - 1, p) + ln_fish_selpars_re(y - 1, p, f, s);
             } // else = adding in random walk deviations
             
-            // Redefine tmp_ln_fish_pars with updated RW deviates
+            // Redefine tmp_ln_fish_pars with updated RW or AR deviates
             tmp_ln_fish_selpars(p) = tmp_seldevs_vec(y, p); // Exponentiated within Get_Selex
 
           } // end parameter (p) loop
         } // end if statement for random walk
-        
-        if(F_Slx_re_model(f, s) == 1) { // AR1 process by year
-          
-          // Temporary container object to store selectivity deviations
-          array<Type> tmp_seldevs_vec(n_years, n_re_pars);
-          
-          for(int p = 0; p < n_re_pars; p++) {
-            if(y == 0) { // Year = 0 (Initial Condition)
-              tmp_seldevs_vec(y, p) = tmp_ln_fish_selpars(p); // Fixed effect for first year 
-            } else{
-              tmp_seldevs_vec(y, p) = tmp_seldevs_vec(y - 1, p) + ln_fish_selpars_re(y - 1, p, f, s);
-            } // else = adding in AR1 deviations
-
-            // Redefine tmp_ln_fish_selpars with updated AR1 deviates
-            tmp_ln_fish_selpars(p) = tmp_seldevs_vec(y, p); // Exponentiated in Get_Selex fxn
-            
-          } // p loop
-        } // end if statement for AR1_y
         
         for(int a = 0; a < n_ages; a++) {
           
