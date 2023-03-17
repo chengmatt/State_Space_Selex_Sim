@@ -411,7 +411,7 @@ prepare_EM_input <- function(years,
   if(time_selex == "None") { # No time-varying
     data$F_Slx_re_model <- matrix(1e5, nrow = n_fish_comps, ncol = n_sexes)
     pars$ln_fish_selpars_re <- array(rnorm(1, 0, 0),
-                                     dim = c((length(years)), n_time_selex_pars, n_fish_comps, n_sexes))
+                                     dim = c((length(years)-1), n_time_selex_pars, n_fish_comps, n_sexes))
     pars$fixed_sel_re_fish <- array(rnorm(1,0,0), dim = c(1, n_fish_comps, n_sexes))
     
     # Set mapping here for random effects (no random effects)
@@ -423,14 +423,14 @@ prepare_EM_input <- function(years,
   if(time_selex == "RW") { # Random Walk
     data$F_Slx_re_model <- matrix(0, nrow = n_fish_comps, ncol = n_sexes)
     pars$ln_fish_selpars_re <- array(rnorm(1, 0, 0),
-                                     dim = c((length(years)), n_time_selex_pars, n_fish_comps, n_sexes))
+                                     dim = c((length(years)-1), n_time_selex_pars, n_fish_comps, n_sexes))
     pars$fixed_sel_re_fish <- array(rnorm(1,0,1), dim = c(n_time_selex_pars, n_fish_comps, n_sexes))
   } # random walk if statement
   
   if(time_selex == "AR1_y") { # Autoregressive 1 by year
     data$F_Slx_re_model <- matrix(0, nrow = n_fish_comps, ncol = n_sexes)
     pars$ln_fish_selpars_re <- array(rnorm(1, 1, 0),
-                                     dim = c((length(years)), n_time_selex_pars, n_fish_comps, n_sexes))
+                                     dim = c((length(years)-1), n_time_selex_pars, n_fish_comps, n_sexes))
     pars$fixed_sel_re_fish <- array(rnorm(1, 1 ,0), dim = c(2 * n_time_selex_pars, n_fish_comps, n_sexes))
   } # AR1_y if statement
   

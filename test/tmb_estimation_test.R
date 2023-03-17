@@ -23,34 +23,37 @@ simulate_data(fxn_path = fxn_path,
               check_equil = FALSE,
               spreadsheet_path = spreadsheet_path, 
               rec_type = "BH",
-              Start_F = c(0.01), 
-              Fish_Start_yr = c(1), 
+              Start_F = c(0.01, 0.01), 
+              Fish_Start_yr = c(1, 1), 
               Surv_Start_yr = c(1), 
               max_rel_F_M = c(1,1), 
-              desc_rel_F_M = c(0.05), 
-              F_type = c("Contrast"),
+              desc_rel_F_M = c(0.05, 0.05), 
+              F_type = c("Contrast", "Const_Inc"),
               yr_chng = c(25), 
               yr_chng_end = 30,
-              fish_likelihood = "dirichlet_multinomial",
+              fish_likelihood = c("dirichlet_multinomial",
+                                  "dirichlet_multinomial"),
               srv_likelihood = "multinomial",
               # DM_Srv_Param = 1,
-              DM_Fish_Param = 1,
-              Input_Fish_N_Max = c(200), 
+              DM_Fish_Param = c(1, 1),
+              Input_Fish_N_Max = c(200, 200), 
               Input_Srv_N_Max = c(200),
               fish_CV = c(0.1, 0.1),
               srv_CV = c(0.1), 
-              catch_CV = c(0.01), 
+              catch_CV = c(0.01, 0.01), 
               Input_N_Fish_Time = "F_Vary", 
-              Input_N_Fish_Fixed = c(30),
+              Input_N_Fish_Fixed = c(30, 30),
               Mort_Time = "Constant", 
-              q_Mean_Fish = c(0.05), 
+              q_Mean_Fish = c(0.05, 0.05), 
               q_Mean_Surv = 0.01, 
-              fish_selex = c("logistic"), 
+              fish_selex = c("logistic", "logistic"), 
               srv_selex = c("logistic"), 
               # if switching to a single sex, be sure to change the nrow to the number of sexes,
               # and to make sure the selex parameters for the fleets align n_pars * n_sexes
               # e.g., (7, 0.8, 4, 0.3) for a logistic with two sexes, nrow = 2
               fish_pars = list(Fleet_1_L = matrix(data = c(5, 0.85), 
+                                                  nrow = 1, byrow = TRUE),
+                               Fleet_2_L = matrix(data = c(2, 0.85), 
                                                   nrow = 1, byrow = TRUE)), # fish fleet 2
               srv_pars = list(Fleet_3_SL = matrix(data = c(2, 0.85), 
                                                   nrow = 1, byrow = TRUE)), # survey fleet 1
@@ -81,7 +84,7 @@ start.time <- Sys.time()
 
 compile_tmb(wd = here("src"), cpp = "EM.cpp")
 
-for(sim in sim:n_sims){
+for(sim in 1:n_sims){
   
   # Prepare inputs here
   input <- prepare_EM_input(years = years,
@@ -101,12 +104,13 @@ for(sim in sim:n_sims){
                             rec_model = "BH", 
                             F_Slx_Model_Input = c("logistic"),
                             S_Slx_Model_Input = c("logistic"), 
-                            time_selex = "None",
-                            n_time_selex_pars = NULL,
+                            time_selex = "AR1_y",
+                            n_time_selex_pars = 1,
                             fix_pars = c(
                                          "ln_SigmaRec",
                                          "ln_q_fish", 
-                                         "ln_h"), 
+                                         "ln_h",
+                                         "fixed_sel_re_fish"), 
                                          # "ln_N1Devs",
                                          # "ln_Fy",
                                          # "ln_RecDevs",
@@ -138,6 +142,7 @@ for(sim in sim:n_sims){
   # input$parameters$ln_Fy[] <- log(0.1)
   input$parameters$ln_N1Devs[] <- 0.1
   # input$data$srv_cv <- 0.01
+  input$parameters$fixed_sel_re_fish[] <- log(2)
 
   # Run EM model here and get sdrep
   tryCatch(expr = model <- run_EM(data = input$data, parameters = input$parameters, 
@@ -165,6 +170,11 @@ for(sim in sim:n_sims){
          ylab = "Numbers")
     # lines(fish_mort[1+year-1,,sim] * Fish_selex_at_age[year,,,1,sim])
     lines(N_at_age[1+year-1+1,,1,sim], type = "l", col = "blue")
+    for(i in 1:length(years)) {
+      if(i == 1) {
+        plot(model$model_fxn$rep$F_Slx[1,,1,1], type = 'l')
+      } else lines(model$model_fxn$rep$F_Slx[i,,1,1])
+    }
   }
   
   # Get parameter estimates

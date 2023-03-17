@@ -251,7 +251,7 @@ simulate_data <- function(fxn_path,
                 # Generate comps based on catch at age
                 Fish_Age_Comps[y,,f,s,sim] <- sample_comps(error = fish_likelihood,
                                                            Input_N = Input_N_Fish[y,f], 
-                                                           DM_Param = DM_Fish_Param, 
+                                                           DM_Param = DM_Fish_Param[f], 
                                                            prob = Prob_Fish_Comps / sum(Prob_Fish_Comps))
                 
               }  # Only start sampling if we are the start of the fish start year
@@ -289,7 +289,7 @@ simulate_data <- function(fxn_path,
                 # Generate comps based on the expected CPUE at age
                 Survey_Age_Comps[y,,sf,s,sim] <- sample_comps(error = srv_likelihood,
                                                               Input_N = Input_N_Srv[y,sf], 
-                                                              DM_Param = DM_Srv_Param, 
+                                                              DM_Param = DM_Srv_Param[sf], 
                                                               prob = Prob_Surv_at_age / sum(Prob_Surv_at_age))
                 
               } # Only start sampling if we are at the start of the survey start year
