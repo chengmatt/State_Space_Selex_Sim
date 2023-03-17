@@ -24,7 +24,7 @@ The OM is able to be specified for multiple fishery and survey fleets, as well a
 |Recruitment| Beverton Holt Recruitment, Mean Recruitment |
 |Fishing mortality pattern| Contrast, Constant, Increase, Decrease, Increase_Plat, Const_Inc, Const_Ramp_Const, Contrast_Const  |
 |Selectivity| Logistic, Gamma, Uniform, Exponential Logistic, Double Logistic, Double Normal |
-|Compositional Likelihoods| Multinomial, Dirichlet-Multinomial |
+|Compositional Likelihoods| Multinomial, Dirichlet, Dirichlet-Multinomial |
 
 ### Estimation Model Options
 The EM is able to be specified for multiple fishery and survey fleets, as well as multiple sexes. 
