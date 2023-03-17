@@ -14,24 +14,46 @@ fxn_path <- here("R_scripts", "functions")
 source(here(fxn_path, "simulate_data.R"))
 
 # Path to general input biological parameters
-spreadsheet_path <- here("input", "Sablefish_Inputs.xlsx")
+# spreadsheet_path <- here("input", "Sablefish_Inputs.xlsx")
+spreadsheet_path <- here("input", "EBS_Pollock_Inputs.xlsx")
 
 # simulate data
-simulate_data(fxn_path = fxn_path, spreadsheet_path = spreadsheet_path, 
-              check_equil = FALSE, rec_type = "mean_rec",
-              n_years = 101, Start_F = c(0.15, 0.01), 
-              Fish_Start_yr = c(70, 70), Surv_Start_yr = c(70), 
-              max_rel_F_M = c(0.1, 1.5), desc_rel_F_M = c(0.05), 
-              F_type = c("Constant", "Constant"), yr_chng = c(86), 
-              fish_Neff_max = c(200, 200), srv_Neff_max = c(200), fish_CV = c(0.1, 0.1),
-              srv_CV = c(0.1), catch_CV = c(0, 0), 
-              Neff_Fish_Time = "F_Vary", fixed_Neff = c(50, 50),
-              Mort_Time = "Constant", q_Mean_Fish = c(0.05, 0.05), q_Mean_Surv = 0.01, 
-              Rec_Dev_Type = "iid", rho_rec = NA, 
-              fish_selex = c("logistic", "logistic"), srv_selex = c("logistic"), 
-              fish_pars = list(Fleet_1_L = matrix(data = c(4, 0.8), nrow = 1, byrow = TRUE),
-                               Fleet_1_L = matrix(data = c(9, 0.8), nrow = 1, byrow = TRUE)),
-              srv_pars = list(Fleet_3_SL = matrix(data = c(3,0.8), nrow = 1, byrow = TRUE)), 
+# simulate data
+simulate_data(fxn_path = fxn_path, 
+              check_equil = FALSE,
+              spreadsheet_path = spreadsheet_path, 
+              rec_type = "BH",
+              Start_F = c(0.01), 
+              Fish_Start_yr = c(100), 
+              Surv_Start_yr = c(100), 
+              max_rel_F_M = c(1,1), 
+              desc_rel_F_M = c(0.05), 
+              F_type = c("Contrast"),
+              yr_chng = c(115), 
+              yr_chng_end = 130,
+              fish_likelihood = "multinomial",
+              srv_likelihood = "dirichlet_multinomial",
+              DM_Fish_Param = 100,
+              DM_Srv_Param = 100, 
+              Input_Fish_N_Max = c(200), 
+              Input_Srv_N_Max = c(200),
+              fish_CV = c(0.1, 0.1),
+              srv_CV = c(0.1), 
+              catch_CV = c(0.01), 
+              Input_N_Fish_Time = "F_Vary", 
+              Input_N_Fish_Fixed = c(30),
+              Mort_Time = "Constant", 
+              q_Mean_Fish = c(0.05), 
+              q_Mean_Surv = 0.01, 
+              fish_selex = c("logistic"), 
+              srv_selex = c("logistic"), 
+              # if switching to a single sex, be sure to change the nrow to the number of sexes,
+              # and to make sure the selex parameters for the fleets align n_pars * n_sexes
+              # e.g., (7, 0.8, 4, 0.3) for a logistic with two sexes, nrow = 2
+              fish_pars = list(Fleet_1_L = matrix(data = c(5, 0.85), 
+                                                  nrow = 1, byrow = TRUE)), # fish fleet 2
+              srv_pars = list(Fleet_3_SL = matrix(data = c(2, 0.85), 
+                                                  nrow = 1, byrow = TRUE)), # survey fleet 1
               f_ratio = 1, m_ratio = 0)
 
 
@@ -53,7 +75,7 @@ selectivity <- list(Fleet_2 = list(model = rep("logistic", 3), re = rep("none", 
 
 # Set catchability
 catchability <- list(Fleet_2 = list(re = rep("none", 3), q_upper = rep(0.5, 3)),
-                     Fleet_1 = list(re = rep("none", 2), q_upper = rep(0.5, 2)),
+                     Fleet_1 = list(re = rep("none", 1), q_upper = rep(0.5, 1)),
                      Fleet_1_1TB = list(re = rep("none", 1), q_upper = rep(0.5, 1)),
                      Fleet_1_6TB = list(re = rep("none", 1), q_upper = rep(0.5, 1)),
                      Fleet_1_ar1_y = list(re = rep("none", 1), q_upper = rep(0.5, 1)),
@@ -85,6 +107,7 @@ noFish_Idx <- c(TRUE, TRUE, TRUE, TRUE, TRUE, TRUE)
 # Save results
 ssb_results <- data.frame()
 f_results <- data.frame()
+dir_par <- vector()
 
 for(i in 2:length(selectivity)) {
   
@@ -118,7 +141,8 @@ for(i in 2:length(selectivity)) {
                                           selectivity = selectivity[[i]], 
                                           recruit_model = 2, M = M, 
                                           catchability = catchability[[i]],
-                                          NAA_re = NULL)
+                                          NAA_re = NULL, age_comp = list(fleets = "multinomial",
+                                                                         indices = "dir-mult"))
     
     # Fit WHAM here
     tryCatch( {
@@ -131,6 +155,7 @@ for(i in 2:length(selectivity)) {
       
       results_list[[sim]] <- get_results(em_fit)
       sdrep_list[[sim]] <- em_fit$sdrep
+      dir_par[sim] <- em_fit$sdrep$par.fixed[names(em_fit$sdrep$par.fixed ) == "index_paa_pars"] 
       
       # threp <- em_fit$report()
       # sapply(grep("nll",names(threp),value=T), function(x) sum(threp[[x]]))

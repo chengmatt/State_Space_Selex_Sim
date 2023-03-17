@@ -13,6 +13,8 @@
 #' @param use_srv_index same as above
 #' @param use_fish_comps Boolean (TRUE OR FALSE) TRUE = USE, FALSE = don't use
 #' @param use_srv_comps same above abovce
+#' @param Fish_Comp_Like_Model Fishery composition likelihoods ("multinomial" or "dirichlet_multinomial")
+#' @param Srv_Comp_Like_Model Survey composition likelihoods ("multinomial" or "dirichlet_multinomial")
 #' @param rec_model recruitment model == 0 (mean recruitment)
 #' @param F_Slx_Model_Input Fishery selectivity model character (logistic, gamma, double_logistic)
 #' @param S_Slx_Model_Input same as above
@@ -36,6 +38,8 @@ prepare_EM_input <- function(years,
                              use_srv_index = TRUE, 
                              use_fish_comps = TRUE,
                              use_srv_comps = TRUE,
+                             Fish_Comp_Like_Model,
+                             Srv_Comp_Like_Model,
                              F_Slx_Model_Input,
                              S_Slx_Model_Input,
                              rec_model = 0,
@@ -95,11 +99,11 @@ prepare_EM_input <- function(years,
     } # end s loop
     
     # Empty array to store values in
-    obs_fish_age_Neff <- array(data = NA, dim = c(length(years), n_fleets, n_sexes))
+    obs_fish_age_Input_N <- array(data = NA, dim = c(length(years), n_fleets, n_sexes))
     
     # Effective sample size
     for(s in 1:n_sexes) {
-      obs_fish_age_Neff[,1,s] <- rowSums(floor(obs_fish_age_comps[,,,s]))
+      obs_fish_age_Input_N[,1,s] <- rowSums(floor(obs_fish_age_comps[,,,s]))
     } # s loop
     
     # Now, apply the proportion function over a single fleet
@@ -120,8 +124,8 @@ prepare_EM_input <- function(years,
     } # end f loop
     
     # Effective Sample Sizes
-    obs_fish_age_Neff <- array(fish_Neff[Fish_Start_yr[1]:(n_years - 1),], 
-                               dim = c(length(years), 2, n_sexes))
+    obs_fish_age_Input_N <- array(Input_N_Fish[Fish_Start_yr[1]:(n_years - 1),], 
+                               dim = c(length(years), n_fish_comps, n_sexes))
     
   } # end else
   
@@ -138,8 +142,8 @@ prepare_EM_input <- function(years,
                                        MARGIN = 1, FUN=function(x) { x/sum(x) }))
   } # s loop
   
-  # Get survey age neffs
-  obs_srv_age_Neff <- array(srv_Neff[Fish_Start_yr[1]:(n_years - 1),], 
+  # Get survey age input sample size
+  obs_srv_age_Input_N <- array(Input_N_Srv[Fish_Start_yr[1]:(n_years - 1),], 
                             dim = c(length(years), n_srv_comps, n_sexes))
   
   
@@ -252,6 +256,54 @@ prepare_EM_input <- function(years,
     use_srv_comps <- array(0, dim = c(length(years), n_srv_comps, n_sexes))
   }
   
+  # Compositional Likelihoods
+  # Fishery
+  fish_comp_likelihoods <- matrix(ncol = n_sexes, nrow = n_fish_comps)
+  ln_DM_Fish_Param <- matrix(ncol = n_sexes, nrow = n_fish_comps) # set up ln fishery parameters
+  map_ln_DM_Fish_Param <- matrix(ncol = n_sexes, nrow = n_fish_comps) # set up mapping for DM 
+  
+  for(i in 1:length(Fish_Comp_Like_Model)) {
+    
+    if(Fish_Comp_Like_Model[i] == "multinomial") {
+      fish_comp_likelihoods[i,1:n_sexes] <- rep(0, n_sexes)
+      map_ln_DM_Fish_Param[i,1:n_sexes] <- rep(NA, n_sexes)
+    } # if Multinomial
+    
+    if(Fish_Comp_Like_Model[i] == "dirichlet_multinomial") {
+      fish_comp_likelihoods[i, 1:n_sexes] <- rep(1, n_sexes)
+      map_ln_DM_Fish_Param[i,1:n_sexes] <- rep(1, n_sexes)
+    } # if DM 
+    
+    # Random starting values for DM theta parameter
+    ln_DM_Fish_Param[i,1:n_sexes] <- log(3) 
+    
+  } # end i fishery
+
+  # Survey
+  srv_comp_likelihoods <- matrix(ncol = n_sexes, nrow = n_srv_comps)
+  ln_DM_Srv_Param <- matrix(ncol = n_sexes, nrow = n_srv_comps)
+  map_ln_DM_Srv_Param <- matrix(ncol = n_sexes, nrow = n_srv_comps)
+  for(i in 1:length(Srv_Comp_Like_Model)) {
+    
+    if(Srv_Comp_Like_Model[i] == "multinomial") {
+      srv_comp_likelihoods[i,1:n_sexes] <- rep(0, n_sexes)
+      map_ln_DM_Srv_Param[i,1:n_sexes] <- rep(NA, n_sexes)
+    } # if multinomial
+    
+    if(Srv_Comp_Like_Model[i] == "dirichlet_multinomial") {
+      srv_comp_likelihoods[i,1:n_sexes] <- rep(1, n_sexes)
+      map_ln_DM_Srv_Param[i,1:n_sexes] <- rep(1, n_sexes)
+    } # if DM
+    
+    # Random starting values for DM theta parameter
+    ln_DM_Srv_Param[i,1:n_sexes] <- log(3) 
+    
+  } # end i survey
+  
+  # Map factor for fishery and survey comps if there is a multinomial likelihood
+  if(Fish_Comp_Like_Model %in% c("multinomial")) map$ln_DM_Fish_Param <- factor(map_ln_DM_Fish_Param)
+  if(Srv_Comp_Like_Model %in% c("multinomial"))  map$ln_DM_Srv_Param <- factor(map_ln_DM_Srv_Param)
+
   # Input these data into a list object
   data$ages <- ages
   data$years <- years
@@ -263,9 +315,9 @@ prepare_EM_input <- function(years,
   data$n_srv_indices = n_srv_indices
   data$obs_catches <- obs_catches
   data$obs_fish_age_comps <- obs_fish_age_comps
-  data$obs_fish_age_Neff <- obs_fish_age_Neff
+  data$obs_fish_age_Input_N <- obs_fish_age_Input_N
   data$obs_srv_age_comps <- obs_srv_age_comps
-  data$obs_srv_age_Neff <- obs_srv_age_Neff
+  data$obs_srv_age_Input_N <- obs_srv_age_Input_N
   data$obs_fish_indices <- obs_fish_indices
   data$obs_srv_indices <- obs_srv_indices
   data$WAA <- WAA
@@ -281,6 +333,8 @@ prepare_EM_input <- function(years,
   data$use_srv_index  <- use_srv_index 
   data$use_fish_comps <- use_fish_comps
   data$use_srv_comps  <- use_srv_comps 
+  data$fish_comp_likelihoods <- fish_comp_likelihoods
+  data$srv_comp_likelihoods <- srv_comp_likelihoods
   data$S_Slx_model <- S_Slx_model
   data$F_Slx_model <- F_Slx_model
   
@@ -288,11 +342,13 @@ prepare_EM_input <- function(years,
   # Parameter specifications ------------------------------------------------
   
   # Set up parameters
-  pars$ln_SigmaRec <- sigma_rec # recruitment variability
+  pars$ln_DM_Fish_Param <- ln_DM_Fish_Param # DM theta for fishery
+  pars$ln_DM_Srv_Param <- ln_DM_Srv_Param # DM theta for survey
+  pars$ln_SigmaRec <- log(sigma_rec) # recruitment variability
   pars$ln_RecDevs <- rec_devs[years[-1],sim] # rec devs
-  pars$ln_N1Devs <- rnorm(length(years), 0, 0.0) # rec devs
+  pars$ln_N1Devs <- rnorm(length(ages)-1, 0, 0.0) # rec devs
   pars$ln_M <- log(mean(Mort_at_age)) # natural mortality
-  
+
   # row sums for fish mort
   if(n_fleets == 1 & dim(Fish_Age_Comps)[3] == 1) { # 1 fleet model and truth = multiple
     pars$ln_Fy <- matrix(log(fish_mort[Fish_Start_yr[1]:(n_years - 1),,sim]),
@@ -309,15 +365,15 @@ prepare_EM_input <- function(years,
                          ncol = n_fleets, nrow = length(years))
   }
   
-  pars$logit_q_fish <- rnorm(n_fish_indices, 0, 0.0) # catchability for fishery
-  pars$logit_q_srv <- rnorm(n_srv_indices, 0, 0.0) # catchability for survey
+  pars$ln_q_fish <- rnorm(n_fish_indices, 0, 0.0) # catchability for fishery
+  pars$ln_q_srv <- rnorm(n_srv_indices, 0, 0.0) # catchability for survey
   
   if(rec_model == "mean_rec") {
     pars$ln_RecPars <- as.vector(c(mu_rec)) # Mean Recruitment (1 parameter)
     data$rec_model <- 0
   }
   if(rec_model == "BH") {
-    pars$ln_RecPars <- as.vector(c(log(r0), h)) # R0 and steepness
+    pars$ln_RecPars <- as.vector(c(log(r0), log(h))) # R0 and steepness
     data$rec_model <- 1
   }
   
@@ -335,7 +391,7 @@ prepare_EM_input <- function(years,
     if(S_Slx_Model_Input[i] == "double_logistic") n_srv_pars[i] <- 4
   } # end i loop
   # Put array into our list
-  pars$ln_srv_selpars <- array(log(rnorm(1, 1, 0)), dim = c(n_srv_comps, n_sexes, n_srv_blocks, max(n_srv_pars)))
+  pars$ln_srv_selpars <- array(log(rnorm(1, 2, 0)), dim = c(n_srv_comps, n_sexes, n_srv_blocks, max(n_srv_pars)))
   
   # Do the same, but for the fishery
   n_fish_blocks <- length(unique(as.vector(F_Slx_Blocks_Input))) # unique numbers (max fish blocks)
@@ -349,11 +405,11 @@ prepare_EM_input <- function(years,
   } # end i loop
   
   # put array into our parameter list
-  pars$ln_fish_selpars <- array(log(rnorm(1, 1, 0)), dim = c(n_fish_comps, n_sexes, n_fish_blocks, max(n_fish_pars)))
+  pars$ln_fish_selpars <- array(log(rnorm(1, 2, 0)), dim = c(n_fish_comps, n_sexes, n_fish_blocks, max(n_fish_pars)))
   
   # Time-Varying Selectivity Options (Fishery)
   if(time_selex == "None") { # No time-varying
-    data$F_Slx_re_model <- matrix(10000, nrow = n_fish_comps, ncol = n_sexes)
+    data$F_Slx_re_model <- matrix(1e5, nrow = n_fish_comps, ncol = n_sexes)
     pars$ln_fish_selpars_re <- array(rnorm(1, 0, 0),
                                      dim = c((length(years)), n_time_selex_pars, n_fish_comps, n_sexes))
     pars$fixed_sel_re_fish <- array(rnorm(1,0,0), dim = c(1, n_fish_comps, n_sexes))

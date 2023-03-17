@@ -49,6 +49,13 @@ create_OM_objects <<- function(n_years, ages, n_fish_fleets, n_sex, n_sims) {
                       c(paste("Sim",1:n_sims))
                     ))
   
+  # Initial age deviates
+  init_age_devs <<- array(dim = c(length(ages)-1, n_sims),
+                          dimnames = list(
+                            c(paste("Age", 1:(length(ages)-1), sep = "_")),
+                            c(paste("Sim",1:n_sims))
+                          ))
+  
   # Catch at age across years
   Catch_at_age <<- array(dim = c(n_years, length(ages), n_fish_fleets, n_sex, n_sims), 
                         dimnames = list( # Set up dimensions names

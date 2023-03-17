@@ -69,10 +69,10 @@ make_wham_input <- function(n_fleets, n_indices, Catch_CV_Val = 0, catch_error =
   
   if(single_fleet == TRUE) {
     # Prepare effective sample sizes as a single fleet. i.e., sum up multinomial ESS
-    input$catch_Neff <- matrix(rowSums(fish_Neff[min(Fish_Start_yr):(min(Fish_Start_yr)+n_y-1),,drop = FALSE]))
+    input$catch_Neff <- matrix(rowSums(Input_N_Fish[min(Fish_Start_yr):(min(Fish_Start_yr)+n_y-1),,drop = FALSE]))
   } else{
     # Catch effective sample size for catch_paa (comps for fishery) matrix(length(years), n_fleets)
-    input$catch_Neff <- fish_Neff[min(Fish_Start_yr):(min(Fish_Start_yr)+n_y-1),,drop = FALSE ] # Effective sample size for catch
+    input$catch_Neff <- Input_N_Fish[min(Fish_Start_yr):(min(Fish_Start_yr)+n_y-1),,drop = FALSE ] # Effective sample size for catch
   } # if one single fleet = TRUE
   
   # Specify selectivity block pointers for the fishery fleet (length(years), n_fleets) 
@@ -247,10 +247,10 @@ make_wham_input <- function(n_fleets, n_indices, Catch_CV_Val = 0, catch_error =
   
   if(single_fleet == TRUE) {
     # Prepare effective sample sizes as a single fleet. i.e., sum up multinomial ESS
-    Neff_fish_mat <- matrix(rowSums(fish_Neff[min(Fish_Start_yr):(min(Fish_Start_yr)+n_y-1),,drop = FALSE]))
+    Neff_fish_mat <- matrix(rowSums(Input_N_Fish[min(Fish_Start_yr):(min(Fish_Start_yr)+n_y-1),,drop = FALSE]))
   } else{
     # Filter to the specified years in the model
-    Neff_fish_mat <- fish_Neff[min(Fish_Start_yr):(min(Fish_Start_yr)+n_y-1),,drop = FALSE]
+    Neff_fish_mat <- Input_N_Fish[min(Fish_Start_yr):(min(Fish_Start_yr)+n_y-1),,drop = FALSE]
   } # if one single fleet = TRUE
 
   for(f in 1:input$n_fleets) {
@@ -259,7 +259,7 @@ make_wham_input <- function(n_fleets, n_indices, Catch_CV_Val = 0, catch_error =
   
   # do the same above, but for the survey - keeping the min as fish start year because
   # we want to retain the 0s
-  Neff_srv_mat <- srv_Neff[min(Fish_Start_yr):(min(Fish_Start_yr)+n_y-1),,drop = FALSE ]
+  Neff_srv_mat <- Input_N_Srv[min(Fish_Start_yr):(min(Fish_Start_yr)+n_y-1),,drop = FALSE ]
   
   for(sf in 1:n_srv_fleets) {
     index_Neff[,(input$n_fleets + sf)] <- Neff_srv_mat[,sf]

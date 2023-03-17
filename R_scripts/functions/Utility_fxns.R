@@ -59,7 +59,7 @@ add_newton <- function(n.newton, ad_model, mle_optim) {
 #' @examples
 
 run_EM <- function(data, parameters, map, n.newton, random = NULL,
-                   iter.max = 1e5, eval.max = 1e5, 
+                   iter.max = 1e6, eval.max = 1e6, 
                    silent = TRUE, getsdrep = TRUE) {
   
   # Make AD Function here
@@ -70,14 +70,14 @@ run_EM <- function(data, parameters, map, n.newton, random = NULL,
   # Optimize model here w/ nlminb
   mle_optim <- stats::nlminb(model_fxn$par, model_fxn$fn, model_fxn$gr, 
                              control = list(iter.max = iter.max, eval.max = eval.max),
-                             lower = -15, upper = 15)
+                             lower = -30, upper = 30)
   
   # Take additional newton steps
   add_newton(n.newton = n.newton, ad_model = model_fxn, mle_optim = mle_optim)
   
   if(getsdrep == TRUE) {
     # Get report with mle optimized parameters
-    model_fxn$rep <- model_fxn$report() # Need to pass both fixed and random effects!!!
+    model_fxn$rep <- model_fxn$report(model_fxn$env$last.par.best) # Need to pass both fixed and random effects!!!
     # Get sd report here from TMB
     sd_rep <- TMB::sdreport(model_fxn)
   } # if get sdrep = TRUE
@@ -111,6 +111,7 @@ check_model_convergence <- function(mle_optim, sd_rep, mod_rep, min_grad = 0.001
   if(mle_optim$convergence == 0 &
      sd_rep$pdHess == TRUE & 
      max_grad_val < min_grad &
+     !is.nan(sum(model$sd_rep$sd )) &
      !is.nan(mod_rep$rep$jnLL)) convergence = "Converged"
   else convergence = "Not Converged"
   

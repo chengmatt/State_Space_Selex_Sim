@@ -4,26 +4,47 @@
 # Creator: Matthew LH. Cheng
 # Date: 11/3/22
 
-#' @param Comp_Fleet Fleet type - options are Fishery or Survey
-#' @param error Error structure for sampling age comps - options currently are multinomial
-#' @param N_eff Effective sample size for the compositional dataset, corresponding to a fleet
+#' @param alpha Dirichlet Alpha parameter
+#' @param Input_N Effective sample size for the compositional dataset, corresponding to a fleet
+rdirmultinom <- function(Input_N, alpha){ 
+  # Function for dirichlet draws
+  rd1 <- function(alpha){
+    x <- rgamma(length(alpha), alpha)
+    p <- x/sum(x)
+    p
+  } # sample from dirichlet
+  # Sample from multinomial now
+  rdirmultinom_probs <- as.vector(stats::rmultinom(1, Input_N, rd1(alpha)))
+  return(rdirmultinom_probs)
+}
 
-sample_comps <- function(Comp_Fleet, error, N_eff, prob) {
-  if(Comp_Fleet == "Fishery") {
+
+#' @param error Error structure for sampling age comps - options currently are multinomial
+#' @param Input_N Effective sample size for the compositional dataset, corresponding to a fleet
+#' @param DM_Param Weight/Theta parameter governing the variability of the Dirichlet-Multinomial
+#' @param prob Underlying probability (vector) of sampling
+
+sample_comps <- function(error, Input_N, DM_Param = NULL, prob) {
+  
     if(error == "multinomial") {
       # Generate comps based on the expected catch at age
-      Age_Comps <- rmultinom(n = 1, size = N_eff, prob = prob)[,1]
+      Age_Comps <- rmultinom(n = 1, size = Input_N, prob = prob)
     } # if our error is multinomial
-    
-  } # if our fleet is fishery
   
-  if(Comp_Fleet == "Survey") {
-    if(error == "multinomial") {
-      # Generate comps based on the expected CPUE at agew
-      Age_Comps <- rmultinom(n = 1, size = N_eff, prob = prob)[,1]
-    } # if our error structure is multinomial
-    
-  } # if our fleet is survey 
+  if(error == "dirichlet") {
+    lambda <- Input_N/DM_Param^2 - 1
+    alpha <- prob * lambda # Get concentration parameter
+    Comp_Probs <- rgamma(length(alpha), alpha) # Sample from dirichlet
+    Age_Comps <- Comp_Probs/sum(Comp_Probs) # Normalize!
+  }
+  
+  if(error == "dirichlet_multinomial") { # Thorson et al. 2017
+    # The Dirichlet portion of this essentially modifies the inherent sampling probability of CAA
+    # Dir_Probs <- gtools::rdirichlet(n = length(prob), alpha = prob * DM_Param)
+    alpha <- prob * DM_Param # Get dirichlet alpha parameter
+    Age_Comps <- rdirmultinom(Input_N = Input_N, alpha = alpha) # Get dirichlet multinomial samples
+
+  } # if our error is dirichlet multinomial
 
   return(Age_Comps)
 

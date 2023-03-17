@@ -1,4 +1,4 @@
-# Purpose: To test TMB EM biases, debug, troubleshoot, and develop fxns and EM model
+`# Purpose: To test TMB EM biases, debug, troubleshoot, and develop fxns for EM model
 # Set up ------------------------------------------------------------------
 
 library(here)
@@ -15,44 +15,46 @@ source(here(fxn_path, "prepare_EM_input.R"))
 compile_tmb(wd = here("src"), cpp = "EM.cpp")
 
 # Path to general input biological parameters
-# spreadsheet_path <- here("input", "EBS_Pollock_Inputs.xlsx")
-spreadsheet_path <- here("input", "Sablefish_Inputs.xlsx")
+spreadsheet_path <- here("input", "EBS_Pollock_Inputs.xlsx")
+# spreadsheet_path <- here("input", "Sablefish_Inputs.xlsx")
 
 # simulate data
 simulate_data(fxn_path = fxn_path, 
               check_equil = FALSE,
               spreadsheet_path = spreadsheet_path, 
               rec_type = "BH",
-              Start_F = c(0.01, 0.01), 
-              Fish_Start_yr = c(100, 100), 
-              Surv_Start_yr = c(100), 
-              max_rel_F_M = c(1, 1), 
-              desc_rel_F_M = c(0.05, 0.05), 
-              F_type = c("Contrast", "Const_Inc"),
-              yr_chng = c(115, 115), 
-              yr_chng_end = 130,
-              fish_Neff_max = c(200, 200), 
-              srv_Neff_max = c(200),
+              Start_F = c(0.01), 
+              Fish_Start_yr = c(1), 
+              Surv_Start_yr = c(1), 
+              max_rel_F_M = c(1,1), 
+              desc_rel_F_M = c(0.05), 
+              F_type = c("Contrast"),
+              yr_chng = c(25), 
+              yr_chng_end = 30,
+              fish_likelihood = "dirichlet_multinomial",
+              srv_likelihood = "multinomial",
+              # DM_Srv_Param = 1,
+              DM_Fish_Param = 1,
+              Input_Fish_N_Max = c(200), 
+              Input_Srv_N_Max = c(200),
               fish_CV = c(0.1, 0.1),
               srv_CV = c(0.1), 
-              catch_CV = c(0.01, 0.01), 
-              Neff_Fish_Time = "Constant", 
-              fixed_Neff = c(30, 30),
+              catch_CV = c(0.01), 
+              Input_N_Fish_Time = "F_Vary", 
+              Input_N_Fish_Fixed = c(30),
               Mort_Time = "Constant", 
-              q_Mean_Fish = c(0.05, 0.05), 
+              q_Mean_Fish = c(0.05), 
               q_Mean_Surv = 0.01, 
-              fish_selex = c("logistic", "logistic"), 
+              fish_selex = c("logistic"), 
               srv_selex = c("logistic"), 
               # if switching to a single sex, be sure to change the nrow to the number of sexes,
               # and to make sure the selex parameters for the fleets align n_pars * n_sexes
               # e.g., (7, 0.8, 4, 0.3) for a logistic with two sexes, nrow = 2
-              fish_pars = list(Fleet_1_L = matrix(data = c(3, 0.8, 5, 0.8), 
-                                                  nrow = 2, byrow = TRUE),
-                               Fleet_2_L = matrix(data = c(5, 0.4, 7, 0.3), 
-                                                  nrow = 2, byrow = TRUE)), # fish fleet 2
-              srv_pars = list(Fleet_3_SL = matrix(data = c(2, 0.5, 3, 0.4), 
-                                                  nrow = 2, byrow = TRUE)), # survey fleet 1
-              f_ratio = 0.5, m_ratio = 0.5)
+              fish_pars = list(Fleet_1_L = matrix(data = c(5, 0.85), 
+                                                  nrow = 1, byrow = TRUE)), # fish fleet 2
+              srv_pars = list(Fleet_3_SL = matrix(data = c(2, 0.85), 
+                                                  nrow = 1, byrow = TRUE)), # survey fleet 1
+              f_ratio = 1, m_ratio = 0)
 
 plot_OM(path = here("figs", "Base_OM_Figs"), file_name = "OM_Check.pdf")
 
@@ -70,6 +72,7 @@ all_harv_rates <- data.frame()
 conv <- vector()
 depletion_all <- data.frame()
 ssb0_all <- data.frame()
+fish_neff_all <- data.frame()
 
 # Specify years here
 years <- Fish_Start_yr[1]:(n_years - 1)
@@ -78,86 +81,128 @@ start.time <- Sys.time()
 
 compile_tmb(wd = here("src"), cpp = "EM.cpp")
 
-for(sim in 1:n_sims){
-  
+for(sim in sim:n_sims){
   
   # Prepare inputs here
   input <- prepare_EM_input(years = years,
                             n_fleets = 1, 
-                            catch_cv = c(1e-2),
+                            catch_cv = c(0.01),
                             F_Slx_Blocks_Input = matrix(c(rep(0)),
                                                         nrow = length(years),
                                                         ncol = 1), # fishery blocks
                             S_Slx_Blocks_Input = matrix(c(0), # selectivity blocks
                                                         nrow = length(years), 
                                                         ncol = 1),
+                            # use_srv_comps = FALSE,
+                            # use_srv_index = FALSE,
                             use_fish_index = FALSE,
+                            Fish_Comp_Like_Model = c("dirichlet_multinomial"),
+                            Srv_Comp_Like_Model = c("multinomial"),
                             rec_model = "BH", 
-                            F_Slx_Model_Input = c("exp_logistic"),
+                            F_Slx_Model_Input = c("logistic"),
                             S_Slx_Model_Input = c("logistic"), 
                             time_selex = "None",
                             n_time_selex_pars = NULL,
-                            fix_pars = c("ln_SigmaRec", "logit_q_fish", "ln_h"),
+                            fix_pars = c(
+                                         "ln_SigmaRec",
+                                         "ln_q_fish", 
+                                         "ln_h"), 
+                                         # "ln_N1Devs",
+                                         # "ln_Fy",
+                                         # "ln_RecDevs",
+                                         # "ln_fish_selpars",
+                                         # "ln_srv_selpars",
+                                         # "ln_q_srv",
+                                         # "ln_RecPars",
+                                         # "ln_M"),
+                                         # "ln_DM_Fish_Param"),
                             sim = sim)
+  
   
   # input$parameters$ln_srv_selpars[] <- log(c(2, 3, 0.5, 0.4))
   # input$parameters$ln_fish_selpars[] <- log(c(3, 5, 0.8, 0.8))
-  input$data$N1_Sex_Test <- matrix(N_at_age[100,,,sim], ncol = 2, nrow = 30)
-  input$parameters$ln_N1Devs <- log(rowSums(matrix(N_at_age[100,,,sim], ncol = 2, nrow = 30) ))
-  # input$parameters$fixed_sel_re_fish[] <- c(0.2, 0.2, 0.2, 0.2)
-  input$parameters$ln_fish_selpars[] <- log(c(0.5, 0.5, 3, 3, 0.1, 0.1))
-    
+  input$data$N1_Sex_Test <- log(matrix(N_at_age[1,,,sim], ncol = 2, nrow = 30))
+  # input$parameters$ln_N1Devs <- log(rowSums(matrix(N_at_age[1,,,sim], ncol = 1, nrow = length(ages)) ))
+  # input$data$obs_fish_age_Input_N[] <- (Input_N_Fish[Fish_Start_yr[1]:(n_years-1),] + 
+  #                                         (DM_Fish_Param * Input_N_Fish[Fish_Start_yr[1]:(n_years-1),])) /
+  #   (Input_N_Fish[Fish_Start_yr[1]:(n_years-1),] + DM_Fish_Param)
+  input$parameters$ln_q_srv <- log(mean(q_Surv))
+  input$parameters$ln_fish_selpars[] <- log(c(5, 0.85))
+  input$parameters$ln_srv_selpars[] <- log(c(2, 0.85))
+  input$parameters$ln_DM_Fish_Param[] <- log(1)
+  input$parameters$ln_DM_Srv_Param[] <- log(1)
+  input$data$ssb0_dat <- ssb0
+  input$data$obs_fish_age_Input_N[] <- input$data$obs_fish_age_Input_N[]
+  # input$parameters$ln_SigmaRec <- 0.01
+  # input$parameters$ln_SigmaRec <- log(input$parameters$ln_SigmaRec )
+  # input$parameters$ln_Fy[] <- log(0.1)
+  input$parameters$ln_N1Devs[] <- 0.1
+  # input$data$srv_cv <- 0.01
+
   # Run EM model here and get sdrep
   tryCatch(expr = model <- run_EM(data = input$data, parameters = input$parameters, 
                                   map = rlist::list.append(input$map), 
-                                  n.newton = 5, 
-                                  # random = "ln_fish_selpars_re",
-                                  silent = F, getsdrep = TRUE), error = function(e){e})
+                                  n.newton = 3, 
+                                  # random = "ln_RecDevs",
+                                  silent = TRUE, getsdrep = TRUE), error = function(e){e})
   
   # Check model convergence
   convergence_status <- check_model_convergence(mle_optim = model$mle_optim,
                                                 mod_rep = model$model_fxn,
                                                 sd_rep = model$sd_rep,
-                                                min_grad = 0.1)
+                                                min_grad = 0.01)
   conv[sim] <- convergence_status$Convergence
   max_par[sim] <- convergence_status$Max_Grad_Par
   
-  # par(mfrow = c(3, 1))
   if(conv[sim] == "Converged") {
-    year <- 31
+    par(mfrow = c(1,2))
+    year <- 1
     plot(model$model_fxn$rep$NAA[year,,1], type = "l", xlab ="Age",
-         ylab = "Numbers", main = paste("dataset 1", "run 2"))
-    lines(N_at_age[100+year-1,,1,sim], type = "l", col = "red")
+         ylab = "Numbers")
+    # lines(fish_mort[1+year-1,,sim] * Fish_selex_at_age[year,,,1,sim])
+    lines(N_at_age[1+year-1,,1,sim], type = "l", col = "blue")
+    plot(model$model_fxn$rep$NAA[year+1,,1], type = "l", xlab ="Age",
+         ylab = "Numbers")
+    # lines(fish_mort[1+year-1,,sim] * Fish_selex_at_age[year,,,1,sim])
+    lines(N_at_age[1+year-1+1,,1,sim], type = "l", col = "blue")
   }
   
   # Get parameter estimates
   M_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_M", trans = "log") %>%
     mutate(t = mean(Mort_at_age), type = "mortality", sim = sim, conv = conv[sim])
-  q_srv_df <- extract_parameter_vals(sd_rep = model$sd_rep,   par = "logit_q_srv", trans = "logit", logit_bounds = c(0, 0.5)) %>%
+  q_srv_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_q_srv", trans = "log") %>%
     mutate(t = mean(q_Surv), type = "q_surv", sim = sim, conv = conv[sim])
   meanrec_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_RecPars", trans = "log") %>%
     mutate(t = c(r0), type = c("r0"), sim = sim, conv = conv[sim])
-  # fish_sel_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_fish_selpars", trans = "log") %>%
-  # mutate(t = c(3, 5, 0.8, 0.8), type = c("f1", "f2", "f1d", "f2d"), sim = sim, conv = conv[sim])
+  fish_sel_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_fish_selpars", trans = "log") %>%
+  mutate(t = c(5,0.85), type = c("f1", "f2"), sim = sim, conv = conv[sim])
+  srv_sel_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_srv_selpars", trans = "log") %>%
+    mutate(t = c(2, 0.85), type = c("s1", "s2"), sim = sim, conv = conv[sim])
+  fish_dm_theta_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_DM_Fish_Param", trans = "log") %>%
+    mutate(t = c(DM_Fish_Param), type = c("DMF1"), sim = sim, conv = conv[sim])
+  # srv_dm_theta_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_DM_Srv_Param", trans = "log") %>%
+    # mutate(t = c(1), type = c("DMS1"), sim = sim, conv = conv[sim])
+  # recsig_theta_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_SigmaRec", trans = "log") %>%
+    # mutate(t = c(sigma_rec), type = c("sigmarec"), sim = sim, conv = conv[sim])
   # Bind parameter estimates
-  par_all <- rbind(M_df, q_srv_df, meanrec_df, par_all)
-  
+  par_all <- rbind( par_all, fish_dm_theta_df,  M_df, q_srv_df, meanrec_df, fish_dm_theta_df,fish_sel_df, srv_sel_df)
+
   # Recruitment
   rec_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "Total_Rec") %>% 
-    mutate(t = rec_total[100:(n_years-1),sim], sim = sim, conv = conv[sim],
-           year = 100:(n_years-1))
+    mutate(t = rec_total[1:(n_years-1),sim], sim = sim, conv = conv[sim],
+           year = 1:(n_years-1))
   rec_all <- rbind(rec_df, rec_all)
   
   # Check SSB
   ssb_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "SSB") %>% 
     mutate(t = SSB[Fish_Start_yr[1]:(n_years-1), sim], sim = sim, conv = conv[sim],
-           year = 100:(n_years-1))
+           year = 1:(n_years-1))
   ssb_all <- rbind(ssb_df, ssb_all)
   
   # Check F
   f_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "Total_Fy") %>% 
-    mutate(t = rowSums(fish_mort[Fish_Start_yr[1]:(n_years-1),,sim]), sim = sim, conv = conv[sim],
-           year = 100:(n_years-1))
+    mutate(t = fish_mort[Fish_Start_yr[1]:(n_years-1),,sim], sim = sim, conv = conv[sim],
+           year = 1:(n_years-1))
   f_all <- rbind(f_all, f_df)
   
   # Check depletion rates
@@ -176,7 +221,7 @@ for(sim in 1:n_sims){
   # Check fishery mean age
   fish_mean_ages <- extract_mean_age_vals(mod_rep = model$model_fxn, comp_name = "pred_fish_age_comps",
                                           bins = ages, comp_start_yr = Fish_Start_yr[1], sim = sim,
-                                          n_fish_true_fleets = 2) %>% mutate(conv = conv[sim])
+                                          n_fish_true_fleets = 1) %>% mutate(conv = conv[sim])
   fish_mu_age <- rbind(fish_mu_age, fish_mean_ages)
   
   # Get SSB0
@@ -184,11 +229,18 @@ for(sim in 1:n_sims){
     mutate(t = ssb0, sim = sim, conv = conv[sim])
   ssb0_all <- rbind(ssb0_all, ssb0_df)
   
+  # Get Fishery effective sample size
+  fish_neff_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "Fish_Neff") %>%
+  mutate(t = (Input_N_Fish[Fish_Start_yr[1]:(n_years-1),] + 
+                (Input_N_Fish[Fish_Start_yr[1]:(n_years-1),] *DM_Fish_Param)) /
+           ( Input_N_Fish[Fish_Start_yr[1]:(n_years-1),] + DM_Fish_Param)
+  , sim = sim, conv = conv[sim], year = 1:(n_years-1))
+  fish_neff_all <- rbind(fish_neff_all, fish_neff_df)
+  # 1/(1+DM_Fish_Param) + Input_N_Fish[Fish_Start_yr[1]:(n_years-1),]*(DM_Fish_Param/(1+DM_Fish_Param)
   print(paste("done w/  sim = ", sim))
   print(conv[sim])
   
 }
-
 
 # Summary Checks ----------------------------------------------------------
 
@@ -219,8 +271,12 @@ depletion_sum <-  get_RE_precentiles(df = depletion_all %>% filter(conv == "Conv
                                      est_val_col = 1, true_val_col = 5,
                                      par_name = "Depletion (SSB / SSB0)", group_vars = "year")
 
+fish_neff_sum <- get_RE_precentiles(df = fish_neff_all %>% filter(conv == "Converged"),
+                                 est_val_col = 1, true_val_col = 5,
+                                 par_name = "Fish Neff", group_vars = "year")
+
 all <- rbind(rec_sum, ssb_sum, f_sum,fish_mu_age_sum, srv_mu_age_sum,
-             depletion_sum) 
+             depletion_sum, fish_neff_sum) 
 
 
 # Get relative error time series
@@ -237,7 +293,8 @@ plot_RE_ts_base(data = all, par_name = "Total Recruitment", ylim = c(-0.9, 0.9))
 
 # Parameter estimates
 par_df <- par_all %>% mutate(RE = (mle_val - t ) / t) %>% 
-  filter(conv == "Converged")
+  filter(conv == "Converged") %>% 
+  mutate(CV = abs(mle_sd / trans_mle_val))
 ssb0_all_df <- ssb0_all %>% mutate(RE = (mle_val - t ) / t) %>% 
   filter(conv == "Converged")
 
@@ -248,10 +305,22 @@ par_sum <- get_RE_precentiles(df = par_all %>% filter(conv == "Converged"),
                               est_val_col = 2, true_val_col = 7, 
                               par_name = "", group_vars = "type")
 
+ggplot(par_df, aes(x = type, y = RE, fill = type)) +
+  geom_boxplot(alpha = 0.5) +
+  geom_hline(aes(yintercept = 0), size = 0.85, lty = 2, col = "black") +
+  theme_bw() +
+  # coord_cartesian(ylim = c(-1.5, 1.5)) +
+  facet_wrap(~type, scale = "free") +
+ ggthemes::scale_fill_colorblind() +
+  theme(legend.position = "none")
+
+dm <- par_df %>% filter(type == "q_surv")
+rec0 <- par_df %>% filter(type == "r0")
+plot(rec0$RE, dm$RE)
 
 (par_plot <- ggplot(par_df %>% filter(RE < 1), aes(x = RE, fill = type)) +
     geom_density(alpha = 0.2) +
-    facet_wrap(~type, scales = "free", nrow = 2) +
+    facet_wrap(~type, scales = "free") +
     geom_errorbarh(inherit.aes = FALSE, data = par_sum, 
                    aes(xmin = lwr_95, xmax = upr_95, y = 0, color = type),
                    height = 0, size = 2.5, alpha = 0.55, linetype = 1) +
@@ -269,7 +338,7 @@ par_sum <- get_RE_precentiles(df = par_all %>% filter(conv == "Converged"),
           axis.text = element_text(size = 13, color = "black"),
           legend.position = "none", legend.text = element_text(size = 15)))
 
-(ssb0_all_plot <- ggplot(ssb0_all_df %>% filter(RE < 1), aes(x = RE)) +
+(ssb0_all_plot <- ggplot(ssb0_all_df %>% filter, aes(x = RE)) +
     geom_density(alpha = 0.2) +
     geom_vline(aes(xintercept = median(RE)), linetype = 2,
                size = 0.85, col = "red", alpha = 1) +
@@ -285,12 +354,13 @@ par_sum <- get_RE_precentiles(df = par_all %>% filter(conv == "Converged"),
           axis.text = element_text(size = 13, color = "black"),
           legend.position = "none", legend.text = element_text(size = 15)))
 
-plot_grid(par_plot, est_plot, ncol = 1, align = "hv", axis = "bl",
-          rel_heights = c(0.3, 1))
+plot_grid(par_plot, est_plot, ncol = 2, align = "hv", axis = "bl",
+          rel_widths  = c(0.75, 1))
 
 f_all %>% 
   filter(conv == "Converged") %>% 
   ggplot(aes(x = year, y = mle_val, group = sim)) +
   geom_line(color = "grey", size = 1) +
-  geom_line(aes(y = t), color = "red") +
+  geom_line(aes(y = t), color = "red", lty = 2, size = 1) +
   theme_bw()
+

@@ -35,7 +35,7 @@ selex_opts <- function(selex_type, bins, par_values) {
     # Get k value
     k <- as.numeric(par_mat[,1][par_mat[,2] == "k"])
     # Compute selex 
-    selex <- 1 / (1 + exp(-1 * (bins - a50) / k)) 
+    selex <- 1 / (1 + exp(-1 * ((bins - a50)/k) )) 
     
   } # logistic selectivity
   
