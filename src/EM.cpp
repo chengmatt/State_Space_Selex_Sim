@@ -47,7 +47,7 @@ Type objective_function<Type>::operator() ()
   DATA_INTEGER(rec_model); // Recruitment model, == 0 Mean Recruitment
   DATA_IVECTOR(F_Slx_model); // Fishery Selectivity Model, == 0 Logistic n_fleets
   DATA_IMATRIX(F_Slx_Blocks); // Fishery Selectivity Time Blocks, n_years * n_fish_comps; 
-  // this is set up such that the selectivity within a fleet and across sexes is constant
+  // this is set up such that the selectivity within a fleet and across sexes is constant (i.e., can't implement different blocks for different sexes)
   DATA_IVECTOR(S_Slx_model); // Survey Selectivity Model, == 0 Logistic n_fleets 
   DATA_IMATRIX(S_Slx_Blocks); // Survey Selectivity Time Blocks, n_years * n_srv_fleets; 
   DATA_IMATRIX(fish_comp_likelihoods);  // Vector of integers denoting likelihoods for fish comps (n_fish_fleets, n_sexes)
@@ -137,7 +137,6 @@ Type objective_function<Type>::operator() ()
   array<Type> Fish_Neff(n_years, n_fish_comps, n_sexes); 
   array<Type> Srv_Neff(n_years, n_srv_comps, n_sexes);
   Type rec_nLL = 0; // Recruitment likelihood penalty 
-  // Type Fpen_nLL = 0; // Penalty for Fs
   Type fish_sel_re_nLL = 0; // Fishery selectivity random effects
   Type jnLL = 0; // Joint Negative log Likelihood
   
@@ -149,14 +148,13 @@ Type objective_function<Type>::operator() ()
   srv_comp_nLL.setZero();
   
   // TESTING
-  DATA_MATRIX(N1_Sex_Test);
-  DATA_INTEGER(ssb0_dat);
+  // DATA_MATRIX(N1_Sex_Test);
+  // DATA_INTEGER(ssb0_dat);
   
   // MODEL STRUCTURE ----------------------------------------------
   // y = year, a = age, s = sex; in general, f = fishery fleet, sf = survey fleet
 
   // Selectivity ----------------------------------------------
-  
   // Selectivity random effects  ------------------------------------------------------
   for(int f = 0; f < n_fish_comps; f++) {
     for(int s = 0; s < n_sexes; s++) {
@@ -269,11 +267,6 @@ Type objective_function<Type>::operator() ()
   // Get FAA and fishing mortality
   for(int y = 0; y < n_years; y++) {
     for(int f = 0; f < n_fleets; f++) {
-      
-      // Calculate Fs based upon random walk
-      // if(y == 0) F_y(0, f) = exp(ln_Fy(0, f));
-      // if(y > 0) F_y(y, f) = F_y(y - 1, f) * exp(ln_Fy(y, f));
-      
       for(int a = 0; a < n_ages; a++) {
         for(int s = 0; s < n_sexes; s++) {
           // Calculate F_at_age
@@ -282,7 +275,7 @@ Type objective_function<Type>::operator() ()
           sum_FAA(y, a, s) += FAA(y, a, f, s);
         } // s loop
       } // a loop
-      // Increment F
+      // Increment F to get total across fleets
       Total_Fy(y) +=  exp(ln_Fy(y, f));
     } // f loop
   } // y loop
@@ -377,9 +370,9 @@ Type objective_function<Type>::operator() ()
      
    // Calculate SSB here (Indexing 0 for females)
       if(y >= 1) {
-        SSB(y) = sum(NAA.col(0).transpose().col(y) * 
-                     MatAA.col(0).transpose().col(y) *
-                     WAA.col(0).transpose().col(y));
+      SSB(y) = sum(NAA.col(0).transpose().col(y) * 
+                   MatAA.col(0).transpose().col(y) *
+                   WAA.col(0).transpose().col(y));
       }
   } // end year loop
         
@@ -414,11 +407,10 @@ Type objective_function<Type>::operator() ()
       for(int s = 0; s < n_sexes; s++) {
         for(int a = 0; a < n_ages; a++) {
           // Increment to get total index, conditional on selectivity
-          pred_fish_indices(y, fi) += exp(ln_q_fish(fi)) * NAA(y, a, s) * WAA(y, a, s) *  F_Slx(y, a, fi, s);
+          pred_fish_indices(y, fi) += exp(ln_q_fish(fi)) * NAA(y, a, s) * 
+                                          WAA(y, a, s) *  F_Slx(y, a, fi, s);
         } // a loop
       } // s loop
-      // Scale by catchability in log space
-      // pred_fish_indices(y, fi) *= exp(ln_q_fish(fi));
     } // y loop
   } // fi loop 
   
@@ -428,16 +420,14 @@ Type objective_function<Type>::operator() ()
       for(int s = 0; s < n_sexes; s++) { 
         for(int a = 0; a < n_ages; a++) {
           // Increment to get scale index conditional on selectivity
-          pred_srv_indices(y, si) += exp(ln_q_srv(si)) * NAA(y, a, s) * S_Slx(y, a, si, s);
+          pred_srv_indices(y, si) += exp(ln_q_srv(si)) * NAA(y, a, s) * 
+                                         S_Slx(y, a, si, s);
         } // a loop
       } // s loop
-      // Scale by catchability in log space
-      // pred_srv_indices(y, si) *= exp(ln_q_srv(si));
     } // y loop 
   } // si loop  
    
   // Calculate Compositions and Related Quantities ----------------------------------------------  
-  
   // Fishery Compositions 
   for(int y = 0; y < n_years; y++) {
     for(int fc = 0; fc < n_fish_comps; fc++) {
@@ -523,7 +513,7 @@ Type objective_function<Type>::operator() ()
           Fish_Neff(y, fc, s) = (Fish_Input_N + (Fish_Input_N * exp(ln_DM_Fish_Param(fc, s)))) / 
                                 (Fish_Input_N + exp(ln_DM_Fish_Param(fc, s)));
             
-            // Linear Version
+            // Linear Version of DM Neff
             // 1/(1+exp(ln_DM_Fish_Param(fc, s))) + 
             //                     Fish_Input_N*(exp(ln_DM_Fish_Param(fc, s))/
             //                     (1+exp(ln_DM_Fish_Param(fc, s))));
@@ -567,7 +557,7 @@ Type objective_function<Type>::operator() ()
           Srv_Neff(y, sc, s) = (Srv_Input_N + (Srv_Input_N * exp(ln_DM_Srv_Param(sc, s)))) / 
                                (Srv_Input_N + exp(ln_DM_Srv_Param(sc, s)));
             
-            // Linear Version
+            // Linear Version of DM Neff
             // 1/(1+exp(ln_DM_Srv_Param(sc, s))) + 
             //                    Srv_Input_N*(exp(ln_DM_Srv_Param(sc, s))/
             //                    (1+exp(ln_DM_Srv_Param(sc, s))));
@@ -588,10 +578,12 @@ Type objective_function<Type>::operator() ()
       
       // Get likelihood here
       catch_nLL(y, f) -= use_catch(y, f) * dnorm(log(obs_catches(y, f)),
-                log(pred_catches(y, f)), catch_sd(f), true);
+                         log(pred_catches(y, f)) -(pow(catch_sd(f),2)/Type(2)), 
+                         catch_sd(f), true);
       
       SIMULATE{ // Simulate catch
-        obs_catches(y, f) = exp(rnorm(log(pred_catches(y, f)), catch_sd(f) ));
+        obs_catches(y, f) = exp(rnorm(log(pred_catches(y, f))
+                              -(pow(catch_sd(f),2)/Type(2)),  catch_sd(f) ));
       } // Simulation statement
       
     } // f loop
@@ -609,10 +601,12 @@ Type objective_function<Type>::operator() ()
       
       // Likelihood calculations
       fish_index_nLL(y, fi) -= use_fish_index(y, fi) * dnorm(log(obs_fish_indices(y, fi)), 
-                     log(pred_fish_indices(y, fi)), fish_sd(fi), true);
+                     log(pred_fish_indices(y, fi)) -(pow(fish_sd(fi), 2)/Type(2)), 
+                     fish_sd(fi), true);
       
       SIMULATE{ // Simulate Fishery Index
-        obs_fish_indices(y, fi) = exp(rnorm(log(pred_fish_indices(y, fi)), fish_sd(fi))); 
+        obs_fish_indices(y, fi) = exp(rnorm(log(pred_fish_indices(y, fi))
+                                    -(pow(fish_sd(fi), 2)/Type(2)), fish_sd(fi))); 
       } // Simulation statement
       
     } // fi loop
@@ -624,10 +618,12 @@ Type objective_function<Type>::operator() ()
       
       // Likelihood calculations
       srv_index_nLL(y, si) -= use_srv_index(y, si) * dnorm(log(obs_srv_indices(y, si)), 
-                    log(pred_srv_indices(y, si)), srv_sd(si), true); 
+                    log(pred_srv_indices(y, si)) -(pow(srv_sd(si), 2)/Type(2)), 
+                    srv_sd(si), true); 
       
       SIMULATE{ // Simulate Survey Index
-        obs_srv_indices(y, si) = exp(rnorm(log(pred_srv_indices(y, si)), srv_sd(si))); 
+        obs_srv_indices(y, si) = exp(rnorm(log(pred_srv_indices(y, si))
+                                   -(pow(srv_sd(si), 2)/Type(2)), srv_sd(si))); 
       } // Simulation statement
       
     } // y loop

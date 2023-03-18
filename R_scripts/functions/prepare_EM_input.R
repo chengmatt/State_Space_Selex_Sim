@@ -27,7 +27,7 @@
 #' @export
 #'
 #' @examples
-#' Note that n_years here refers to the all the rows of the array
+#' Note that n_years here refers to all the rows of the array
 prepare_EM_input <- function(years,
                              n_fleets, 
                              catch_cv,

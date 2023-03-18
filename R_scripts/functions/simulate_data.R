@@ -3,10 +3,40 @@
 # Date 1/2/23
 # Creator: Matthew LH. Cheng
 
+#' @param fxn_path Path to folder where all functions are coded in
+#' @param spreadsheet_path Path to life-history parameter spreadsheet
+#' @param check_equil Whether or not we want to check if population is at equilibrium
+#' @param rec_type Recruitment dynamics (specify as "mean_rec" for mean recruitment of "BH" for Beverton-Holt)
+#' @param Start_F Starting F vector
+#' @param Fish_Start_yr Starting Fishing years for fleets
+#' @param max_rel_F_M Maximum F value relative to the M
+#' @param desc_rel_F_M Descending F value relative to the M
+#' @param F_type Specify type of fishing mortality pattern
+#' @param yr_chng If we are simulating a fleet structure change, when do we want this change to occur at 
+#' Note that this is only applicable for (Const_Inc, Contrast, Const_Ramp_Const, and Contrast_Const)
+#' @param yr_chng_end If we are simulating a fleet structure change, when do we want this fleet structure change
+#' to end. Applicable for (Const_Ramp_Const, Contrast_Const)
+#' @param fish_likelihood Fishery com positional likelihood
+#' @param srv_likelihood Survey compositional likelihood
+#' @param Input_N_Fish_Time Whether Neff for the fisheries remain constant, or vary as a function of time (Constant or F_Vary)
+#' @param Input_N_Fish_Fixed Value for which Neff is fixed at - user-specified so that F_vary's N_eff determination doesn't
+#' drop below a certain value. 
+#' @param fish_CV Fishery CVs for indices
+#' @param srv_CV Survey CVs for indices
 #' @param DM_Fish_Param Weight parameter for Dirichlet Multinomial in the fishery
 #' @param DM_Srv_Param Weight parameter for Dirichlet Mutlinomial in the survey
-#' @param fish_likelihood Fishery compositional likelihood
-#' @param srv_likelihood Survey compositional likelihood
+#' @param catch_CV Catch CVs for aggregate catch
+#' @param Mort_Time Type of natural mortality pattern (only "Constant" is coded in right now)
+#' @param q_Mean_Fish Catchability for fishery (vector if > 1 fishery fleet)
+#' @param q_Mean_Srv Catchability for survey (vector if > 1 survey fleet)
+#' @param Rec_Dev_Type Whether or not recruitment deviations are "iid" or "Auto_Cor" (autocorrelated)
+#' @param rho_rec If recruitment deviations are autocorrelated, what should the rho parameter be
+#' @param fish_selex Fishery selectivity vector (Options are: uniform, logistic, gamma, double_logistic, double_normal)
+#' @param srv_selex Survey selectivity vector (Options are: uniform, logistic, gamma, double_logistic, double_normal)
+#' @param fish_pars Fishery selectivity parameters. Needs to be the same dimensions as the specified fish_selex function. 
+#' @param srv_pars Survey selectivity parameters. Needs to be the same dimensions as the specified srv_selex function. 
+#' @param f_ratio Female ratio for initial-age-at recruitment
+#' @param m_ratio Male ratio for initial-age-at-recruitment
 
 simulate_data <- function(fxn_path, 
                           spreadsheet_path, 
@@ -238,12 +268,9 @@ simulate_data <- function(fxn_path,
               # Only start sampling if y > Fish start year. 
               if(y >= Fish_Start_yr[f]) { # Observation Model for Fishery
                 
-                # Apply fishery error here
-                fish_obs_error <- exp(rnorm(1, 0, sqrt(log((fish_CV[f]^2) + 1))))
-                
                 # Generate a fishery index structured by fleet and sex (numbers based)
                 Fishery_Index[y,f,s,sim] <- q_Fish[y,f,sim]  *  sum(N_at_age[y,,s,sim] * wt_at_age[y,,s,sim] *  
-                                            Fish_selex_at_age[y,,f,s,sim] * fish_obs_error)
+                                            Fish_selex_at_age[y,,f,s,sim])
                 
                 # Probability for fishery age comps, using CAA as probability
                 Prob_Fish_Comps <- Catch_at_age[y,,f,s,sim]
@@ -261,9 +288,9 @@ simulate_data <- function(fxn_path,
             Fishery_Index_Agg[y,f,sim] <- sum(melt(Fishery_Index[y,f,,sim]), na.rm = TRUE) # Aggregate
             
             # # Apply error here, index fish_CV vector
-            # Fishery_Index_Agg[y,f,sim] <- idx_obs_error(error = "log_normal", 
-            #                                             true_index = Fishery_Index_Agg[y,f,sim],
-            #                                             CV = fish_CV[f])
+            Fishery_Index_Agg[y,f,sim] <- idx_obs_error(error = "log_normal",
+                                                        true_index = Fishery_Index_Agg[y,f,sim],
+                                                        CV = fish_CV[f])
           } # end fishery fleet index and loop
           
           # Survey Index and Comps --------------------------------------------------
@@ -275,13 +302,10 @@ simulate_data <- function(fxn_path,
               
               # Only start sampling if y > Survey Start Year.
               if(y >= Surv_Start_yr[sf]) { 
-                
-                # Apply obs error to survey
-                srv_obs_error <- exp(rnorm(1, 0, sqrt(log((srv_CV[sf]^2) + 1))))
  
                 # Get survey index here (numbers based)
                 Survey_Index[y,sf,s,sim] <- q_Surv[y,sf,sim]  * sum(N_at_age[y,,s,sim] *
-                                            Surv_selex_at_age[y,,sf,s,sim] * srv_obs_error)
+                                            Surv_selex_at_age[y,,sf,s,sim])
                 
                 # Get probability of sampling a given age class for use in multinomial
                 Prob_Surv_at_age <- (N_at_age[y,,s,sim] * Surv_selex_at_age[y,,sf,s,sim])
@@ -300,9 +324,9 @@ simulate_data <- function(fxn_path,
             Survey_Index_Agg[y,sf,sim] <- sum(melt(Survey_Index[y,sf,,sim]), na.rm = TRUE) # Aggregate
             
             # Apply error here, index srv_CV vector
-            # Survey_Index_Agg[y,sf,sim] <- idx_obs_error(error = "log_normal", 
-            #                                             true_index = Survey_Index_Agg[y,sf,sim],
-            #                                             CV = srv_CV[sf])
+            Survey_Index_Agg[y,sf,sim] <- idx_obs_error(error = "log_normal",
+                                                        true_index = Survey_Index_Agg[y,sf,sim],
+                                                        CV = srv_CV[sf])
             
           } # end sf loop
         } # end check equilibrium loop (not sampling when checking equilibrium)

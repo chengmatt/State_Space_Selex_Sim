@@ -66,12 +66,12 @@ Type Get_Selex(Type age,
 } // end function
 
 template<class Type>
-// Function to compute likelihood for dirichlet-multinomial (follows linear parameterization of
+// Function to compute likelihood for dirichlet-multinomial (follows saturating parameterization of
 // Thorson et al. 2017)
 // @param obs = Observed vector (in proportions)
 // @param pred = Predicted vector (in proportions)
 // @param Input_N = Input sample size
-// @param ln_theta = Theta parameter for DM
+// @param Dir_Param = Dirichlet parameter 
 // @param give_log = whether or not to compute log of likelihood
 Type ddirmult( vector<Type> obs, 
                vector<Type> pred, 
@@ -86,8 +86,9 @@ Type ddirmult( vector<Type> obs,
   vector<Type> p_obs = obs; // Observed vector
   Type dirichlet_param = exp(Dir_Param); // Dirichlet Alpha Parameter
 
-  // NOTE: These calculations are in log space (Thorson et al. 2017)
-  // 1st term -- integration constant that could be dropped
+  // NOTE: These calculations are in log space and are based off on Eq. 10 of (Thorson et al. 2017)
+  // 1st term -- integration constant that could be dropped 
+  // Useful for comparing to multinomial cases
   Type logLike = lgamma(Ntotal + Type(1));
   for(int a = 0; a < n_a; a++) logLike -= lgamma(Ntotal * p_obs(a) + Type(1));
 
@@ -99,14 +100,6 @@ Type ddirmult( vector<Type> obs,
     logLike += lgamma( (Ntotal * p_obs(a)) + (dirichlet_param * p_pred(a)) );
     logLike -= lgamma(dirichlet_param * p_pred(a));
   } // end c loop
-
-  // Type phi = sum(dirichlet_param);
-  // Type logLike = lgamma(Ntotal + 1.0) + lgamma(phi) - lgamma(Ntotal + phi);
-  // for(int a = 0; a < n_a; a++) {
-  //   logLike += -lgamma((p_obs(a) * Input_N) + 1.0) +
-  //               lgamma((p_obs(a) * Input_N) + dirichlet_param(a)) -
-  //               lgamma(dirichlet_param(a));
-  // } // end a loop
   
   if(give_log) return logLike; else return exp(logLike);
 } // end function
