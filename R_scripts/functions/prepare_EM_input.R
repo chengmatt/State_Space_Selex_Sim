@@ -102,8 +102,8 @@ prepare_EM_input <- function(years,
     obs_fish_age_Input_N <- array(data = NA, dim = c(length(years), n_fleets, n_sexes))
     
     # Effective sample size
-    for(s in 1:n_sexes) {
-      obs_fish_age_Input_N[,1,s] <- rowSums(floor(obs_fish_age_comps[,,,s]))
+    for(s in 1:1) {
+      obs_fish_age_Input_N[,1,s] <- rowSums(matrix(Input_N_Fish[Fish_Start_yr[1]:(n_years - 1),] * catch_weight))
     } # s loop
     
     # Now, apply the proportion function over a single fleet
@@ -274,6 +274,11 @@ prepare_EM_input <- function(years,
       map_ln_DM_Fish_Param[i,1:n_sexes] <- rep(1, n_sexes)
     } # if DM 
     
+    if(Fish_Comp_Like_Model[i] == "dirichlet") {
+      fish_comp_likelihoods[i, 1:n_sexes] <- rep(2, n_sexes)
+      map_ln_DM_Fish_Param[i,1:n_sexes] <- rep(1, n_sexes)
+    } # if Dirichlet 
+    
     # Random starting values for DM theta parameter
     ln_DM_Fish_Param[i,1:n_sexes] <- log(3) 
     
@@ -294,6 +299,11 @@ prepare_EM_input <- function(years,
       srv_comp_likelihoods[i,1:n_sexes] <- rep(1, n_sexes)
       map_ln_DM_Srv_Param[i,1:n_sexes] <- rep(1, n_sexes)
     } # if DM
+    
+    if(Srv_Comp_Like_Model[i] == "dirichlet") {
+      srv_comp_likelihoods[i,1:n_sexes] <- rep(2, n_sexes)
+      map_ln_DM_Srv_Param[i,1:n_sexes] <- rep(1, n_sexes)
+    } # if dirichlet
     
     # Random starting values for DM theta parameter
     ln_DM_Srv_Param[i,1:n_sexes] <- log(3) 
@@ -346,7 +356,7 @@ prepare_EM_input <- function(years,
   pars$ln_DM_Srv_Param <- ln_DM_Srv_Param # DM theta for survey
   pars$ln_SigmaRec <- log(sigma_rec) # recruitment variability
   pars$ln_RecDevs <- rec_devs[years[-1],sim] # rec devs
-  pars$ln_N1Devs <- rnorm(length(ages)-1, 0, 0.0) # rec devs
+  pars$ln_N1Devs <- rnorm(length(ages), 0, 0.0) # rec devs
   pars$ln_M <- log(mean(Mort_at_age)) # natural mortality
 
   # row sums for fish mort

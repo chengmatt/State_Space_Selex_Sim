@@ -1,3 +1,7 @@
+// Purpose: An assortment of utility functions and likelihoods
+// Creator: Matthew LH. Cheng (UAF-CFOS)
+// Date: 3/18/23
+
 template <class Type> // Function to call different selectivity parameterizations
 // @param age = indexed age within age loop
 // @param sel_model = integer of selectivity model 
@@ -66,31 +70,30 @@ Type Get_Selex(Type age,
 } // end function
 
 template<class Type>
-// Function to compute likelihood for dirichlet-multinomial (follows saturating parameterization of
+// Function to compute likelihood for dirichlet-multinomial (follows linear parameterization of
 // Thorson et al. 2017)
 // @param obs = Observed vector (in proportions)
 // @param pred = Predicted vector (in proportions)
 // @param Input_N = Input sample size
-// @param Dir_Param = Dirichlet parameter 
+// @param Dir_Param = parameter for DM
 // @param give_log = whether or not to compute log of likelihood
 Type ddirmult( vector<Type> obs, 
                vector<Type> pred, 
                Type Input_N, 
                Type Dir_Param, 
-               int give_log = 0){
+               int do_log = 1){
   
   // Pre-processing
   int n_a = obs.size(); // Number of age-classes/bins
   Type Ntotal = Input_N; // Input sample size assumed
   vector<Type> p_pred = pred; // Predicted vector
   vector<Type> p_obs = obs; // Observed vector
-  Type dirichlet_param = exp(Dir_Param); // Dirichlet Alpha Parameter
+  Type dirichlet_param = exp(Dir_Param) * Ntotal; // Dirichlet Alpha Parameter
 
-  // NOTE: These calculations are in log space and are based off on Eq. 10 of (Thorson et al. 2017)
-  // 1st term -- integration constant that could be dropped 
-  // Useful for comparing to multinomial cases
-  Type logLike = lgamma(Ntotal + Type(1));
-  for(int a = 0; a < n_a; a++) logLike -= lgamma(Ntotal * p_obs(a) + Type(1));
+  // NOTE: These calculations are in log space (Thorson et al. 2017)
+  // 1st term -- integration constant that could be dropped
+  Type logLike = lgamma(Ntotal + 1);
+  for(int a = 0; a < n_a; a++) logLike -= lgamma(Ntotal * p_obs(a) + 1);
 
   // 2nd term in formula
   logLike += lgamma(dirichlet_param) - lgamma(Ntotal + dirichlet_param);
@@ -101,5 +104,107 @@ Type ddirmult( vector<Type> obs,
     logLike -= lgamma(dirichlet_param * p_pred(a));
   } // end c loop
   
-  if(give_log) return logLike; else return exp(logLike);
+  // Type phi = dirichlet_param.sum();
+  // Type logLike = lgamma(Ntotal + 1.0) + lgamma(phi) - lgamma(Ntotal + phi);
+  // for(int a = 0; a < n_a; a++) {
+  //   logLike += -lgamma(p_obs(a) + 1.0) +
+  //     lgamma(p_obs(a) + dirichlet_param(a)) -
+  //     lgamma(dirichlet_param(a));
+  // } // end a loop
+  
+  if(do_log == 1) return logLike; else return exp(logLike);
+} // end function
+
+template <class Type>
+// Function to compute likelihood for dirichlet 
+// @param p_obs = Observed vector (in proportions)
+// @param p_pred = Predicted vector (in proportions)
+// @param Ntotal = Input sample size
+// @param Dir_Param = parameter for DM
+// @param Ntotal = Input sample size
+// @param give_log = whether or not to compute log of likelihood
+Type ddirichlet(vector<Type> p_obs, 
+                vector<Type> p_pred, 
+                Type Ntotal, 
+                Type Dir_Param,
+                int do_log)
+{
+  // Pre-processing
+  Type lambda = Ntotal/pow(exp(Dir_Param), 2) - 1; // Compute Lambda parameters
+  vector<Type> alpha = lambda * p_pred;  // Compute alpha dirichlet parameters
+  Type phi = alpha.sum(); // Sum to get phi
+  int n_ages = p_obs.size(); // Number of ages
+
+  // Define likelihood
+  Type logLike = lgamma(phi);
+  
+  // Loop through to compute likelihood
+  for(int a = 0; a < n_ages; a++) {
+    logLike +=  -lgamma(alpha(a)) + (alpha(a) - 1.0) * log(p_obs(a));
+  } // end a loop
+  
+  if(do_log == 1) return logLike;
+  else return exp(logLike);
+}
+
+template<class Type>
+// Function to compute the likelihoods of a variety of models (multinomial, dirichlet, and dirichlet-multinomial)
+// @param p_obs = Observed vector (in proportions)
+// @param p_pred = Predicted vector (in proportions)
+// @param Ntotal = Input sample size
+// @param Dir_Param = parameter for dirichlet or dirichlet multinomial (log space)
+// @param Ntotal = Input sample size
+// @param acomp_LL_model = Integer to denote likelihood model (== 0, multinomial, == 1, dirichlet-multinomial, == 2, dirichlet)
+// @param give_log = whether or not to compute log of likelihood
+Type get_acomp_nLL(vector<Type> p_obs, 
+                   vector<Type> p_pred, 
+                   Type Ntotal, 
+                   Type Dir_Param,
+                   int acomp_LL_model, 
+                   int do_log) {
+  
+  Type logLike = 0; // Likelihood storage
+  
+  // Compute likelihoods
+  if(acomp_LL_model == 0) { // Multinomial
+    vector<Type> obs_vec = p_obs * Ntotal; // Get Observed vector in numbers
+    logLike -= dmultinom(obs_vec, p_pred, true); // Compute likelihood
+  } // end if
+  
+  if(acomp_LL_model == 1) { // Dirichlet-Multinomial
+    logLike -= ddirmult(p_obs, p_pred, Ntotal, Dir_Param, true);  // cCompute likelihood
+  } // end if
+  
+  if(acomp_LL_model == 2) { // Dirichlet
+    logLike -= ddirichlet(p_obs, p_pred, Ntotal, Dir_Param, true);
+  } // end if
+  
+  if(do_log == 1) return logLike;  else return exp(logLike);
+} // end function
+
+template <class Type> 
+// Function to compute effective sample sizes for given composition likelihoods
+// @param Dir_Param = parameter for dirichlet or dirichlet multinomial (log space)
+// @param Ntotal = Input sample size
+// @param acomp_LL_model = Integer to denote likelihood model (== 0, multinomial, == 1, dirichlet-multinomial, == 2, dirichlet)
+Type get_Neff(Type Ntotal,
+              Type Dir_Param,
+              int acomp_LL_model) {
+  
+  Type Neff = 0; // Define for storage
+  
+  // Compute compositions
+  if(acomp_LL_model == 0) { // Multinomial
+    Neff = Ntotal;
+  } // end if
+  
+  if(acomp_LL_model == 1) { // Dirichlet-Multinomial (Saturating Version)
+    Neff = (Ntotal + (Ntotal * exp(Dir_Param))) / (Ntotal + exp(Dir_Param));
+  } // end if
+  
+  if(acomp_LL_model == 2) { // Dirichlet
+    Neff = Ntotal / pow(exp(Dir_Param), 2);
+  } // end if
+  
+  return Neff; 
 } // end function

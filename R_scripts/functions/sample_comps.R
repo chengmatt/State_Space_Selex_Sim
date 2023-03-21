@@ -7,14 +7,11 @@
 #' @param alpha Dirichlet Alpha parameter
 #' @param Input_N Effective sample size for the compositional dataset, corresponding to a fleet
 rdirmultinom <- function(Input_N, alpha){ 
-  # Function for dirichlet draws
-  rd1 <- function(alpha){
-    x <- rgamma(length(alpha), alpha)
-    p <- x/sum(x)
-    p
-  } # sample from dirichlet
-  # Sample from multinomial now
-  rdirmultinom_probs <- as.vector(stats::rmultinom(1, Input_N, rd1(alpha)))
+  # Make independent draws for a gamma -> Dirichlet draws
+  x <- rgamma(length(alpha), alpha)
+  dir_draws <- x/sum(x) # normalize proportions
+  # Sample from multinomial conditional on dirichlet
+  rdirmultinom_probs <- as.vector(stats::rmultinom(1, Input_N, dir_draws))
   return(rdirmultinom_probs)
 }
 
@@ -41,9 +38,9 @@ sample_comps <- function(error, Input_N, DM_Param = NULL, prob) {
   if(error == "dirichlet_multinomial") { # Thorson et al. 2017
     # The Dirichlet portion of this essentially modifies the inherent sampling probability of CAA
     # Dir_Probs <- gtools::rdirichlet(n = length(prob), alpha = prob * DM_Param)
-    alpha <- prob * DM_Param # Get dirichlet alpha parameter
-    Age_Comps <- rdirmultinom(Input_N = Input_N, alpha = alpha) # Get dirichlet multinomial samples
-
+    alpha <- prob * DM_Param * Input_N # Get dirichlet alpha parameter
+    # Age_Comps <- rdirmultinom(Input_N = Input_N, alpha = alpha) # Get dirichlet multinomial samples
+    Age_Comps <- extraDistr::rdirmnom(n = 1, size = Input_N, alpha = alpha)
   } # if our error is dirichlet multinomial
 
   return(Age_Comps)

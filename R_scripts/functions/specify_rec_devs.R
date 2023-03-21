@@ -26,7 +26,7 @@ specify_rec_devs <- function(Rec_Dev_Type, rho_rec = 0) {
     
     for(sim in 1:n_sims) {
       
-      rec_devs[,sim] <- rnorm(n_years, 0, sigma_rec)
+      rec_devs[,sim] <- rnorm(n_years, -((sigma_rec^2)/2), sigma_rec)
       
     } # end simulation loop
      
@@ -37,7 +37,7 @@ specify_rec_devs <- function(Rec_Dev_Type, rho_rec = 0) {
     for(sim in 1:n_sims) {
       
       # Create deviations here first
-      devs <- rnorm(n_years, 0, sigma_rec)
+      devs <- rnorm(n_years, -((sigma_rec^2)/2), sigma_rec)
       
       # Put these generated deviations in our rec devs dataframe
       rec_devs[1,sim] <- devs[1]

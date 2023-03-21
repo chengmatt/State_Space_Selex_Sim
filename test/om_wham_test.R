@@ -24,15 +24,15 @@ simulate_data(fxn_path = fxn_path,
               spreadsheet_path = spreadsheet_path, 
               rec_type = "BH",
               Start_F = c(0.01), 
-              Fish_Start_yr = c(100), 
-              Surv_Start_yr = c(100), 
+              Fish_Start_yr = c(1), 
+              Surv_Start_yr = c(1), 
               max_rel_F_M = c(1,1), 
               desc_rel_F_M = c(0.05), 
               F_type = c("Contrast"),
-              yr_chng = c(115), 
-              yr_chng_end = 130,
-              fish_likelihood = "multinomial",
-              srv_likelihood = "dirichlet_multinomial",
+              yr_chng = c(25), 
+              yr_chng_end = 30,
+              fish_likelihood = "dirichlet_multinomial",
+              srv_likelihood = "multinomial",
               DM_Fish_Param = 100,
               DM_Srv_Param = 100, 
               Input_Fish_N_Max = c(200), 
@@ -141,8 +141,8 @@ for(i in 2:length(selectivity)) {
                                           selectivity = selectivity[[i]], 
                                           recruit_model = 2, M = M, 
                                           catchability = catchability[[i]],
-                                          NAA_re = NULL, age_comp = list(fleets = "multinomial",
-                                                                         indices = "dir-mult"))
+                                          NAA_re = NULL, age_comp = list(fleets = "dir-mult",
+                                                                         indices = "multinomial"))
     
     # Fit WHAM here
     tryCatch( {
@@ -155,7 +155,7 @@ for(i in 2:length(selectivity)) {
       
       results_list[[sim]] <- get_results(em_fit)
       sdrep_list[[sim]] <- em_fit$sdrep
-      dir_par[sim] <- em_fit$sdrep$par.fixed[names(em_fit$sdrep$par.fixed ) == "index_paa_pars"] 
+      dir_par[sim] <- em_fit$sdrep$par.fixed[names(em_fit$sdrep$par.fixed ) == "catch_paa_pars"] 
       
       # threp <- em_fit$report()
       # sapply(grep("nll",names(threp),value=T), function(x) sum(threp[[x]]))
@@ -177,7 +177,7 @@ for(i in 2:length(selectivity)) {
   # Get SSB -----------------------------------------------------------------
   
   # Save simulations into dataframe
-  SSB_df <- compare_results(results_list = results_list, n_sims = n_sims, 
+  SSB_df <- compare_results(results_list = results_list, n_sims = sim, 
                             EM_variable = "SSB", OM_df = SSB, conv_vec = conv_vec)
   
   # Rename results and bind
@@ -188,7 +188,7 @@ for(i in 2:length(selectivity)) {
   # Get Fs ------------------------------------------------------------------
   
   # Do the same for f
-  F_df <- compare_results(results_list = results_list, n_sims = n_sims, 
+  F_df <- compare_results(results_list = results_list, n_sims = sim, 
                           EM_variable = "F", OM_df = fish_mort, conv_vec = conv_vec)
   
   F_df <- F_df[[2]] %>%  mutate(Par = names(selectivity)[[i]],

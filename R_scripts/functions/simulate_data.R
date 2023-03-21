@@ -129,8 +129,8 @@ simulate_data <- function(fxn_path,
   for(sim in 1:n_sims) {
     
     # Create deviations for initial age-structure
-    init_age_devs[,sim] <- exp(rnorm((length(ages)-1),0,sigma_rec) - (sigma_rec^2/2)) 
-
+    init_age_devs[,sim] <- exp(rnorm((length(ages)),- (sigma_rec^2/2),sigma_rec)) 
+    
     # Check equilibrium -------------------------------------------------------
     if(check_equil == TRUE) {
       # Turn fishing off
@@ -146,21 +146,21 @@ simulate_data <- function(fxn_path,
     # Years loop  -------------------------------------------------------------
     
     for(y in min(Fish_Start_yr):(n_years-1)) { # Start population at year of fishing
-       
+      
       if(y == min(Fish_Start_yr)) { # Start the population from equilibrium + deviations
         
         for(s in 1:n_sex) { # Loop through to propagate according to sex ratio
           # Not plus group
-          N_at_age[y,-max(ages),s,sim] <- r0 * exp(-Mort_at_age[y,-max(ages),sim] * (ages[-max(ages)]-1)) * 
-                                init_age_devs[,sim] * sex_ratio[y, s]
-          # Plus group
-          N_at_age[y,max(ages),s,sim] <- (r0 * (exp(-Mort_at_age[y,max(ages),sim] * (ages[max(ages)]-1)) / 
-                                         (1 - exp(-Mort_at_age[y,max(ages),sim])))) * sex_ratio[y, s]
+          N_at_age[y,,s,sim] <- r0 * exp(-Mort_at_age[y,,sim] * (ages-1)) * 
+                                          init_age_devs[,sim] * sex_ratio[y, s]
+          # # Plus group
+          # N_at_age[y,max(ages),s,sim] <- (r0 * (exp(-Mort_at_age[y,max(ages),sim] * (ages[max(ages)]-1)) / 
+          #                                         (1 - exp(-Mort_at_age[y,max(ages),sim])))) * sex_ratio[y, s]
         } # end s loop
         
         # Update quantities here
         Biom_at_age[y,,,sim] <- N_at_age[y,,,sim] * wt_at_age[y,,,sim] # Calculate Biomass at age 
-
+        
         # Now, update SSB (only females matter so indexing 1 for the sex dimension)
         SSB[y,sim] <- sum(mat_at_age[y,,1,sim] * Biom_at_age[y,,1,sim], na.rm = TRUE)
         
@@ -169,16 +169,24 @@ simulate_data <- function(fxn_path,
         
       } # end if statement for start year of the fishery
       
+      ### Update Biomass values and Numbers -------------------------------------
+      
+      # Update Biomass at age 
+      Biom_at_age[y,,,sim] <- N_at_age[y,,,sim] * wt_at_age[y,,,sim]
+      
+      # Now, update SSB (only females matter so indexing 1 for the sex dimension)
+      SSB[y,sim] <- sum(mat_at_age[y,,1,sim] * Biom_at_age[y,,1,sim], na.rm = TRUE)
+      
       if(y > min(Fish_Start_yr)) { # Recruitment happens the following year
         
         if(rec_type == "BH") { # do beverton holt recruitment
           # Now generate new recruits with the updated SSB
-          rec_total[y,sim] <- beverton_holt_recruit(ssb = SSB[y-1,sim], h = h, r0 = r0) * 
-            exp(rec_devs[y,sim] - ((sigma_rec^2)/2))
+          rec_total[y,sim] <- beverton_holt_recruit(ssb = SSB[y,sim], h = h, r0 = r0) * 
+                              exp(rec_devs[y,sim])
         } # if statement for BH
         
         if(rec_type == "mean_rec") {
-          rec_total[y,sim] <- exp(mu_rec + rec_devs[y,sim] - ((sigma_rec^2)/2))
+          rec_total[y,sim] <- exp(mu_rec + rec_devs[y,sim])
         } # do mean recruitment
         
       } # end if statement for recruitment
@@ -193,7 +201,7 @@ simulate_data <- function(fxn_path,
             
             # Add in recruits to the first age class
             if(a == 1 & y > min(Fish_Start_yr)) N_at_age[y,1,s,sim] <- rec_total[y,sim] * sex_ratio[y,s]
-
+            
             if(a < length(ages)) { # if we are not in the plus group nor are we in the recruit age
               
               # Calculate age, fleet, and sex specific mortality (returns vector fo fleet specific mortalities)
@@ -219,14 +227,6 @@ simulate_data <- function(fxn_path,
           } # sexes loop
         } # ages loop
         
-        ### Update Biomass values and Numbers -------------------------------------
-        
-        # Update Biomass at age 
-        Biom_at_age[y,,,sim] <- N_at_age[y,,,sim] * wt_at_age[y,,,sim]
-        
-        # Now, update SSB (only females matter so indexing 1 for the sex dimension)
-        SSB[y,sim] <- sum(mat_at_age[y,,1,sim] * Biom_at_age[y,,1,sim], na.rm = TRUE)
-        
         # Generate observations  ---------------------------------------------------
         
         if(check_equil == FALSE) { # end sampling if we want to check equilibrium
@@ -249,7 +249,7 @@ simulate_data <- function(fxn_path,
               
               # if only 1 fishery fleet
               if(n_fish_fleets == 1) Z_s <- (fish_mort[y,f,sim] * Fish_selex_at_age[y,,f,s,sim]) +  Mort_at_age[y,,sim]
-
+              
               ###  Get Catch at Age (Only F to C for now) -----------------------------------
               
               # Calculate instantaneous fishing mortality for a given fleet, sex, and age
@@ -260,7 +260,7 @@ simulate_data <- function(fxn_path,
               
               if(s == n_sex) { # Get catch aggregated across ages and sexes, and add lognormal errors
                 Catch_agg[y, f, sim] <- sum(Catch_at_age[y,,f,,sim] * wt_at_age[y,,,sim]) * 
-                                        exp( rnorm(1, 0, sqrt(log(catch_CV^2 + 1))) )
+                                        exp( rnorm(1, -sqrt(log(catch_CV[f]^2 + 1))^2/2, sqrt(log(catch_CV[f]^2 + 1))) )
               } # if we are done w/ looping through sexes
               
               ### Sample Fishery Index and Comps ------------------------------------------
@@ -270,11 +270,11 @@ simulate_data <- function(fxn_path,
                 
                 # Generate a fishery index structured by fleet and sex (numbers based)
                 Fishery_Index[y,f,s,sim] <- q_Fish[y,f,sim]  *  sum(N_at_age[y,,s,sim] * wt_at_age[y,,s,sim] *  
-                                            Fish_selex_at_age[y,,f,s,sim])
+                                                                      Fish_selex_at_age[y,,f,s,sim])
                 
                 # Probability for fishery age comps, using CAA as probability
                 Prob_Fish_Comps <- Catch_at_age[y,,f,s,sim]
-                
+
                 # Generate comps based on catch at age
                 Fish_Age_Comps[y,,f,s,sim] <- sample_comps(error = fish_likelihood,
                                                            Input_N = Input_N_Fish[y,f], 
@@ -302,13 +302,13 @@ simulate_data <- function(fxn_path,
               
               # Only start sampling if y > Survey Start Year.
               if(y >= Surv_Start_yr[sf]) { 
- 
+                
                 # Get survey index here (numbers based)
                 Survey_Index[y,sf,s,sim] <- q_Surv[y,sf,sim]  * sum(N_at_age[y,,s,sim] *
-                                            Surv_selex_at_age[y,,sf,s,sim])
+                                                                    Surv_selex_at_age[y,,sf,s,sim])
                 
                 # Get probability of sampling a given age class for use in multinomial
-                Prob_Surv_at_age <- (N_at_age[y,,s,sim] * Surv_selex_at_age[y,,sf,s,sim])
+                Prob_Surv_at_age <- N_at_age[y,,s,sim] * Surv_selex_at_age[y,,sf,s,sim]
                 
                 # Generate comps based on the expected CPUE at age
                 Survey_Age_Comps[y,,sf,s,sim] <- sample_comps(error = srv_likelihood,
@@ -317,7 +317,6 @@ simulate_data <- function(fxn_path,
                                                               prob = Prob_Surv_at_age / sum(Prob_Surv_at_age))
                 
               } # Only start sampling if we are at the start of the survey start year
-              
             } # end sex loop for survey here
             
             # Summarize this fishery index aggregated by sex and applying some error
@@ -350,6 +349,7 @@ simulate_data <- function(fxn_path,
   rec_devs <<- rec_devs
   DM_Fish_Param <<- DM_Fish_Param
   DM_Srv_Param <<- DM_Srv_Param
+  init_age_devs <<- init_age_devs
   
   om_list <- list(N_at_age = N_at_age, Biom_at_age = Biom_at_age,
                   SSB = SSB, rec_total = rec_total, Catch_at_age = Catch_at_age, Catch_agg = Catch_agg,

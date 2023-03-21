@@ -1,4 +1,4 @@
-`# Purpose: To test TMB EM biases, debug, troubleshoot, and develop fxns for EM model
+# Purpose: To test TMB EM biases, debug, troubleshoot, and develop fxns for EM model
 # Set up ------------------------------------------------------------------
 
 library(here)
@@ -25,7 +25,7 @@ simulate_data(fxn_path = fxn_path,
               rec_type = "BH",
               Start_F = c(0.01), 
               Fish_Start_yr = c(1), 
-              Surv_Start_yr = c(1), 
+              Surv_Start_yr = c(1),  
               max_rel_F_M = c(1,1), 
               desc_rel_F_M = c(0.05), 
               F_type = c("Contrast"),
@@ -40,8 +40,8 @@ simulate_data(fxn_path = fxn_path,
               fish_CV = c(0.1, 0.1),
               srv_CV = c(0.1), 
               catch_CV = c(0.01), 
-              Input_N_Fish_Time = "F_Vary", 
-              Input_N_Fish_Fixed = c(30),
+              Input_N_Fish_Time = "Constant", 
+              Input_N_Fish_Fixed = c(25),
               Mort_Time = "Constant", 
               q_Mean_Fish = c(0.05), 
               q_Mean_Surv = 0.01, 
@@ -78,10 +78,9 @@ fish_neff_all <- data.frame()
 years <- Fish_Start_yr[1]:(n_years - 1)
 
 start.time <- Sys.time()
-
 compile_tmb(wd = here("src"), cpp = "EM.cpp")
 
-for(sim in 1:n_sims){
+for(sim in sim:n_sims){
   
   # Prepare inputs here
   input <- prepare_EM_input(years = years,
@@ -95,7 +94,7 @@ for(sim in 1:n_sims){
                                                         ncol = 1),
                             # use_srv_comps = FALSE,
                             # use_srv_index = FALSE,
-                            use_fish_index = FALSE,
+                            # use_fish_index = FALSE,
                             Fish_Comp_Like_Model = c("dirichlet_multinomial"),
                             Srv_Comp_Like_Model = c("multinomial"),
                             rec_model = "BH", 
@@ -107,7 +106,7 @@ for(sim in 1:n_sims){
                                          "ln_SigmaRec",
                                          "ln_q_fish", 
                                          "ln_h"),
-                                         # "fixed_sel_re_fish"), 
+                                         # "fixed_sel_re_fish",
                                          # "ln_N1Devs",
                                          # "ln_Fy",
                                          # "ln_RecDevs",
@@ -123,22 +122,24 @@ for(sim in 1:n_sims){
   # input$parameters$ln_srv_selpars[] <- log(c(2, 3, 0.5, 0.4))
   # input$parameters$ln_fish_selpars[] <- log(c(3, 5, 0.8, 0.8))
   input$data$N1_Sex_Test <- log(matrix(N_at_age[1,,,sim], ncol = 2, nrow = 30))
-  # input$parameters$ln_N1Devs <- log(rowSums(matrix(N_at_age[1,,,sim], ncol = 1, nrow = length(ages)) ))
+  input$parameters$ln_N1Devs <- log(init_age_devs[,sim])
   # input$data$obs_fish_age_Input_N[] <- (Input_N_Fish[Fish_Start_yr[1]:(n_years-1),] + 
   #                                         (DM_Fish_Param * Input_N_Fish[Fish_Start_yr[1]:(n_years-1),])) /
   #   (Input_N_Fish[Fish_Start_yr[1]:(n_years-1),] + DM_Fish_Param)
   input$parameters$ln_q_srv <- log(mean(q_Surv))
+  input$parameters$ln_q_fish <- log(mean(q_Fish))
+  
   input$parameters$ln_fish_selpars[] <- log(c(5, 0.85))
   input$parameters$ln_srv_selpars[] <- log(c(2, 0.85))
-  input$parameters$ln_DM_Fish_Param[] <- log(1)
+  input$parameters$ln_DM_Fish_Param[] <- log(2)
   input$parameters$ln_DM_Srv_Param[] <- log(1)
   input$data$ssb0_dat <- ssb0
-  # input$data$obs_fish_age_Input_N[] <- input$data$obs_fish_age_Input_N[]
+  input$data$obs_fish_age_Input_N[] <- input$data$obs_fish_age_Input_N[] * 5
   # input$parameters$ln_SigmaRec <- 0.01
   # input$parameters$ln_SigmaRec <- log(input$parameters$ln_SigmaRec )
-  # input$parameters$ln_Fy[] <- log(0.1)
+  # input$parameters$ln_Fy[] <- log(0.01)
   # input$parameters$ln_N1Devs[] <- 0.1
-  # input$data$srv_cv <- 0.01
+  # input$data$srv_cv <- 0.05
   # input$parameters$fixed_sel_re_fish[] <- log(2)
 
   # Run EM model here and get sdrep
@@ -180,10 +181,10 @@ for(sim in 1:n_sims){
     mutate(t = mean(q_Surv), type = "q_surv", sim = sim, conv = conv[sim])
   meanrec_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_RecPars", trans = "log") %>%
     mutate(t = c(r0), type = c("r0"), sim = sim, conv = conv[sim])
-  fish_sel_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_fish_selpars", trans = "log") %>%
-  mutate(t = c(5,0.85), type = c("f1", "f2"), sim = sim, conv = conv[sim])
-  srv_sel_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_srv_selpars", trans = "log") %>%
-    mutate(t = c(2, 0.85), type = c("s1", "s2"), sim = sim, conv = conv[sim])
+  # fish_sel_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_fish_selpars", trans = "log") %>%
+  # mutate(t = c(5,0.85), type = c("f1", "f2"), sim = sim, conv = conv[sim])
+  # srv_sel_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_srv_selpars", trans = "log") %>%
+  #   mutate(t = c(2, 0.85), type = c("s1", "s2"), sim = sim, conv = conv[sim])
   fish_dm_theta_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_DM_Fish_Param", trans = "log") %>%
     mutate(t = c(DM_Fish_Param), type = c("DMF1"), sim = sim, conv = conv[sim])
   # srv_dm_theta_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_DM_Srv_Param", trans = "log") %>%
@@ -191,7 +192,8 @@ for(sim in 1:n_sims){
   # recsig_theta_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_SigmaRec", trans = "log") %>%
     # mutate(t = c(sigma_rec), type = c("sigmarec"), sim = sim, conv = conv[sim])
   # Bind parameter estimates
-  par_all <- rbind( par_all, fish_dm_theta_df,  M_df, q_srv_df, meanrec_df, fish_dm_theta_df,fish_sel_df, srv_sel_df)
+  par_all <- rbind( par_all, fish_dm_theta_df,  M_df, q_srv_df, meanrec_df, fish_dm_theta_df)
+                    # fish_sel_df, srv_sel_df)
 
   # Recruitment
   rec_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "Total_Rec") %>% 
@@ -236,17 +238,27 @@ for(sim in 1:n_sims){
   ssb0_all <- rbind(ssb0_all, ssb0_df)
   
   # Get Fishery effective sample size
+  # fish_neff_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "Fish_Neff") %>%
+  # mutate(t = Input_N_Fish[Fish_Start_yr[1]:(n_years-1),]/ DM_Fish_Param^2
+  # , sim = sim, conv = conv[sim], year = 1:(n_years-1))
+  
+  # fish_neff_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "Fish_Neff") %>%
+  #   mutate(t =   (Input_N_Fish[Fish_Start_yr[1]:(n_years-1),] + (Input_N_Fish[Fish_Start_yr[1]:(n_years-1),] * DM_Fish_Param)) / (Input_N_Fish[Fish_Start_yr[1]:(n_years-1),] +  DM_Fish_Param), sim = sim, conv = conv[sim], year = 1:(n_years-1))
+  
   fish_neff_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "Fish_Neff") %>%
-  mutate(t = (Input_N_Fish[Fish_Start_yr[1]:(n_years-1),] + 
-                (Input_N_Fish[Fish_Start_yr[1]:(n_years-1),] *DM_Fish_Param)) /
-           ( Input_N_Fish[Fish_Start_yr[1]:(n_years-1),] + DM_Fish_Param)
-  , sim = sim, conv = conv[sim], year = 1:(n_years-1))
+  mutate(t =  1/(1+DM_Fish_Param) + Input_N_Fish[Fish_Start_yr[1]:(n_years-1),]*(DM_Fish_Param/(1+DM_Fish_Param)), sim = sim, conv = conv[sim], year = 1:(n_years-1))
+  # 
+  # 
   fish_neff_all <- rbind(fish_neff_all, fish_neff_df)
-  # 1/(1+DM_Fish_Param) + Input_N_Fish[Fish_Start_yr[1]:(n_years-1),]*(DM_Fish_Param/(1+DM_Fish_Param)
+  # (Input_N_Fish[-31] / DM_Fish_Param^2)
+  # 1/(1+DM_Fish_Param) + Input_N_Fish[Fish_Start_yr[1]:(n_years-1),]*(DM_Fish_Param/(1+DM_Fish_Param))
+  # 1/(1+0.04496562) + (Input_N_Fish[Fish_Start_yr[1]:(n_years-1),] * 10) *(0.04496562/(1+0.04496562))
+  
   print(paste("done w/  sim = ", sim))
   print(conv[sim])
   
 }
+
 
 # Summary Checks ----------------------------------------------------------
 
@@ -304,6 +316,8 @@ par_df <- par_all %>% mutate(RE = (mle_val - t ) / t) %>%
 ssb0_all_df <- ssb0_all %>% mutate(RE = (mle_val - t ) / t) %>% 
   filter(conv == "Converged")
 
+# hist((par_df$mle_val[par_df$type == "DMF1"] - 1.5) / 1.5)
+
 # par_df %>% group_by(type) %>% summarize(mle_val = median(mle_val))
 
 # Quick summary stats
@@ -321,7 +335,7 @@ ggplot(par_df, aes(x = type, y = RE, fill = type)) +
   theme(legend.position = "none")
 
 dm <- par_df %>% filter(type == "q_surv")
-rec0 <- par_df %>% filter(type == "r0")
+rec0 <- par_df %>% filter(type == "DMF1")
 plot(rec0$RE, dm$RE)
 
 (par_plot <- ggplot(par_df %>% filter(RE < 1), aes(x = RE, fill = type)) +
