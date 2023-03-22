@@ -582,9 +582,9 @@ Type objective_function<Type>::operator() ()
           Type ln_fish_theta = ln_DM_Fish_Param(fc, s); // Dispersion Parameter
           
           // Evaluate log-likelihood 
-          // fish_comp_nLL(y, fc, s) -= use_fish_comps(y, fc, s) *
-          //                            ddirmult(obs_fish_age_vec, pred_fish_age_vec,
-          //                                     Fish_Input_N, ln_fish_theta, true);
+          fish_comp_nLL(y, fc, s) -= use_fish_comps(y, fc, s) *
+                                     ddirmult(obs_fish_age_vec, pred_fish_age_vec,
+                                              Fish_Input_N, ln_fish_theta, true);
           
           // Type s1 = 0.0;
           // Type s2 = 0.0;
