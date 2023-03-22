@@ -11,7 +11,7 @@ Type objective_function<Type>::operator() ()
 {
   using namespace density; // Define namespace to use SEPARABLE, AR1, SCALE
   using namespace Eigen; // Define namespace for Eigen functions (i.e., sparse matrix)
-  
+    
   // DATA SECTION ----------------------------------------------
   // Define general model dimensions
   DATA_VECTOR(ages); // Vector of ages
@@ -22,7 +22,7 @@ Type objective_function<Type>::operator() ()
   DATA_INTEGER(n_srv_indices); // Number of survey indices of abundance 
   DATA_INTEGER(n_fish_comps); // Number of fishery comps
   DATA_INTEGER(n_srv_comps); // Number of survey comps
-  
+    
   int n_ages = ages.size(); // Determine length of age vector
   int n_years = years.size(); // Determine length of years vector
   
@@ -337,11 +337,6 @@ Type objective_function<Type>::operator() ()
   for(int y = 0; y < n_years; y++) {
     for(int s = 0; s < n_sexes; s++) {
       
-      // Calculate SSB here (Indexing 0 for females)
-      SSB(y) = sum(NAA.col(0).transpose().col(y) * 
-        MatAA.col(0).transpose().col(y) *
-        WAA.col(0).transpose().col(y));
-      
       // Recruitment ----------------------------------------------
       if(y >= 1) { 
         
@@ -357,8 +352,8 @@ Type objective_function<Type>::operator() ()
           Type h = exp(ln_RecPars(1)); // Steepness in normal space
           
           // Define BH components
-          Type BH_first_part = Type(4) * h * R0 * SSB(y);
-          Type BH_sec_part = (ssb0 * (Type(1) - h)) + SSB(y) * ((Type(5)*h) - 1);
+          Type BH_first_part = Type(4) * h * R0 * SSB(y - 1);
+          Type BH_sec_part = (ssb0 * (Type(1) - h)) + SSB(y - 1) * ((Type(5)*h) - 1);
           Type ln_BH_tmp_rec = log(BH_first_part/BH_sec_part); // Deterministic BH in log space
           
           // Get recruitment with process error here
@@ -386,6 +381,12 @@ Type objective_function<Type>::operator() ()
       // Increment total recruitment here
       Total_Rec(y) += NAA(y, 0, s);
     } // end sex loop
+      
+    // Calculate SSB here (Indexing 0 for females)
+    SSB(y) = sum(NAA.col(0).transpose().col(y) * 
+      MatAA.col(0).transpose().col(y) *
+      WAA.col(0).transpose().col(y));
+    
   } // end year loop
   
   // Catch ----------------------------------------------
@@ -449,9 +450,10 @@ Type objective_function<Type>::operator() ()
           
           // Get predicted comps here prior to normalizing w/ catch at age
           pred_fish_age_comps(y, a, fc, s) = CAA(y, a, fc, s);
+           
           // Increment to get total numbers at age for a given fleet
           Total_Fishery_Numbers(y, fc, s) += pred_fish_age_comps(y, a, fc, s);
-          
+           
           // Divide by the total when done w/ predicting fish age comps (normalize to sum to 1)
           if(a == n_ages - 1) {
             for(int a = 0; a < n_ages; a++) {
@@ -509,7 +511,7 @@ Type objective_function<Type>::operator() ()
     } // f loop
   } // y loop
   
-  
+   
   // Index likelihood (Log-normal likelihood) ----------------------------------------------
   vector<Type> fish_sd(n_fish_indices); // Convert fishery index CV to standard deviation
   vector<Type> srv_sd(n_srv_indices); // Convert survey index CV to standard deviation
@@ -577,15 +579,26 @@ Type objective_function<Type>::operator() ()
         if(fish_comp_likelihoods(fc, s) == 1) { // dirichlet-multinomial
           
           Type Fish_Input_N = obs_fish_age_Input_N(y, fc, s); // Input Sample Size
-          Type fish_theta = exp(ln_DM_Fish_Param(fc, s)); // Dispersion Parameter
+          Type ln_fish_theta = ln_DM_Fish_Param(fc, s); // Dispersion Parameter
           
           // Evaluate log-likelihood 
-          fish_comp_nLL(y, fc, s) -= use_fish_comps(y, fc, s) *
-            ddirmult(obs_fish_age_vec, pred_fish_age_vec, Fish_Input_N,
-                     ln_DM_Fish_Param(fc, s), true);
-          // Get Effective Sample Sizes
-          Fish_Neff(y, fc, s) =  1/(1+fish_theta) + Fish_Input_N * (fish_theta/(1+fish_theta));
+          // fish_comp_nLL(y, fc, s) -= use_fish_comps(y, fc, s) *
+          //                            ddirmult(obs_fish_age_vec, pred_fish_age_vec,
+          //                                     Fish_Input_N, ln_fish_theta, true);
           
+          // Type s1 = 0.0;
+          // Type s2 = 0.0;
+          // 
+          // for(int a = 0; a < n_ages; a++){
+          //   s1 += lgamma(Fish_Input_N * obs_fish_age_vec(a) + 1);
+          //   s2 += lgamma(Fish_Input_N * obs_fish_age_vec(a) + exp(ln_fish_theta) * Fish_Input_N * pred_fish_age_vec(a)) - lgamma(exp(ln_fish_theta) * Fish_Input_N * pred_fish_age_vec(a));
+          // }
+          // 
+          // fish_comp_nLL(y, fc, s) -= lgamma(Fish_Input_N + 1) - s1 + lgamma(exp(ln_fish_theta)  * Fish_Input_N) -                                        lgamma(Fish_Input_N + exp(ln_fish_theta)  * Fish_Input_N) + s2;
+          
+          // Get Effective Sample Sizes
+          Fish_Neff(y, fc, s) =  (1 + exp(ln_fish_theta) * Fish_Input_N) / (1 + exp(ln_fish_theta));
+
         } // end if statement for dirichlet-multinomial
         
         if(fish_comp_likelihoods(fc, s) == 2) { // Dirichlet likelihood
@@ -628,14 +641,14 @@ Type objective_function<Type>::operator() ()
         if(srv_comp_likelihoods(sc, s) == 1) { // dirichlet-multinomial
           
           Type Srv_Input_N = obs_srv_age_Input_N(y, sc, s);
-          Type srv_theta = exp(ln_DM_Srv_Param(sc, s)); // Dispersion Parameter
+          Type ln_srv_theta = ln_DM_Srv_Param(sc, s); // Dispersion Parameter
           
           // Evaluate log-likelihood
           srv_comp_nLL(y, sc, s) -= use_srv_comps(y, sc, s) * 
             ddirmult(obs_srv_age_vec, pred_srv_age_vec,
-                     Srv_Input_N, ln_DM_Srv_Param(sc, s), true);
+                     Srv_Input_N, ln_srv_theta, true);
           // Get Effective Sample Sizes
-          Srv_Neff(y, sc, s) = 1/(1+srv_theta) + Srv_Input_N*(srv_theta/(1+srv_theta));
+          Srv_Neff(y, sc, s) = (1 + exp(ln_srv_theta) * Srv_Input_N) / (1 + exp(ln_srv_theta));
           
         } // end if statement for dirichlet-multinomial
         

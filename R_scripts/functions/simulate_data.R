@@ -169,19 +169,11 @@ simulate_data <- function(fxn_path,
         
       } # end if statement for start year of the fishery
       
-      ### Update Biomass values and Numbers -------------------------------------
-      
-      # Update Biomass at age 
-      Biom_at_age[y,,,sim] <- N_at_age[y,,,sim] * wt_at_age[y,,,sim]
-      
-      # Now, update SSB (only females matter so indexing 1 for the sex dimension)
-      SSB[y,sim] <- sum(mat_at_age[y,,1,sim] * Biom_at_age[y,,1,sim], na.rm = TRUE)
-      
       if(y > min(Fish_Start_yr)) { # Recruitment happens the following year
         
         if(rec_type == "BH") { # do beverton holt recruitment
           # Now generate new recruits with the updated SSB
-          rec_total[y,sim] <- beverton_holt_recruit(ssb = SSB[y,sim], h = h, r0 = r0) * 
+          rec_total[y,sim] <- beverton_holt_recruit(ssb = SSB[y - 1,sim], h = h, r0 = r0) * 
                               exp(rec_devs[y,sim])
         } # if statement for BH
         
@@ -226,6 +218,15 @@ simulate_data <- function(fxn_path,
             } # if we are in the plus group 
           } # sexes loop
         } # ages loop
+        
+        ### Update Biomass values and Numbers -------------------------------------
+        
+        # Update Biomass at age 
+        Biom_at_age[y,,,sim] <- N_at_age[y,,,sim] * wt_at_age[y,,,sim]
+        
+        # Now, update SSB (only females matter so indexing 1 for the sex dimension)
+        SSB[y,sim] <- sum(mat_at_age[y,,1,sim] * Biom_at_age[y,,1,sim], na.rm = TRUE)
+        
         
         # Generate observations  ---------------------------------------------------
         

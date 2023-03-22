@@ -102,7 +102,7 @@ Type ddirmult( vector<Type> obs,
   for(int a = 0; a < n_a; a++){
     logLike += lgamma( (Ntotal * p_obs(a)) + (dirichlet_param * p_pred(a)) );
     logLike -= lgamma(dirichlet_param * p_pred(a));
-  } // end c loop
+  } // end a loop
   
   // Type phi = dirichlet_param.sum();
   // Type logLike = lgamma(Ntotal + 1.0) + lgamma(phi) - lgamma(Ntotal + phi);
@@ -127,7 +127,7 @@ Type ddirichlet(vector<Type> p_obs,
                 vector<Type> p_pred, 
                 Type Ntotal, 
                 Type Dir_Param,
-                int do_log)
+                int do_log = 1)
 {
   // Pre-processing
   Type lambda = Ntotal/pow(exp(Dir_Param), 2) - 1; // Compute Lambda parameters
@@ -208,3 +208,4 @@ Type get_Neff(Type Ntotal,
   
   return Neff; 
 } // end function
+
