@@ -18,7 +18,7 @@
 #' @param rec_model recruitment model == 0 (mean recruitment)
 #' @param F_Slx_Model_Input Fishery selectivity model character (logistic, gamma, double_logistic)
 #' @param S_Slx_Model_Input same as above
-#' @param time_selex Type of time-varying to do (Options are: None, RW, and AR1_y)
+#' @param time_selex Type of time-varying to do (Options are: None, RW)
 #' @param fix_pars What parameters we want to fix
 #' @param n_time_selex_pars Number of time-varying selectivity parameters we want to estimate on the parametric form
 #' @param sim simulation indexing
@@ -443,14 +443,6 @@ prepare_EM_input <- function(years,
                                      dim = c((length(years)-1), n_time_selex_pars, n_fish_comps, n_sexes))
     pars$fixed_sel_re_fish <- array(rnorm(1,0.3,1), dim = c(n_time_selex_pars, n_fish_comps, n_sexes))
   } # random walk if statement
-  
-  if(time_selex == "AR1_y") { # Autoregressive 1 by year
-    data$F_Slx_re_model <- matrix(0, nrow = n_fish_comps, ncol = n_sexes)
-    pars$ln_fish_selpars_re <- array(rnorm(1, 0.3, 0),
-                                     dim = c((length(years)-1), n_time_selex_pars, n_fish_comps, n_sexes))
-    pars$fixed_sel_re_fish <- array(rnorm(1, 0.3 ,0), dim = c(2 * n_time_selex_pars, n_fish_comps, n_sexes))
-  } # AR1_y if statement
-  
   
   # Parameter mapping -------------------------------------------------------
   if(sum(fix_pars %in% c("ln_h")) == 1) {

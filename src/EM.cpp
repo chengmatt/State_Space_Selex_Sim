@@ -149,8 +149,8 @@ Type objective_function<Type>::operator() ()
   srv_comp_nLL.setZero();
   
   // TESTING
-  DATA_MATRIX(N1_Sex_Test);
-  DATA_INTEGER(ssb0_dat);
+  // DATA_MATRIX(N1_Sex_Test);
+  // DATA_INTEGER(ssb0_dat);
   
   // MODEL STRUCTURE ----------------------------------------------
   // y = year, a = age, s = sex; in general, f = fishery fleet, sf = survey fleet
@@ -170,29 +170,7 @@ Type objective_function<Type>::operator() ()
                                      Type(0.0), fixed_sel_re_fish(p, f, s), true);
           } // y loop
         } // p loop
-         
       } // end random walk if statement
-      
-      if(F_Slx_re_model(f, s) == 1) { // AR(1) by year 
-        
-        for(int p = 0; p < n_re_pars; p++) {
-          // Create container to fill in with empty array
-          array<Type> tmp_F_selpars_re(n_re_years);
-          for(int y = 0; y < n_re_years; y++){
-            tmp_F_selpars_re(y) = ln_fish_selpars_re(y, p, f, s);
-          } // y loop
-          
-          // Sigma for Variance
-          Type sigma_fish = exp( fixed_sel_re_fish(0, p, f, s) ); 
-          // Correlation by year
-          Type rho_y = Type(2)/(Type(1) + exp(-Type(2) * fixed_sel_re_fish(1, p, f, s) )) - Type(1); 
-          // Variance of the AR process
-          Type sigma_sel =  pow(pow(sigma_fish,2) / (1-pow(rho_y,2)),0.5); 
-          // Evaluate likelihood here
-          fish_sel_re_nLL += SCALE(AR1(rho_y), sigma_sel)(tmp_F_selpars_re); 
-          
-        } // p loop
-      } // if AR(1) by year
       
     } // s loop
   } // f loop
@@ -227,25 +205,7 @@ Type objective_function<Type>::operator() ()
             
           } // end parameter (p) loop
         } // end if statement for random walk
-        
-        if(F_Slx_re_model(f, s) == 1) { // AR1 process by year
-          
-          // Temporary container object to store selectivity deviations
-          array<Type> tmp_seldevs_vec(n_years, n_re_pars);
-          
-          for(int p = 0; p < n_re_pars; p++) {
-            if(y == 0) { // Year = 0 (Initial Condition)
-              tmp_seldevs_vec(y, p) = tmp_ln_fish_selpars(p); // Fixed effect for first year 
-            } else{
-              tmp_seldevs_vec(y, p) = tmp_seldevs_vec(y - 1, p) + ln_fish_selpars_re(y - 1, p, f, s);
-            } // else = adding in AR1 deviations
-            
-            // Redefine tmp_ln_fish_selpars with updated AR1 deviates
-            tmp_ln_fish_selpars(p) = tmp_seldevs_vec(y, p); // Exponentiated in Get_Selex fxn
-            
-          } // p loop
-        } // end if statement for AR1_y
-        
+    
         for(int a = 0; a < n_ages; a++) {
           
           // Get age index
@@ -589,6 +549,7 @@ Type objective_function<Type>::operator() ()
     for(int y = 0; y < n_years; y++) {
       for(int s = 0; s < n_sexes; s++) {
         
+        // Pre-processing - extract out quantities
         vector<Type> obs_srv_age= obs_srv_age_comps.col(s).col(sc).transpose().col(y); // Pull out observed vector
         vector<Type> pred_srv_age = pred_srv_age_comps.col(s).col(sc).transpose().col(y); // Pull out predicted vector
         Type Srv_Input_N = obs_srv_age_Input_N(y, sc, s); // Get Input sample size

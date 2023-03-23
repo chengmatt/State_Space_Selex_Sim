@@ -50,7 +50,7 @@ simulate_data(fxn_path = fxn_path,
               # e.g., (7, 0.8, 4, 0.3) for a logistic with two sexes, nrow = 2
               fish_pars = list(Fleet_1_L = matrix(data = c(5, 0.85), 
                                                   nrow = 1, byrow = TRUE),
-                               Fleet_2_L = matrix(data = c(5, 0.85), 
+                               Fleet_2_L = matrix(data = c(3, 0.85), 
                                                   nrow = 1, byrow = TRUE)), # fish fleet 2
               srv_pars = list(Fleet_3_SL = matrix(data = c(2, 0.85), 
                                                   nrow = 1, byrow = TRUE)), # survey fleet 1
@@ -93,17 +93,14 @@ for(sim in 1:n_sims){
                             S_Slx_Blocks_Input = matrix(c(0), # selectivity blocks
                                                         nrow = length(years), 
                                                         ncol = 1),
-                            # use_srv_comps = FALSE,
-                            # use_srv_index = FALSE,
                             use_fish_index = FALSE,
-                            # use_catch = FALSE,
                             Fish_Comp_Like_Model = c("multinomial" ),
                             Srv_Comp_Like_Model = c("multinomial"),
                             rec_model = "BH", 
                             F_Slx_Model_Input = c("logistic"),
                             S_Slx_Model_Input = c("logistic"), 
-                            time_selex = "None",
-                            n_time_selex_pars = NULL,
+                            time_selex = "RW",
+                            n_time_selex_pars = 1,
                             fix_pars = c(
                                          "ln_SigmaRec",
                                          "ln_q_fish", 
@@ -119,39 +116,14 @@ for(sim in 1:n_sims){
                                          # "ln_M"),
                                          # "ln_DM_Fish_Param"),
                             sim = sim)
-  
-  
-  # input$parameters$ln_srv_selpars[] <- log(c(2, 3, 0.5, 0.4))
-  # input$parameters$ln_fish_selpars[] <- log(c(3, 5, 0.8, 0.8))
-  input$data$N1_Sex_Test <- log(matrix(N_at_age[1,,,sim], ncol = 2, nrow = 30))
-  input$parameters$ln_N1Devs <- log(init_age_devs[,sim])
-  # input$data$obs_fish_age_Input_N[] <- (Input_N_Fish[Fish_Start_yr[1]:(n_years-1),] + 
-  #                                         (DM_Fish_Param * Input_N_Fish[Fish_Start_yr[1]:(n_years-1),])) /
-  #   (Input_N_Fish[Fish_Start_yr[1]:(n_years-1),] + DM_Fish_Param)
-  input$parameters$ln_q_srv <- log(mean(q_Surv))
-  # input$parameters$ln_q_fish <- log(mean(q_Fish))
-  # 
-  # input$parameters$ln_fish_selpars[] <- log(c(5, 0.85))
-  input$parameters$ln_srv_selpars[] <- log(c(2, 0.85))
-  # input$parameters$ln_DM_Fish_Param[] <- log(2)
-  # input$parameters$ln_DM_Srv_Param[] <- log(1)
-  input$data$ssb0_dat <- ssb0
-  # input$data$obs_fish_age_Input_N[] <- input$data$obs_fish_age_Input_N[] * 1
-  # input$data$obs_fish_age_Input_N[] <- 1/(1+DM_Fish_Param) + Input_N_Fish[Fish_Start_yr[1]:(n_years-1),]*
-                                      # (DM_Fish_Param/(1+DM_Fish_Param)) 
-  # input$parameters$ln_SigmaRec <- 0.01
-  # input$parameters$ln_SigmaRec <- log(input$parameters$ln_SigmaRec )
-  # input$parameters$ln_Fy[] <- log(0.01)
-  # input$parameters$ln_N1Devs[] <- 0.1
-  # input$data$srv_cv <- 0.05
-  # input$parameters$fixed_sel_re_fish[] <- log(5)
+
 
   # Run EM model here and get sdrep
   tryCatch(expr = model <- run_EM(data = input$data, parameters = input$parameters, 
                                   map = rlist::list.append(input$map), 
                                   n.newton = 3, 
-                                  # random = "ln_fish_selpars_re",
-                                  silent = TRUE, getsdrep = TRUE), error = function(e){e})
+                                  random = "ln_fish_selpars_re",
+                                  silent = F, getsdrep = TRUE), error = function(e){e})
   
   # Check model convergence
   convergence_status <- check_model_convergence(mle_optim = model$mle_optim,
