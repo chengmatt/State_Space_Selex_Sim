@@ -80,8 +80,7 @@ prepare_EM_input <- function(years,
   } else{ # multi fleet - leave as is
     obs_catches <- matrix(Catch_agg[(Fish_Start_yr[1]:(n_years-1)),,sim], nrow = length(years), ncol = n_fleets)
   } # end else
-  
-  
+
   # Fishery Age Comps -------------------------------------------------------
   
   obs_fish_age_comps <- array(data = 0, dim = c(length(years), length(ages), n_fleets, n_sexes))
@@ -99,13 +98,20 @@ prepare_EM_input <- function(years,
     } # end s loop
     
     # Empty array to store values in
-    obs_fish_age_Input_N <- array(data = NA, dim = c(length(years), n_fleets, n_sexes))
+    obs_fish_age_Input_N <- array(data = NA, dim = c(length(years), 1, n_sexes))
     
-    # Effective sample size
-    for(s in 1:1) {
-      obs_fish_age_Input_N[,1,s] <- rowSums(matrix(Input_N_Fish[Fish_Start_yr[1]:(n_years - 1),] * 
-                                                     catch_weight, ncol = dim(Fish_Age_Comps)[3]))
-    } # s loop
+    if(Fish_Comp_Like_Model %in% c("dirichlet_multionimal", "multinomial")) { # if mutlinomial or DM
+      # Effective sample size
+      for(s in 1:n_sexes) {
+        obs_fish_age_Input_N[,1,s] <- rowSums(floor(obs_fish_age_comps[,,,s]))
+      } # s loop
+    } else{ # Dirichlet input sample sizes - weigh by the catch and input N (bc simulation sums to 1)
+      # Effective sample size
+      for(s in 1:n_sexes) {
+        obs_fish_age_Input_N[,1,s] <- rowSums(matrix(Input_N_Fish[Fish_Start_yr[1]:(n_years - 1),] *
+                                                       catch_weight, ncol = dim(Fish_Age_Comps)[3]))
+      } # s loop
+    } # end else statement
     
     # Now, apply the proportion function over a single fleet
     for(s in 1:n_sexes) {
@@ -312,8 +318,8 @@ prepare_EM_input <- function(years,
   } # end i survey
   
   # Map factor for fishery and survey comps if there is a multinomial likelihood
-  if(Fish_Comp_Like_Model %in% c("multinomial")) map$ln_DM_Fish_Param <- factor(map_ln_DM_Fish_Param)
-  if(Srv_Comp_Like_Model %in% c("multinomial"))  map$ln_DM_Srv_Param <- factor(map_ln_DM_Srv_Param)
+  if(Fish_Comp_Like_Model %in% "multinomial") map$ln_DM_Fish_Param <- factor(map_ln_DM_Fish_Param)
+  if(Srv_Comp_Like_Model %in% "multinomial")  map$ln_DM_Srv_Param <- factor(map_ln_DM_Srv_Param)
 
   # Input these data into a list object
   data$ages <- ages
@@ -357,7 +363,7 @@ prepare_EM_input <- function(years,
   pars$ln_DM_Srv_Param <- ln_DM_Srv_Param # DM theta for survey
   pars$ln_SigmaRec <- log(sigma_rec) # recruitment variability
   pars$ln_RecDevs <- rec_devs[years[-1],sim] # rec devs
-  pars$ln_N1Devs <- rnorm(length(ages), 0, 0.0) # rec devs
+  pars$ln_N1Devs <- rnorm(length(ages)-1, 0, 0.0) # rec devs
   pars$ln_M <- log(mean(Mort_at_age)) # natural mortality
 
   # row sums for fish mort
@@ -421,9 +427,9 @@ prepare_EM_input <- function(years,
   # Time-Varying Selectivity Options (Fishery)
   if(time_selex == "None") { # No time-varying
     data$F_Slx_re_model <- matrix(1e5, nrow = n_fish_comps, ncol = n_sexes)
-    pars$ln_fish_selpars_re <- array(rnorm(1, 0, 0),
+    pars$ln_fish_selpars_re <- array(rnorm(1, 0.3, 0),
                                      dim = c((length(years)-1), n_time_selex_pars, n_fish_comps, n_sexes))
-    pars$fixed_sel_re_fish <- array(rnorm(1,0,0), dim = c(1, n_fish_comps, n_sexes))
+    pars$fixed_sel_re_fish <- array(rnorm(1,0.3,0), dim = c(1, n_fish_comps, n_sexes))
     
     # Set mapping here for random effects (no random effects)
     map$ln_fish_selpars_re <- factor(rep(NA, length(pars$ln_fish_selpars_re))) # Fix random effects
@@ -433,16 +439,16 @@ prepare_EM_input <- function(years,
   
   if(time_selex == "RW") { # Random Walk
     data$F_Slx_re_model <- matrix(0, nrow = n_fish_comps, ncol = n_sexes)
-    pars$ln_fish_selpars_re <- array(rnorm(1, 0, 0),
+    pars$ln_fish_selpars_re <- array(rnorm(1, 0.3, 0),
                                      dim = c((length(years)-1), n_time_selex_pars, n_fish_comps, n_sexes))
-    pars$fixed_sel_re_fish <- array(rnorm(1,0,1), dim = c(n_time_selex_pars, n_fish_comps, n_sexes))
+    pars$fixed_sel_re_fish <- array(rnorm(1,0.3,1), dim = c(n_time_selex_pars, n_fish_comps, n_sexes))
   } # random walk if statement
   
   if(time_selex == "AR1_y") { # Autoregressive 1 by year
     data$F_Slx_re_model <- matrix(0, nrow = n_fish_comps, ncol = n_sexes)
-    pars$ln_fish_selpars_re <- array(rnorm(1, 1, 0),
+    pars$ln_fish_selpars_re <- array(rnorm(1, 0.3, 0),
                                      dim = c((length(years)-1), n_time_selex_pars, n_fish_comps, n_sexes))
-    pars$fixed_sel_re_fish <- array(rnorm(1, 1 ,0), dim = c(2 * n_time_selex_pars, n_fish_comps, n_sexes))
+    pars$fixed_sel_re_fish <- array(rnorm(1, 0.3 ,0), dim = c(2 * n_time_selex_pars, n_fish_comps, n_sexes))
   } # AR1_y if statement
   
   

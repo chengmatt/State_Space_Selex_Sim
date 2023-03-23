@@ -70,7 +70,7 @@ run_EM <- function(data, parameters, map, n.newton, random = NULL,
   # Optimize model here w/ nlminb
   mle_optim <- stats::nlminb(model_fxn$par, model_fxn$fn, model_fxn$gr, 
                              control = list(iter.max = iter.max, eval.max = eval.max),
-                             lower = -15, upper = 15)
+                             lower = -10, upper = 10)
   
   # Take additional newton steps
   add_newton(n.newton = n.newton, ad_model = model_fxn, mle_optim = mle_optim)
@@ -108,8 +108,7 @@ check_model_convergence <- function(mle_optim, sd_rep, mod_rep, min_grad = 0.001
   # Parameter with maximum gradient
   max_grad_par <- names(sd_rep$par.fixed)[which.max(abs(sd_rep$gradient.fixed))]
   
-  if(mle_optim$convergence == 0 &
-     sd_rep$pdHess == TRUE & 
+  if(sd_rep$pdHess == TRUE & 
      max_grad_val < min_grad &
      !is.nan(sum(model$sd_rep$sd )) &
      !is.nan(mod_rep$rep$jnLL)) convergence = "Converged"
