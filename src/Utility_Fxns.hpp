@@ -168,15 +168,15 @@ Type get_acomp_nLL(vector<Type> p_obs,
   // Compute likelihoods
   if(acomp_LL_model == 0) { // Multinomial
     vector<Type> obs_vec = p_obs * Ntotal; // Get Observed vector in numbers
-    logLike -= dmultinom(obs_vec, p_pred, true); // Compute likelihood
+    logLike += dmultinom(obs_vec, p_pred, true); // Compute likelihood
   } // end if
   
   if(acomp_LL_model == 1) { // Dirichlet-Multinomial
-    logLike -= ddirmult(p_obs, p_pred, Ntotal, Dir_Param, true);  // cCompute likelihood
+    logLike += ddirmult(p_obs, p_pred, Ntotal, Dir_Param, true);  // cCompute likelihood
   } // end if
   
   if(acomp_LL_model == 2) { // Dirichlet
-    logLike -= ddirichlet(p_obs, p_pred, Ntotal, Dir_Param, true);
+    logLike += ddirichlet(p_obs, p_pred, Ntotal, Dir_Param, true);
   } // end if
   
   if(do_log == 1) return logLike;  else return exp(logLike);
@@ -199,7 +199,7 @@ Type get_Neff(Type Ntotal,
   } // end if
   
   if(acomp_LL_model == 1) { // Dirichlet-Multinomial (Saturating Version)
-    Neff = (Ntotal + (Ntotal * exp(Dir_Param))) / (Ntotal + exp(Dir_Param));
+    Neff = (1 + (Ntotal * exp(Dir_Param))) / (1 + exp(Dir_Param));
   } // end if
   
   if(acomp_LL_model == 2) { // Dirichlet

@@ -170,7 +170,7 @@ Type objective_function<Type>::operator() ()
                                      Type(0.0), fixed_sel_re_fish(p, f, s), true);
           } // y loop
         } // p loop
-        
+         
       } // end random walk if statement
       
       if(F_Slx_re_model(f, s) == 1) { // AR(1) by year 
@@ -307,12 +307,12 @@ Type objective_function<Type>::operator() ()
   // Initialization and SBPR calculations ----------------------------------------------
   vector<Type> SBPR_N(n_ages); // Numbers Per recruit container
   vector<Type> SBPR_SSB0(n_ages); // Spawning Biomass Per recruit container
-  
+   
   // Loop through spawning biomass per recruit calculations
   for(int a = 0; a < n_ages; a++) {
     if(a == 0) SBPR_N(a) = Type(1);
-    if(a > 0 && a < n_ages - 1) SBPR_N(a) = SBPR_N(a - 1) * exp(-M); 
-    if(a == n_ages - 1) SBPR_N(a) = SBPR_N(a - 1) * exp(-M) * (1 / (1 - exp(-M)));
+    if(a > 0) SBPR_N(a) = SBPR_N(a - 1) * exp(-M); 
+    // if(a == n_ages - 1) SBPR_N(a) = SBPR_N(a - 1) * exp(-M) * (1 / (1 - exp(-M)));
     SBPR_SSB0(a) = SBPR_N(a) * MatAA(0, a, 0) * WAA(0, a, 0);
   } // a loop
   
@@ -322,17 +322,18 @@ Type objective_function<Type>::operator() ()
   // Initialize age-structure 
   for(int a = 0; a < n_ages; a++) {
     for(int s = 0; s < n_sexes; s++){
+      // TESTING
       // NAA(0, a, s) = exp(ln_N1Devs(a)) * Sex_Ratio(s);
-      // if(a < n_ages - 1) {
+      // if(a < n_ages - 1) { // not plus group
         NAA(0, a, s) = exp(ln_N1Devs(a)) * exp(ln_RecPars(0)) *
                        exp(-M * Type(a)) * Sex_Ratio(s);
       // } else{
-      //   NAA(0, a, s) = exp(ln_RecPars(0)) * exp(-M * Type(a)) / 
+      //   NAA(0, a, s) = exp(ln_RecPars(0)) * exp(-M * Type(a)) /
       //                     (1 - exp(-M)) * Sex_Ratio(s);
-      // }
-    } // end s loop
+      // } // plus group 
+    } // end s loop 
   } // end a loop
-  
+   
   // Population Dynamics Equations ----------------------------------------------
   for(int y = 0; y < n_years; y++) {
     for(int s = 0; s < n_sexes; s++) {
@@ -556,63 +557,27 @@ Type objective_function<Type>::operator() ()
   // Fishery Compositions
   vector<Type> obs_fish_age_vec(n_ages); // Obs fishery vector to hold and pass values to nLL
   vector<Type> pred_fish_age_vec(n_ages); // Pred fishery vector to hold and pass values to nLL
+  matrix<Type> DM1_FI(n_years, n_ages);
+  matrix<Type> DM2_FI(n_years, n_ages);
   
   for(int fc = 0; fc < n_fish_comps; fc++) {
     for(int y = 0 ; y < n_years; y++) {
       for(int s = 0; s < n_sexes; s++) {
         
-        obs_fish_age_vec = obs_fish_age_comps.col(s).col(fc).transpose().col(y); // Pull out observed vector
-        pred_fish_age_vec = pred_fish_age_comps.col(s).col(fc).transpose().col(y); // Pull out predicted vector  
+        // Pre-processing - extract out quantities
+        vector<Type> obs_fish_age = obs_fish_age_comps.col(s).col(fc).transpose().col(y); // Pull out observed vector
+        vector<Type> pred_fish_age = pred_fish_age_comps.col(s).col(fc).transpose().col(y); // Pull out predicted vector 
+        Type Fish_Input_N = obs_fish_age_Input_N(y, fc, s); // Input Sample Size
+        Type ln_fish_theta = ln_DM_Fish_Param(fc, s); // Dispersion parameter if needed
         
-        if(fish_comp_likelihoods(fc, s) == 0) { // multinomial
-          
-          // Multiply observed fishery age vector by input sample size
-          vector<Type> tmp_obs_fish_age_vec = (obs_fish_age_vec) * obs_fish_age_Input_N(y, fc, s);
-          // Evaluate log-likelihood
-          fish_comp_nLL(y, fc, s) -= use_fish_comps(y, fc, s) * dmultinom(tmp_obs_fish_age_vec,  
-                        pred_fish_age_vec, true);
-          // Get Effective Sample Sizes
-          Fish_Neff(y, fc, s) = obs_fish_age_Input_N(y, fc, s);
-          
-        } // end if statement for multinomial
+        // Get likelihood here
+        fish_comp_nLL(y, fc, s) -= use_fish_comps(y, fc, s) * 
+                                   get_acomp_nLL(obs_fish_age, pred_fish_age, Fish_Input_N,
+                                                 ln_fish_theta, fish_comp_likelihoods(fc, s), true);
         
-        if(fish_comp_likelihoods(fc, s) == 1) { // dirichlet-multinomial
-          
-          Type Fish_Input_N = obs_fish_age_Input_N(y, fc, s); // Input Sample Size
-          Type ln_fish_theta = ln_DM_Fish_Param(fc, s); // Dispersion Parameter
-          
-          // Evaluate log-likelihood 
-          fish_comp_nLL(y, fc, s) -= use_fish_comps(y, fc, s) *
-                                     ddirmult(obs_fish_age_vec, pred_fish_age_vec,
-                                              Fish_Input_N, ln_fish_theta, true);
-          
-          // Type s1 = 0.0;
-          // Type s2 = 0.0;
-          // 
-          // for(int a = 0; a < n_ages; a++){
-          //   s1 += lgamma(Fish_Input_N * obs_fish_age_vec(a) + 1);
-          //   s2 += lgamma(Fish_Input_N * obs_fish_age_vec(a) + exp(ln_fish_theta) * Fish_Input_N * pred_fish_age_vec(a)) - lgamma(exp(ln_fish_theta) * Fish_Input_N * pred_fish_age_vec(a));
-          // }
-          // 
-          // fish_comp_nLL(y, fc, s) -= lgamma(Fish_Input_N + 1) - s1 + lgamma(exp(ln_fish_theta)  * Fish_Input_N) -                                        lgamma(Fish_Input_N + exp(ln_fish_theta)  * Fish_Input_N) + s2;
-          
-          // Get Effective Sample Sizes
-          Fish_Neff(y, fc, s) =  (1 + exp(ln_fish_theta) * Fish_Input_N) / (1 + exp(ln_fish_theta));
+        // Get effective sample sizes
+        Fish_Neff(y, fc, s) = get_Neff(Fish_Input_N, ln_fish_theta, fish_comp_likelihoods(fc, s));
 
-        } // end if statement for dirichlet-multinomial
-        
-        if(fish_comp_likelihoods(fc, s) == 2) { // Dirichlet likelihood
-          
-          // Get Fishery Input Sample Size
-          Type Fish_Input_N = obs_fish_age_Input_N(y, fc, s);
-          // Evaluate log-likelihood 
-          fish_comp_nLL(y, fc, s) -= use_fish_comps(y, fc, s) * ddirichlet(obs_fish_age_vec, pred_fish_age_vec,
-                        Fish_Input_N, ln_DM_Fish_Param(fc, s), true);
-          // Get effective sample sizes
-          Fish_Neff(y, fc, s) = Fish_Input_N / pow(exp(ln_DM_Fish_Param(fc, s)), 2);
-          
-        }// end if dirichlet likelihood
-        
       } // s loop
     } // y loop
   } // fc loop
@@ -624,45 +589,18 @@ Type objective_function<Type>::operator() ()
     for(int y = 0; y < n_years; y++) {
       for(int s = 0; s < n_sexes; s++) {
         
-        obs_srv_age_vec = obs_srv_age_comps.col(s).col(sc).transpose().col(y); // Pull out observed vector
-        pred_srv_age_vec = pred_srv_age_comps.col(s).col(sc).transpose().col(y); // Pull out predicted vector
+        vector<Type> obs_srv_age= obs_srv_age_comps.col(s).col(sc).transpose().col(y); // Pull out observed vector
+        vector<Type> pred_srv_age = pred_srv_age_comps.col(s).col(sc).transpose().col(y); // Pull out predicted vector
+        Type Srv_Input_N = obs_srv_age_Input_N(y, sc, s); // Get Input sample size
+        Type ln_srv_theta = ln_DM_Srv_Param(sc, s); // Dispersion parameter if needed
         
-        if(srv_comp_likelihoods(sc, s) == 0) { // multinomial
-          
-          // Multiply observed survey age vector by input sample size
-          vector<Type> tmp_obs_srv_age_vec = (obs_srv_age_vec) * obs_srv_age_Input_N(y, sc, s);
-          // Evaluate log-likelihood
-          srv_comp_nLL(y, sc, s) -= use_srv_comps(y, sc, s) * dmultinom(tmp_obs_srv_age_vec, pred_srv_age_vec, true);
-          // Get Effective Sample Sizes
-          Srv_Neff(y, sc, s) = obs_srv_age_Input_N(y, sc, s);
-          
-        } // end if statement for multinomial
+        // Get likelihood here
+        srv_comp_nLL(y, sc, s) -= use_srv_comps(y, sc, s) * 
+                                  get_acomp_nLL(obs_srv_age, pred_srv_age, Srv_Input_N,
+                                                ln_srv_theta, srv_comp_likelihoods(sc, s), true);
         
-        if(srv_comp_likelihoods(sc, s) == 1) { // dirichlet-multinomial
-          
-          Type Srv_Input_N = obs_srv_age_Input_N(y, sc, s);
-          Type ln_srv_theta = ln_DM_Srv_Param(sc, s); // Dispersion Parameter
-          
-          // Evaluate log-likelihood
-          srv_comp_nLL(y, sc, s) -= use_srv_comps(y, sc, s) * 
-            ddirmult(obs_srv_age_vec, pred_srv_age_vec,
-                     Srv_Input_N, ln_srv_theta, true);
-          // Get Effective Sample Sizes
-          Srv_Neff(y, sc, s) = (1 + exp(ln_srv_theta) * Srv_Input_N) / (1 + exp(ln_srv_theta));
-          
-        } // end if statement for dirichlet-multinomial
-        
-        if(srv_comp_likelihoods(sc, s) == 2) { // Dirichlet likelihood
-          
-          // Get Survey Input Sample Size
-          Type Srv_Input_N = obs_srv_age_Input_N(y, sc, s);
-          // Evaluate log-likelihood
-          srv_comp_nLL(y, sc, s) -= use_srv_comps(y, sc, s) * ddirichlet(obs_srv_age_vec, pred_srv_age_vec,
-                       Srv_Input_N, ln_DM_Srv_Param(sc, s), true);
-          // Get effective sample sizes
-          Srv_Neff(y, sc, s) = Srv_Input_N / pow(exp(ln_DM_Srv_Param(sc, s)), 2);
-          
-        }// end if dirichlet likelihood
+        // Get effective sample sizes
+        Srv_Neff(y, sc, s) = get_Neff(Srv_Input_N, ln_srv_theta, srv_comp_likelihoods(sc, s));
         
       } // s loop
     } // y loop 

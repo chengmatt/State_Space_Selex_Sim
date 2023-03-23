@@ -103,7 +103,8 @@ prepare_EM_input <- function(years,
     
     # Effective sample size
     for(s in 1:1) {
-      obs_fish_age_Input_N[,1,s] <- rowSums(matrix(Input_N_Fish[Fish_Start_yr[1]:(n_years - 1),] * catch_weight))
+      obs_fish_age_Input_N[,1,s] <- rowSums(matrix(Input_N_Fish[Fish_Start_yr[1]:(n_years - 1),] * 
+                                                     catch_weight, ncol = dim(Fish_Age_Comps)[3]))
     } # s loop
     
     # Now, apply the proportion function over a single fleet
