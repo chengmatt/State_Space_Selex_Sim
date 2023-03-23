@@ -32,6 +32,6 @@ The EM is able to be specified for multiple fishery and survey fleets, as well a
 | --------| --------|
 |Recruitment| Beverton Holt Recruitment, Mean Recruitment |
 |Selectivity| Logistic, Gamma, Exponential Logistic, Double Logistic |
-|Time-varying selectivity| Random walk, 1DAR1_Year, Time-blocks during any period|
+|Time-varying selectivity| Random walk, Time-blocks during any period|
 |Compositional Likelihoods| Multinomial (tested), Dirichlet (tested), Dirichlet-Multinomial (requires more testing - not recommended to use) |
 
