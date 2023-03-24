@@ -232,8 +232,7 @@ extract_mean_age_vals <- function(mod_rep, comp_name, bins, comp_start_yr,
     dplyr::group_by(year, fleet, sex) %>% 
     dplyr::summarize(pred_mean_age = sum(value * bins)) %>% 
     mutate(sim = sim)
-  
-  
+
   # Create global objects for use in loops
   n_years <- length(Fish_Start_yr[1]:(Fish_Start_yr[1] + max(pred_mean_ages$year) - 1))
   
@@ -288,7 +287,6 @@ extract_mean_age_vals <- function(mod_rep, comp_name, bins, comp_start_yr,
         } # s loop
       } # i loop
     } # end if this is modeled as a single fleet when there are > 1 fleet
-    
     
     # Multi fleet in OM and EM
     if(n_mod_fleets > 1 & n_fish_true_fleets > 1) {
@@ -370,3 +368,143 @@ get_RE_precentiles <- function(df, est_val_col = 1, true_val_col = 5, par_name =
   
   return(df)
 }
+
+
+#' Title To extract estiamted and true values from model runs
+#'
+#' @param sd_rep sd report from TMB
+#' @param model_fxn model_fxn from tmb
+#' @param sim simulation number
+#' @param conv convergence statistic
+#' @param n_years number of years in model
+#' @param ages number of ages in model
+#' @param F_x x% of SPR
+#' @param ntrue_fish_fleets Number of true fishery fleets 
+#' @param nmod_fish_fleets Number of modelled fishery fleets
+#'
+#' @return
+#' @export
+#'
+#' @examples
+
+get_quants <- function(sd_rep, 
+                       model_fxn,
+                       sim, 
+                       conv, 
+                       n_years, 
+                       ages,
+                       F_x,
+                       ntrue_fish_fleets,
+                       nmod_fish_fleets) {
+  
+  # Define parameters we want to get
+  par_name <- c("ln_M", 
+                "ln_q_srv", 
+                "ln_RecPars", 
+                "ln_srv_selpars", 
+                "ln_fish_selpars",
+                "fixed_sel_re_fish")
+  
+  # True quantities
+  t <- c(mean(Mort_at_age),  # Natural Mortality
+         mean(q_Surv),  # Catchability
+         r0, # Virgin Recruitment
+         NA,  # Srv selex
+         NA,  # Fish selex
+         NA) # Fish selex variance pars
+  
+  # Empty dataframe
+  par_all <- data.frame()
+  # Define years
+  years <- 1:n_years
+  
+  # Loop through to extract values
+  for(par in 1:length(par_name)) {
+    par_df <- extract_parameter_vals(sd_rep = sd_rep, par = par_name[par], trans = "log") %>%
+              dplyr::mutate(type = par_name[par], t = t[par])
+    par_all <- rbind(par_all, par_df)
+  } # end par loop
+  
+  # Get SSB0
+  ssb0_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "ssb0") %>% 
+    dplyr::mutate(type = "SSB0", trans_mle_val = NA,
+           mle_var = NA, t = ssb0) %>%  dplyr::rename(mle_sd = mle_se)
+  par_all <- rbind(par_all, ssb0_df)
+  
+  # Get Fx here
+  # Pre-Processing first
+  est_M <- exp(sd_rep$par.fixed[names(model$sd_rep$par.fixed) == "ln_M"]) # natural mortality
+  # Get Fs here
+  if(nmod_fish_fleets > 1) {
+    # Vector of fleets (define to multiply)
+    fleet_num <- seq(1, nmod_fish_fleets)
+    # Extract Fs here
+    est_TermF <- exp(sd_rep$par.fixed[names(model$sd_rep$par.fixed) == "ln_Fy"])[c(length(years) * fleet_num)]
+  } else{ # only 1 fleet
+    # Extract Fs here
+    est_TermF <- exp(sd_rep$par.fixed[names(model$sd_rep$par.fixed) == "ln_Fy"])[c(length(years))]
+  } # else statement
+
+  est_Selex <- model_fxn$rep$F_Slx[years[length(years)],,,1] # selectivity only for females
+  
+  # Get estaimted Fx% value
+  Fx_val <- get_Fx_refpt(ages = ages,
+                          MortAA = rep(est_M, length = length(ages)), 
+                          SelexAA = t(est_Selex), 
+                          MatAA = mat_at_age[length(years),,1,sim], # females
+                          WAA = wt_at_age[length(years),,1,sim],  # females
+                          Terminal_F = est_TermF, 
+                          F_x = F_x)
+  
+  # Get true f40
+  true_f40 <- get_Fx_refpt(ages = ages,
+                           MortAA = Mort_at_age[length(years),,sim], 
+                           SelexAA = t(Fish_selex_at_age[length(years),,,1,sim]),  # females selex
+                           MatAA = mat_at_age[length(years),,1,sim],  # females
+                           WAA = wt_at_age[length(years),,1,sim],  # females
+                           Terminal_F = fish_mort[length(years),,sim],
+                           F_x = F_x)
+
+  # Create empty df for Fx% to rbind to par all dataframe
+  F_df <- data.frame(matrix(ncol = length(names(par_all))))
+  colnames(F_df) <- names(par_all) # replace colnames in empty df
+  
+  # Now, input into empty dataframe
+  F_df <- F_df %>% dplyr::mutate(trans_mle_val = Fx_val, 
+                                 type = paste("F", F_x, sep = "_"),
+                                 t = true_f40)
+  
+  # Now, bind all quantities of interest into one df
+  par_all <- rbind(F_df, par_all)
+  
+  # Input idenitfier and converence stats
+  par_all <- par_all %>% dplyr::mutate(conv = conv, sim = sim)
+  row.names(par_all) <- NULL # Get rid of pesky row names
+  
+  # Extract time series quantities
+  # Recruitment
+  rec_df <- extract_ADREP_vals(sd_rep = sd_rep, par = "Total_Rec") %>% 
+    dplyr::mutate(t = rec_total[years,sim], sim = sim, conv = conv, year = years,
+           type = "Total Recruitment")
+
+  # SSB
+  ssb_df <- extract_ADREP_vals(sd_rep = sd_rep, par = "SSB") %>% 
+    dplyr::mutate(t = SSB[years, sim], sim = sim, conv = conv, year = years,
+           type = "Spawning Stock Biomass")
+  
+  # Get total fishing mortality
+  f_df <- extract_ADREP_vals(sd_rep = sd_rep, par = "Total_Fy") %>% 
+    dplyr::mutate(t = rowSums(matrix(fish_mort[years,,sim], ncol = ntrue_fish_fleets)), 
+           sim = sim, conv = conv, year = years, type = "Total Fishing Mortality")
+  
+  # Get depletion
+  depletion_df <- extract_ADREP_vals(sd_rep = sd_rep, par = "Depletion") %>%
+    dplyr::mutate(t = (SSB[years,sim]/ssb0), sim = sim, conv = conv, year = years,
+           type = "Depletion")
+  
+  ts_all <- rbind(rec_df, ssb_df, f_df, depletion_df)
+  
+  return(list(TS_df = ts_all, Par_df = par_all))
+
+} # end function
+

@@ -28,7 +28,7 @@ simulate_data(fxn_path = fxn_path,
               Surv_Start_yr = c(1),  
               max_rel_F_M = c(1, 1), 
               desc_rel_F_M = c(0.05, 0.05), 
-              F_type = c("Constant", "Const_Inc"),
+              F_type = c("Contrast", "Const_Inc"),
               yr_chng = c(25, 25), 
               yr_chng_end = c(30, 30),
               fish_likelihood = c("multinomial", "multinomial"),
@@ -60,20 +60,8 @@ plot_OM(path = here("figs", "Base_OM_Figs"), file_name = "OM_Check.pdf")
 
 # Load in data ------------------------------------------------------------
 
-ssb_all <- data.frame()
-f_all <- data.frame()
-rec_all <- data.frame()
-biom_all <- data.frame()
 par_all <- data.frame()
-max_par <- vector()
-fish_mu_age <- data.frame()
-srv_mu_age <- data.frame()
-all_harv_rates <- data.frame()
-conv <- vector()
-depletion_all <- data.frame()
-ssb0_all <- data.frame()
-fish_neff_all <- data.frame()
-f40 <- vector()
+ts_all <- data.frame()
 
 # Specify years here
 years <- Fish_Start_yr[1]:(n_years - 1)
@@ -85,11 +73,11 @@ for(sim in 1:n_sims){
 
   # Prepare inputs here
   input <- prepare_EM_input(years = years,
-                            n_fleets = 1, 
-                            catch_cv = c(0.01),
+                            n_fleets = 2, 
+                            catch_cv = c(0.01, 0.01),
                             F_Slx_Blocks_Input = matrix(c(rep(0)),
                                                         nrow = length(years),
-                                                        ncol = 1), # fishery blocks
+                                                        ncol = 2), # fishery blocks
                             S_Slx_Blocks_Input = matrix(c(0), # selectivity blocks
                                                         nrow = length(years), 
                                                         ncol = 1),
@@ -97,7 +85,7 @@ for(sim in 1:n_sims){
                             Fish_Comp_Like_Model = c("multinomial" ),
                             Srv_Comp_Like_Model = c("multinomial"),
                             rec_model = "BH", 
-                            F_Slx_Model_Input = c("logistic"),
+                            F_Slx_Model_Input = c("logistic", "logistic"),
                             S_Slx_Model_Input = c("logistic"), 
                             time_selex = "RW",
                             n_time_selex_pars = 1,
@@ -105,16 +93,6 @@ for(sim in 1:n_sims){
                                          "ln_SigmaRec",
                                          "ln_q_fish", 
                                          "ln_h"),
-                                         # "fixed_sel_re_fish"),
-                                         # "ln_N1Devs"),
-                                         # "ln_Fy",
-                                         # "ln_RecDevs",
-                                         # # "ln_fish_selpars",
-                                         # "ln_srv_selpars",
-                                         # "ln_q_srv",
-                                         # "ln_RecPars",
-                                         # "ln_M"),
-                                         # "ln_DM_Fish_Param"),
                             sim = sim)
 
 
@@ -133,97 +111,21 @@ for(sim in 1:n_sims){
   conv[sim] <- convergence_status$Convergence
   max_par[sim] <- convergence_status$Max_Grad_Par
   
-  # Get parameter estimates
-  M_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_M", trans = "log") %>%
-    mutate(t = mean(Mort_at_age), type = "mortality", sim = sim, conv = conv[sim])
-  q_srv_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_q_srv", trans = "log") %>%
-    mutate(t = mean(q_Surv), type = "q_surv", sim = sim, conv = conv[sim])
-  meanrec_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_RecPars", trans = "log") %>%
-    mutate(t = c(r0), type = c("r0"), sim = sim, conv = conv[sim])
-  # fish_sel_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_fish_selpars", trans = "log") %>%
-  # mutate(t = c(5,0.85), type = c("f1", "f2"), sim = sim, conv = conv[sim])
-  # srv_sel_df <- extract_parameter_vals(sd_rep = model$sd_rep, par = "ln_srv_selpars", trans = "log") %>%
-    # mutate(t = c(2, 0.85), type = c("s1", "s2"), sim = sim, conv = conv[sim])
-  # Bind parameter estimates
-  par_all <- rbind(par_all, meanrec_df, q_srv_df, M_df)
-
-  # Recruitment
-  rec_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "Total_Rec") %>% 
-    mutate(t = rec_total[1:(n_years-1),sim], sim = sim, conv = conv[sim],
-           year = 1:(n_years-1))
-  rec_all <- rbind(rec_df, rec_all)
-  
-  # Check SSB
-  ssb_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "SSB") %>% 
-    mutate(t = SSB[Fish_Start_yr[1]:(n_years-1), sim], sim = sim, conv = conv[sim],
-           year = 1:(n_years-1))
-  ssb_all <- rbind(ssb_df, ssb_all)
-  
-  # Check F
-  f_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "Total_Fy") %>% 
-    mutate(t = rowSums(fish_mort[Fish_Start_yr[1]:(n_years-1),,sim]), sim = sim, conv = conv[sim],
-           year = 1:(n_years-1))
-  f_all <- rbind(f_all, f_df)
-  
-  # Check depletion rates
-  depletion_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "Depletion") %>%
-    mutate(t = (SSB[Fish_Start_yr[1]:(n_years-1),sim]/ssb0),
-           sim = sim, conv = conv[sim], year = Fish_Start_yr[1]:(n_years-1))
-  depletion_all <- rbind(depletion_df, depletion_all)
-  
-  # # Check survey mean age
-  srv_mean_ages <- extract_mean_age_vals(mod_rep = model$model_fxn, comp_name = "pred_srv_age_comps",
-                                         bins = ages, comp_start_yr = Fish_Start_yr[1], sim = sim,
-                                         n_fish_true_fleets = NULL) %>% mutate(conv = conv[sim])
-  
-  srv_mu_age <- rbind(srv_mu_age, srv_mean_ages)
-  
-  # Check fishery mean age
-  fish_mean_ages <- extract_mean_age_vals(mod_rep = model$model_fxn, comp_name = "pred_fish_age_comps",
-                                          bins = ages, comp_start_yr = Fish_Start_yr[1], sim = sim,
-                                          n_fish_true_fleets = 1) %>% mutate(conv = conv[sim])
-  fish_mu_age <- rbind(fish_mu_age, fish_mean_ages)
-  
-  # Get SSB0
-  ssb0_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "ssb0") %>% 
-    mutate(t = ssb0, sim = sim, conv = conv[sim])
-  ssb0_all <- rbind(ssb0_all, ssb0_df)
-
-  est_M = exp(model$sd_rep$par.fixed[names(model$sd_rep$par.fixed) == "ln_M"])
-  est_TermF = exp(model$sd_rep$par.fixed[names(model$sd_rep$par.fixed) == "ln_Fy"])[c(30)]
-  est_Selex = model$model_fxn$rep$F_Slx[30,,,]
-  
-  for(a in 1:length(ages)) {
-    if(a == 1) plot(model$model_fxn$rep$F_Slx[a,,,], type = "l")
-    if(a > 1) lines(model$model_fxn$rep$F_Slx[a,,,])
-  }
-  lines(Fish_selex_at_age[1,,1,,sim], col = "blue")
-  # lines(Fish_selex_at_age[1,,2,,sim], col = "red")
-  
-  est_F40 <- get_Fx_refpt(ages = ages,
-                 MortAA = rep(est_M, length = length(ages)), 
-                 SelexAA = t(est_Selex), 
-                 MatAA = mat_at_age[30,,1,sim], 
-                 WAA = wt_at_age[30,,1,sim], 
-                 Terminal_F = est_TermF, 
+  quants_df <- get_quants(sd_rep = model$sd_rep,
+                 model_fxn = model$model_fxn, 
+                 sim = sim, 
+                 conv = conv[sim],
+                 n_years = length(years),
+                 ntrue_fish_fleets = dim(Fish_Age_Comps)[3], 
+                 nmod_fish_fleets = input$data$n_fleets,
+                 ages = ages, 
                  F_x = 0.4)
-  
-  f40[sim] <- est_F40
-  
+
   print(paste("done w/  sim = ", sim))
   print(conv[sim])
   
 }
 
-true_f40 <- get_Fx_refpt(ages = ages,
-                        MortAA = Mort_at_age[30,,sim], 
-                        SelexAA = t(Fish_selex_at_age[30,,,,sim]), 
-                        MatAA = mat_at_age[30,,1,sim], 
-                        WAA = wt_at_age[30,,1,sim], 
-                        Terminal_F = fish_mort[30,,sim], 
-                        F_x = 0.4)
-
-median((f40 - true_f40 )/true_f40, na.rm = T)
 
 # Summary Checks ----------------------------------------------------------
 
@@ -253,10 +155,6 @@ srv_mu_age_sum <- get_RE_precentiles(df = srv_mu_age %>% filter(conv == "Converg
 depletion_sum <-  get_RE_precentiles(df = depletion_all %>% filter(conv == "Converged"),
                                      est_val_col = 1, true_val_col = 5,
                                      par_name = "Depletion (SSB / SSB0)", group_vars = "year")
-
-# fish_neff_sum <- get_RE_precentiles(df = fish_neff_all ,
-#                                  est_val_col = 1, true_val_col = 5,
-#                                  par_name = "Fish Neff", group_vars = "year")
 
 all <- rbind(rec_sum, ssb_sum, f_sum,fish_mu_age_sum, srv_mu_age_sum,
              depletion_sum) 
@@ -357,14 +255,6 @@ names(pred_fish_comps) <- c("year", "age", "fleet", "sex", "props", "type")
 true_fish_comps <- reshape2::melt(input$data$obs_fish_age_comps) %>% 
   mutate(type = "pred")
 names(true_fish_comps) <- c("year", "age", "fleet", "sex", "props", "type")
-
-# caa <- reshape2::melt(Catch_at_age[-31,,,,sim]/rowSums(Catch_at_age[-31,,,,sim])) %>% 
-#   mutate(type = "True_CAA",
-#          fleet = 1, sex = 1,
-#          Var1 = parse_number(paste(Var1)), Var2 = parse_number(paste(Var2)))
-# names(caa) <- c("year", "age", "props", "type", "fleet", "sex")
-
-
 
 ggplot() +
   geom_col(pred_fish_comps, mapping = aes(x = age, y = props), alpha = 0.5) +
