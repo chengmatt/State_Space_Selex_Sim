@@ -15,20 +15,20 @@ source(here(fxn_path, "prepare_EM_input.R"))
 compile_tmb(wd = here("src"), cpp = "EM.cpp")
 
 # Path to general input biological parameters
-spreadsheet_path <- here("input", "EBS_Pollock_Inputs.xlsx")
-# spreadsheet_path <- here("input", "Sablefish_Inputs.xlsx")
+# spreadsheet_path <- here("input", "EBS_Pollock_Inputs.xlsx")
+spreadsheet_path <- here("input", "Sablefish_Inputs.xlsx")
 
 # simulate data
 simulate_data(fxn_path = fxn_path, 
               check_equil = FALSE,
               spreadsheet_path = spreadsheet_path, 
               rec_type = "BH",
-              Start_F = c(0.01, 0.05), 
+              Start_F = c(0.108, 0.01 * 0.108), 
               Fish_Start_yr = c(1, 1), 
               Surv_Start_yr = c(1),  
-              max_rel_F_M = c(1, 1), 
-              desc_rel_F_M = c(0.05, 0.05), 
-              F_type = c("Contrast", "Const_Inc"),
+              max_rel_F_M = c(0.01, 0.75), 
+              desc_rel_F_M = c(NULL, NULL), 
+              F_type = c("Const_Ramp_Const", "Const_Ramp_Const"),
               yr_chng = c(25, 25), 
               yr_chng_end = c(30, 30),
               fish_likelihood = c("multinomial", "multinomial"),
@@ -45,16 +45,17 @@ simulate_data(fxn_path = fxn_path,
               q_Mean_Surv = 0.01, 
               fish_selex = c("logistic", "logistic"), 
               srv_selex = c("logistic"), 
-              # if switching to a single sex, be sure to change the nrow to the number of sexes,
-              # and to make sure the selex parameters for the fleets align n_pars * n_sexes
-              # e.g., (7, 0.8, 4, 0.3) for a logistic with two sexes, nrow = 2
-              fish_pars = list(Fleet_1_L = matrix(data = c(5, 0.85), 
-                                                  nrow = 1, byrow = TRUE),
-                               Fleet_2_L = matrix(data = c(3, 0.85), 
-                                                  nrow = 1, byrow = TRUE)), # fish fleet 2
-              srv_pars = list(Fleet_3_SL = matrix(data = c(2, 0.85), 
-                                                  nrow = 1, byrow = TRUE)), # survey fleet 1
-              f_ratio = 1, m_ratio = 0)
+              fish_pars = list(Fleet_1_L = matrix(data = c(3, 0.85, 5, 0.6), 
+                                                  nrow = 2, byrow = TRUE),
+                               Fleet_2_L = matrix(data = c(6, 0.85, 10, 0.4), 
+                                                  nrow = 2, byrow = TRUE)), # fish fleet 2
+              srv_pars = list(Fleet_3_SL = matrix(data = c(2, 0.85, 5, 0.3), 
+                                                  nrow = 2, byrow = TRUE)), # survey fleet 1
+              f_ratio = 0.5, m_ratio = 0.5)
+
+# if switching to a single sex, be sure to change the nrow to the number of sexes,
+# and to make sure the selex parameters for the fleets align n_pars * n_sexes
+# e.g., (7, 0.8, 4, 0.3) for a logistic with two sexes, nrow = 2
 
 plot_OM(path = here("figs", "Base_OM_Figs"), file_name = "OM_Check.pdf")
 
@@ -64,7 +65,7 @@ par_all <- data.frame()
 ts_all <- data.frame()
 
 # Specify years here
-years <- Fish_Start_yr[1]:(n_years - 1)
+years <- 1:(n_years - 1)
 
 start.time <- Sys.time()
 compile_tmb(wd = here("src"), cpp = "EM.cpp")
@@ -82,13 +83,13 @@ for(sim in 1:n_sims){
                                                         nrow = length(years), 
                                                         ncol = 1),
                             use_fish_index = FALSE,
-                            Fish_Comp_Like_Model = c("multinomial" ),
+                            Fish_Comp_Like_Model = c("multinomial", "multinomial"),
                             Srv_Comp_Like_Model = c("multinomial"),
                             rec_model = "BH", 
                             F_Slx_Model_Input = c("logistic", "logistic"),
                             S_Slx_Model_Input = c("logistic"), 
-                            time_selex = "RW",
-                            n_time_selex_pars = 1,
+                            time_selex = "None",
+                            n_time_selex_pars = NULL,
                             fix_pars = c(
                                          "ln_SigmaRec",
                                          "ln_q_fish", 
@@ -100,7 +101,7 @@ for(sim in 1:n_sims){
   tryCatch(expr = model <- run_EM(data = input$data, parameters = input$parameters, 
                                   map = rlist::list.append(input$map), 
                                   n.newton = 3, 
-                                  random = "ln_fish_selpars_re",
+                                  # random = c("ln_fish_selpars_re"),
                                   silent = F, getsdrep = TRUE), error = function(e){e})
   
   # Check model convergence
@@ -120,7 +121,9 @@ for(sim in 1:n_sims){
                  nmod_fish_fleets = input$data$n_fleets,
                  ages = ages, 
                  F_x = 0.4)
-
+  
+  ts_all <- rbind(quants_df$TS_df, ts_all)
+  par_all <- rbind(quants_df$Par_df, par_all)
   print(paste("done w/  sim = ", sim))
   print(conv[sim])
   

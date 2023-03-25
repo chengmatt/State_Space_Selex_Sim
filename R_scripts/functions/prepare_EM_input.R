@@ -29,6 +29,7 @@
 #' @examples
 #' Note that n_years here refers to all the rows of the array
 prepare_EM_input <- function(years,
+                             Fish_Start_yr = 1,
                              n_fleets, 
                              catch_cv,
                              F_Slx_Blocks_Input,
@@ -59,7 +60,7 @@ prepare_EM_input <- function(years,
   ages <- ages # ages
   Fish_Start_yr <- Fish_Start_yr # Fishery start year
   n_sexes <- n_sex # sexes
-  n_years <- nrow(Catch_agg) # number of years
+  n_years <- length(years) # number of years
   n_fleets <- n_fleets # number of fleets
   n_fish_comps <- n_fleets # number of fleets = number of fish comps
   n_fish_indices <- n_fleets # number of fish indices = number of fleets
@@ -70,15 +71,15 @@ prepare_EM_input <- function(years,
   # Catch -------------------------------------------------------------------
   
   if(n_fleets == 1) { # if single fleet - sum across or leave as is
-    obs_catches <- as.matrix(apply( as.matrix(Catch_agg[(Fish_Start_yr[1]:(n_years-1)),,sim]), 1, FUN = sum),
+    obs_catches <- as.matrix(apply( as.matrix(Catch_agg[(Fish_Start_yr[1]:(n_years)),,sim]), 1, FUN = sum),
                              ncol = 1)
     
     # Catch weighting here
-    catch_sum <- rowSums(as.matrix(Catch_agg[(Fish_Start_yr[1]:(n_years-1)),,sim]))
-    catch_weight <- as.matrix(Catch_agg[(Fish_Start_yr[1]:(n_years-1)),,sim]) / catch_sum
+    catch_sum <- rowSums(as.matrix(Catch_agg[(Fish_Start_yr[1]:(n_years)),,sim]))
+    catch_weight <- as.matrix(Catch_agg[(Fish_Start_yr[1]:(n_years)),,sim]) / catch_sum
     
   } else{ # multi fleet - leave as is
-    obs_catches <- matrix(Catch_agg[(Fish_Start_yr[1]:(n_years-1)),,sim], nrow = length(years), ncol = n_fleets)
+    obs_catches <- matrix(Catch_agg[(Fish_Start_yr[1]:(n_years)),,sim], nrow = length(years), ncol = n_fleets)
   } # end else
 
   # Fishery Age Comps -------------------------------------------------------
@@ -91,7 +92,7 @@ prepare_EM_input <- function(years,
     for(s in 1:n_sexes) {
       for(f in 1:dim(Fish_Age_Comps)[3]) {
         # Filter to save as an object
-        fish_age_comps <-  Fish_Age_Comps[Fish_Start_yr[1]:(n_years - 1),,f,s,sim] * catch_weight[,f]
+        fish_age_comps <-  Fish_Age_Comps[Fish_Start_yr[1]:length(years),,f,s,sim] * catch_weight[,f]
         # Increment comps - fixing fleet index to 1 here
         obs_fish_age_comps[,,1,s] <- obs_fish_age_comps[,,1,s] + fish_age_comps
       } # end f loop
@@ -108,7 +109,7 @@ prepare_EM_input <- function(years,
     } else{ # Dirichlet input sample sizes - weigh by the catch and input N (bc simulation sums to 1)
       # Effective sample size
       for(s in 1:n_sexes) {
-        obs_fish_age_Input_N[,1,s] <- rowSums(matrix(Input_N_Fish[Fish_Start_yr[1]:(n_years - 1),] *
+        obs_fish_age_Input_N[,1,s] <- rowSums(matrix(Input_N_Fish[Fish_Start_yr[1]:length(years),] *
                                                        catch_weight, ncol = dim(Fish_Age_Comps)[3]))
       } # s loop
     } # end else statement
@@ -124,14 +125,14 @@ prepare_EM_input <- function(years,
     for(f in 1:n_fleets) { # needs to loop through transpose and apply for easy retnetion of array dimensions
       for(s in 1:n_sexes) {
         obs_fish_age_comps[,,f,s] <- t(
-          apply(Fish_Age_Comps[Fish_Start_yr[1]:(n_years - 1),,f,s,sim], MARGIN = 1, 
+          apply(Fish_Age_Comps[Fish_Start_yr[1]:length(years),,f,s,sim], MARGIN = 1, 
                 FUN=function(x) { x/sum(x) })
         )
       } # end s loop
     } # end f loop
     
     # Effective Sample Sizes
-    obs_fish_age_Input_N <- array(Input_N_Fish[Fish_Start_yr[1]:(n_years - 1),], 
+    obs_fish_age_Input_N <- array(Input_N_Fish[Fish_Start_yr[1]:length(years),], 
                                dim = c(length(years), n_fish_comps, n_sexes))
     
   } # end else
@@ -145,12 +146,12 @@ prepare_EM_input <- function(years,
   # Apply function to get proportions and munge into matrix
   # Now, apply the proportion function over a single fleet
   for(s in 1:n_sexes) {
-    obs_srv_age_comps[,,,s] <- t(apply(Survey_Age_Comps[Fish_Start_yr[1]:(n_years - 1),,,s,sim],
+    obs_srv_age_comps[,,,s] <- t(apply(Survey_Age_Comps[Fish_Start_yr[1]:length(years),,,s,sim],
                                        MARGIN = 1, FUN=function(x) { x/sum(x) }))
   } # s loop
   
   # Get survey age input sample size
-  obs_srv_age_Input_N <- array(Input_N_Srv[Fish_Start_yr[1]:(n_years - 1),], 
+  obs_srv_age_Input_N <- array(Input_N_Srv[Fish_Start_yr[1]:length(years),], 
                             dim = c(length(years), n_srv_comps, n_sexes))
   
   
@@ -168,12 +169,12 @@ prepare_EM_input <- function(years,
       obs_fish_indices[i, 1] <- mean(Fishery_Index_Agg[(Fish_Start_yr[1]-1) + i,,sim])
     
   } else{
-    obs_fish_indices <-as.matrix( Fishery_Index_Agg[Fish_Start_yr[1]:(n_years - 1),,sim], 
+    obs_fish_indices <-as.matrix( Fishery_Index_Agg[Fish_Start_yr[1]:length(years),,sim], 
                                   nrow = length(years), ncol = n_fish_indices)
   } # multi fleet index = leave as is
   
   # Survey index
-  obs_srv_indices <- as.matrix(Survey_Index_Agg[Fish_Start_yr[1]:(n_years - 1),,sim], 
+  obs_srv_indices <- as.matrix(Survey_Index_Agg[Fish_Start_yr[1]:length(years),,sim], 
                                nrow = length(years), ncol = n_srv_indices)
   
   
@@ -363,34 +364,34 @@ prepare_EM_input <- function(years,
   pars$ln_DM_Srv_Param <- ln_DM_Srv_Param # DM theta for survey
   pars$ln_SigmaRec <- log(sigma_rec) # recruitment variability
   pars$ln_RecDevs <- rec_devs[years[-1],sim] # rec devs
-  pars$ln_N1Devs <- rnorm(length(ages)-1, 0, 0.0) # rec devs
+  pars$ln_N1Devs <- rnorm(length(ages)-1, 0.05, 0.0) # rec devs
   pars$ln_M <- log(mean(Mort_at_age)) # natural mortality
 
   # row sums for fish mort
   if(n_fleets == 1 & dim(Fish_Age_Comps)[3] == 1) { # 1 fleet model and truth = multiple
-    pars$ln_Fy <- matrix(log(fish_mort[Fish_Start_yr[1]:(n_years - 1),,sim]),
+    pars$ln_Fy <- matrix(log(fish_mort[Fish_Start_yr[1]:length(years),,sim]),
                          ncol = n_fleets, nrow = length(years))
   }
   
   if(n_fleets == 1 & dim(Fish_Age_Comps)[3] > 1) { # 1 fleet model, but truth = multiple
-    pars$ln_Fy <- matrix(log(rowSums(fish_mort[Fish_Start_yr[1]:(n_years - 1),,sim])),
+    pars$ln_Fy <- matrix(log(rowSums(fish_mort[Fish_Start_yr[1]:length(years),,sim])),
                          ncol = n_fleets, nrow = length(years))
   }
   
   if(n_fleets > 1 & dim(Fish_Age_Comps)[3] > 1) { # more tha one fleet for both OM and EM
-    pars$ln_Fy <- matrix(log(fish_mort[Fish_Start_yr[1]:(n_years - 1),,sim]),
+    pars$ln_Fy <- matrix(log(fish_mort[Fish_Start_yr[1]:length(years),,sim]),
                          ncol = n_fleets, nrow = length(years))
   }
   
-  pars$ln_q_fish <- rnorm(n_fish_indices, 0, 0.0) # catchability for fishery
-  pars$ln_q_srv <- rnorm(n_srv_indices, 0, 0.0) # catchability for survey
+  pars$ln_q_fish <- log(rnorm(n_fish_indices, 0.1, 0.0)) # catchability for fishery
+  pars$ln_q_srv <- log(rnorm(n_srv_indices, 0.1, 0.0)) # catchability for survey
   
   if(rec_model == "mean_rec") {
-    pars$ln_RecPars <- as.vector(c(mu_rec)) # Mean Recruitment (1 parameter)
+    pars$ln_RecPars <- as.vector(c(mu_rec) * 0.3) # Mean Recruitment (1 parameter)
     data$rec_model <- 0
   }
   if(rec_model == "BH") {
-    pars$ln_RecPars <- as.vector(c(log(r0), log(h))) # R0 and steepness
+    pars$ln_RecPars <- as.vector(c(log(r0) * 0.3, log(h))) # R0 and steepness
     data$rec_model <- 1
   }
   
@@ -422,7 +423,7 @@ prepare_EM_input <- function(years,
   } # end i loop
   
   # put array into our parameter list
-  pars$ln_fish_selpars <- array(log(rnorm(1, 2, 0)), dim = c(n_fish_comps, n_sexes, n_fish_blocks, max(n_fish_pars)))
+  pars$ln_fish_selpars <- array(log(rnorm(1, 1, 0)), dim = c(n_fish_comps, n_sexes, n_fish_blocks, max(n_fish_pars)))
   
   # Time-Varying Selectivity Options (Fishery)
   if(time_selex == "None") { # No time-varying

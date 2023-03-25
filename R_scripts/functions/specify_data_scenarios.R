@@ -60,8 +60,7 @@ fish_surv_data_scenarios <- function(Fish_Start_yr, Surv_Start_yr, Input_Fish_N_
           fish_Input_N_mat[y,f] <- floor(Input_Fish_N_Max[f] * F_scalar[f] * fish_mort[y,f,1])
           
           # Fix Neff at a specified value for those that are < said specified value
-          if(fish_Input_N_mat[y,f] < Input_N_Fish_Fixed[f] &
-             fish_Input_N_mat[y,f] != 0) fish_Input_N_mat[y,f] <- Input_N_Fish_Fixed[f]
+          if(fish_Input_N_mat[y,f] < Input_N_Fish_Fixed[f]) fish_Input_N_mat[y,f] <- Input_N_Fish_Fixed[f]
 
       } # end year loop
       

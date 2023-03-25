@@ -78,7 +78,7 @@ specify_F_pattern <- function(Start_F, Fish_Start_yr, F_type, n_years, max_rel_F
     
   } # if statement for F pattern that is increasing
   
-  if(F_type == "Const_Inc") { # Constant and Increasing F type
+  if(F_type == "Const_Inc_or_Dec") { # Constant and Increasing or Decreasing F type
     
     # Change point for fmort
     chngpoint <- yr_chng

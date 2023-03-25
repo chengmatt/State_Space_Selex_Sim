@@ -347,6 +347,14 @@ simulate_data <- function(fxn_path,
                   Fishery_Index = Fishery_Index, Fish_Age_Comps = Fish_Age_Comps,
                   Fishery_Index_Agg = Fishery_Index_Agg, Survey_Index = Survey_Index,
                   Survey_Age_Comps = Survey_Age_Comps, Survey_Index_Agg = Survey_Index_Agg,
-                  rec_devs = rec_devs)
+                  rec_devs = rec_devs, init_age_devs = init_age_devs, DM_Fish_Param = DM_Fish_Param,
+                  n_sims = n_sims, ages = ages, n_sex = n_sex, Surv_selex_at_age = Surv_selex_at_age,
+                  Fish_selex_at_age = Fish_selex_at_age, Input_N_Fish = Input_N_Fish, 
+                  Input_N_Srv = Input_N_Srv, wt_at_age = wt_at_age, mat_at_age = mat_at_age,
+                  sex_ratio = sex_ratio, fish_CV = fish_CV, srv_CV = srv_CV, sigma_rec = sigma_rec,
+                  Mort_at_age = Mort_at_age, fish_mort = fish_mort, r0 = r0, h = h,
+                  catch_CV = catch_CV, q_Fish = q_Fish, q_Surv = q_Surv, ssb0 = ssb0)
+  
+  return(om_list)
   
 } # end function

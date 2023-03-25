@@ -69,8 +69,7 @@ run_EM <- function(data, parameters, map, n.newton, random = NULL,
   
   # Optimize model here w/ nlminb
   mle_optim <- stats::nlminb(model_fxn$par, model_fxn$fn, model_fxn$gr, 
-                             control = list(iter.max = iter.max, eval.max = eval.max),
-                             lower = -10, upper = 10)
+                             control = list(iter.max = iter.max, eval.max = eval.max))
   
   # Take additional newton steps
   add_newton(n.newton = n.newton, ad_model = model_fxn, mle_optim = mle_optim)
@@ -398,16 +397,14 @@ get_quants <- function(sd_rep,
                        nmod_fish_fleets) {
   
   # Define parameters we want to get
-  par_name <- c("ln_M", 
-                "ln_q_srv", 
+  par_name <- c("ln_q_srv", 
                 "ln_RecPars", 
                 "ln_srv_selpars", 
                 "ln_fish_selpars",
                 "fixed_sel_re_fish")
   
   # True quantities
-  t <- c(mean(Mort_at_age),  # Natural Mortality
-         mean(q_Surv),  # Catchability
+  t <- c(mean(q_Surv), # Catchability
          r0, # Virgin Recruitment
          NA,  # Srv selex
          NA,  # Fish selex
@@ -426,14 +423,13 @@ get_quants <- function(sd_rep,
   } # end par loop
   
   # Get SSB0
-  ssb0_df <- extract_ADREP_vals(sd_rep = model$sd_rep, par = "ssb0") %>% 
+  ssb0_df <- extract_ADREP_vals(sd_rep = sd_rep, par = "ssb0") %>% 
     dplyr::mutate(type = "SSB0", trans_mle_val = NA,
            mle_var = NA, t = ssb0) %>%  dplyr::rename(mle_sd = mle_se)
   par_all <- rbind(par_all, ssb0_df)
   
   # Get Fx here
   # Pre-Processing first
-  est_M <- exp(sd_rep$par.fixed[names(model$sd_rep$par.fixed) == "ln_M"]) # natural mortality
   # Get Fs here
   if(nmod_fish_fleets > 1) {
     # Vector of fleets (define to multiply)
@@ -449,7 +445,7 @@ get_quants <- function(sd_rep,
   
   # Get estaimted Fx% value
   Fx_val <- get_Fx_refpt(ages = ages,
-                          MortAA = rep(est_M, length = length(ages)), 
+                          MortAA = Mort_at_age[length(years),,sim], 
                           SelexAA = t(est_Selex), 
                           MatAA = mat_at_age[length(years),,1,sim], # females
                           WAA = wt_at_age[length(years),,1,sim],  # females
@@ -470,7 +466,7 @@ get_quants <- function(sd_rep,
   colnames(F_df) <- names(par_all) # replace colnames in empty df
   
   # Now, input into empty dataframe
-  F_df <- F_df %>% dplyr::mutate(trans_mle_val = Fx_val, 
+  F_df <- F_df %>% dplyr::mutate(mle_val = Fx_val, 
                                  type = paste("F", F_x, sep = "_"),
                                  t = true_f40)
   
