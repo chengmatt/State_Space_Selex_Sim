@@ -14,7 +14,7 @@ source(here(fxn_path, "Utility_fxns.R"))
 source(here(fxn_path, "prepare_EM_input.R"))
 
 # Create folder for OMs
-dir.create(here("output", "OM_Data"))
+dir.create(here("output", "OM_Scenarios"))
 
 # Read in OM scenarios
 om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios.xlsx"), sheet = "OM")
@@ -30,7 +30,7 @@ for(n_om in 1:n_OM_scen) {
   # Operating Model Loop + Set Up -------------------------------------------
   
   # Create file directory to save model outputs
-  om_path <- here("output", "OM_Data", om_scenarios$OM_Scenarios[n_om])
+  om_path <- here("output", "OM_Scenarios", om_scenarios$OM_Scenarios[n_om])
   dir.create(om_path)
   
   # Pre-Processing
@@ -100,7 +100,7 @@ for(n_om in 1:n_OM_scen) {
   save(oms, file = here(om_path, paste(om_scenarios$OM_Scenarios[n_om], ".RData", sep = "")))
   
   # Plot OM here
-  plot_OM(path = here("output", "OM_Data", om_scenarios$OM_Scenarios[n_om]), 
+  plot_OM(path = here("output", "OM_Scenarios", om_scenarios$OM_Scenarios[n_om]), 
           file_name = "OM_Plots.pdf")
   
 } # end n_om loop

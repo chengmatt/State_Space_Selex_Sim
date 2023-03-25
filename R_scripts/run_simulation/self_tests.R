@@ -28,7 +28,7 @@ compile_tmb(wd = here("src"), cpp = "EM.cpp")
 
 # Read in OM and EM Scenarios
 om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios.xlsx"), sheet = "OM")
-em_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios.xlsx"), sheet = "EM")
+em_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios.xlsx"), sheet = "EM_Self_Tests")
 
 # Read in spreadsheet for life history parameters
 lh_path <- here("input", "Sablefish_Inputs.xlsx")
@@ -36,13 +36,11 @@ lh_path <- here("input", "Sablefish_Inputs.xlsx")
 # Get number of OM and EM scenarios
 n_OM_scen <- length(om_scenarios$OM_Scenarios)
 n_EM_scen <- length(em_scenarios$EM_Scenario)
-n_om = 1
-n_em = 1
 
 for(n_om in 1:n_OM_scen) {
   
   # Load in OM data
-  om_path <- here("output", "OM_Data", om_scenarios$OM_Scenarios[n_om])
+  om_path <- here("output", "OM_Scenarios", om_scenarios$OM_Scenarios[n_om])
   load(here(om_path, paste(om_scenarios$OM_Scenarios[n_om],".RData",sep = "")))
   list2env(oms,globalenv()) # output into global environment
 
@@ -55,10 +53,13 @@ for(n_om in 1:n_OM_scen) {
       time_selex <- em_scenarios$Time_Selex[n_em] # Get time-varying selectivity options
       time_selex_npars <- em_scenarios$Time_Selex_Npars[n_em] # Number of time-varying selectivity parameters 
       if(time_selex_npars == "NA") time_selex_npars <- NULL # replace with NULL
+      om_application <- unlist(strsplit(em_scenarios$OM_Application[n_em], ",")) # EMs to apply to particular OM cases
       
-      # Parrallelize loop
+      # Only run simulations if OM corresponds with an EM
+    if(sum(om_application %in% c(om_scenarios$OM_Scenarios[n_om])) >= 1) {
+      
       sim_models <- foreach(sim = 1:n_sims, 
-                            .packages = c("TMB","here","tidyverse")) %dopar% {
+                            .packages = c("TMB", "here", "tidyverse")) %dopar% {
       
       compile_tmb(wd = here("src"), cpp = "EM.cpp")
       
@@ -111,9 +112,7 @@ for(n_om in 1:n_OM_scen) {
       
       # Combine objects to save
       all_obj_list <- list(model, quants_df$Par_df, quants_df$TS_df)
-      
       all_obj_list
-
     } # end foreach loop
     
     # After we're done running EMs, output objects to save in folder
@@ -129,36 +128,52 @@ for(n_om in 1:n_OM_scen) {
       time_series <- rbind(time_series, sim_models[[s]][[3]]) # save time series
     } # end s loop
     
-    # Now, save our results
-
-    ts_plot <- get_RE_precentiles(df = time_series %>% 
-                                  filter(conv == "Converged", type == "Total Fishing Mortality"), 
-                       est_val_col = 1, true_val_col = 5,  
-                       par_name = "Total Recruitment", group_vars = "year")
+    # Now, save our results - create directory to store results first
+    em_path_res <- here(om_path, em_scenarios$EM_Scenario[n_em])
+    dir.create(em_path_res)
+    save(em_path_res, file = here(em_path_res, paste(em_scenarios$EM_Scenario[n_em], ".RData", sep = ""))) # save models
     
-    (est_plot <- plot_RE_ts_ggplot(data = ts_plot, x = year, y = median, 
-                                   lwr_1 = lwr_80, upr_1 = upr_80,
-                                   lwr_2 = lwr_95, upr_2 = upr_95, 
-                                   facet_name = par_name))
-    params %>% 
-      mutate(RE = (mle_val - t) / t) %>% 
-      filter(!is.na(t)) %>% 
-      ggplot(aes(y = RE, fill = type)) +
-      geom_boxplot() +
-      ylim(-0.3 , 0.3) +
-      geom_hline(yintercept = 0, col = "red") +
-      facet_wrap(~type, scales = "free") +
-      theme_bw()
+    # Differentiate OM and EMs
+    params <- params %>% dplyr::mutate(OM_Scenario = om_scenarios$OM_Scenarios[n_om],
+                                       EM_Scenario = em_scenarios$EM_Scenario[n_em])
+    time_series <- time_series %>% dplyr::mutate(OM_Scenario = om_scenarios$OM_Scenarios[n_om],
+                                                 EM_Scenario = em_scenarios$EM_Scenario[n_em])
     
-    params %>% 
-      mutate(RE = (mle_val - t) / t) %>% 
-      group_by(type) %>% 
-      summarize(median = median(RE))
-
+    # Now, output these as csvs
+    write.csv(params, here(em_path_res, "Param_Results.csv"))
+    write.csv(time_series, here(em_path_res, "TimeSeries_Results.csv"))
+    
+    # Remove, remove OM objects to restart the loop
+    rm(list = c(names(oms)))
     print(paste("Done with EM", n_em, "out of", n_EM_scen))
 
+    } # end if statement for corresponding om and em
   } # end n_em loop
 } # end n_om loop
 
 stopCluster(cl) 
 
+# 
+# ts_plot <- get_RE_precentiles(df = time_series %>% 
+#                                 filter(conv == "Converged", type == "Total Fishing Mortality"), 
+#                               est_val_col = 1, true_val_col = 5,  
+#                               par_name = "Total Recruitment", group_vars = "year")
+# 
+# (est_plot <- plot_RE_ts_ggplot(data = ts_plot, x = year, y = median, 
+#                                lwr_1 = lwr_80, upr_1 = upr_80,
+#                                lwr_2 = lwr_95, upr_2 = upr_95, 
+#                                facet_name = par_name))
+# params %>% 
+#   mutate(RE = (mle_val - t) / t) %>% 
+#   filter(!is.na(t)) %>% 
+#   ggplot(aes(y = RE, fill = type)) +
+#   geom_boxplot() +
+#   ylim(-0.3 , 0.3) +
+#   geom_hline(yintercept = 0, col = "red") +
+#   facet_wrap(~type, scales = "free") +
+#   theme_bw()
+# 
+# params %>% 
+#   mutate(RE = (mle_val - t) / t) %>% 
+#   group_by(type) %>% 
+#   summarize(median = median(RE))
