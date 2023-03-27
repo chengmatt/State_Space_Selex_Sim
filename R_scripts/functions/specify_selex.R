@@ -55,7 +55,6 @@ selex_opts <- function(selex_type, bins, par_values) {
     
     # Now calculate Selex for dome-shaped - scale to a max of 1
     selex <- (bins/amax) ^ (amax/p) * exp((amax - bins) / p)  
-    
   } # gamma dome-shaped selectivity
   
   if(selex_type == "exp_logistic") { # 3 parameters
@@ -66,7 +65,7 @@ selex_opts <- function(selex_type, bins, par_values) {
     beta <- as.numeric(par_mat[,1][par_mat[,2] == "beta"])
     # Get gamma value
     gamma <- as.numeric(par_mat[,1][par_mat[,2] == "gamma"])
-    
+
     # Define parts of the equation
     first = (1 / (1 - gamma)) 
     second = ((1 - gamma) / gamma)^gamma
@@ -75,7 +74,6 @@ selex_opts <- function(selex_type, bins, par_values) {
     
     # Calculate selectivity here
     selex = first * second * (third/fourth)
-
   }
   
   if(selex_type == "double_logistic") { # 4 parameters

@@ -1,5 +1,6 @@
 # Purpose: To run self-tests of OM and EM, but with different number of years for data i.e., 5, 10, and Terminal year
 # following change in fleet structure
+# Note: All EMs run here are 2 fleet models
 # Creator: Matthew LH. Cheng
 # Date 3/23/23
 
@@ -10,6 +11,7 @@ library(here)
 library(tidyverse)
 library(TMB)
 library(doSNOW)
+library(parallel)
 
 ncores <- detectCores() 
 cl <- makeCluster(ncores - 3)
@@ -22,9 +24,6 @@ files <- list.files(fxn_path)
 for(i in 1:length(files)) source(here(fxn_path, files[i]))
 
 compile_tmb(wd = here("src"), cpp = "EM.cpp")
-
-# Create folder for self-tests
-# dir.create(here("output", "self_tests"))
 
 # Read in OM and EM Scenarios
 om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios.xlsx"), sheet = "OM")
@@ -60,7 +59,7 @@ for(n_om in 1:n_OM_scen) {
       
       sim_models <- foreach(sim = 1:n_sims, 
                             .packages = c("TMB", "here", "tidyverse")) %dopar% {
-      
+
       compile_tmb(wd = here("src"), cpp = "EM.cpp")
       
       # Prepare inputs for EM
@@ -80,7 +79,7 @@ for(n_om in 1:n_OM_scen) {
                                 Fish_Comp_Like_Model = c("multinomial", "multinomial"),
                                 Srv_Comp_Like_Model = c("multinomial"),
                                 rec_model = "BH", 
-                                F_Slx_Model_Input = c("logistic", "logistic"),
+                                F_Slx_Model_Input = fish_selex_opt,
                                 S_Slx_Model_Input = c("logistic"), # logistic
                                 time_selex = time_selex, 
                                 n_time_selex_pars = time_selex_npars,
@@ -90,7 +89,7 @@ for(n_om in 1:n_OM_scen) {
       # Run EM model here and get sdrep
       model <- run_EM(data = input$data, parameters = input$parameters, 
                                       map = input$map, 
-                                      n.newton = 5, 
+                                      n.newton = 3, 
                                       silent = TRUE, getsdrep = TRUE)
       
       # Check model convergence
@@ -104,7 +103,8 @@ for(n_om in 1:n_OM_scen) {
                               model_fxn = model$model_fxn, 
                               sim = sim, 
                               conv = convergence_status$Convergence,
-                              n_years = length(years),
+                              n_years = length(years), 
+                              fish_selex_opt = fish_selex_opt,
                               ntrue_fish_fleets = dim(Fish_Age_Comps)[3], 
                               nmod_fish_fleets = input$data$n_fleets,
                               ages = ages, 
@@ -112,9 +112,10 @@ for(n_om in 1:n_OM_scen) {
       
       # Combine objects to save
       all_obj_list <- list(model, quants_df$Par_df, quants_df$TS_df)
+      
       all_obj_list
     } # end foreach loop
-    
+
     # After we're done running EMs, output objects to save in folder
     
     # Pre-processing here
@@ -131,7 +132,7 @@ for(n_om in 1:n_OM_scen) {
     # Now, save our results - create directory to store results first
     em_path_res <- here(om_path, em_scenarios$EM_Scenario[n_em])
     dir.create(em_path_res)
-    save(em_path_res, file = here(em_path_res, paste(em_scenarios$EM_Scenario[n_em], ".RData", sep = ""))) # save models
+    save(model_list, file = here(em_path_res, paste(em_scenarios$EM_Scenario[n_em], ".RData", sep = ""))) # save models
     
     # Differentiate OM and EMs
     params <- params %>% dplyr::mutate(OM_Scenario = om_scenarios$OM_Scenarios[n_om],
@@ -142,10 +143,8 @@ for(n_om in 1:n_OM_scen) {
     # Now, output these as csvs
     write.csv(params, here(em_path_res, "Param_Results.csv"))
     write.csv(time_series, here(em_path_res, "TimeSeries_Results.csv"))
-    
-    # Remove, remove OM objects to restart the loop
-    rm(list = c(names(oms)))
-    print(paste("Done with EM", n_em, "out of", n_EM_scen))
+    cat(crayon::green("OM", n_om, "out of", n_OM_scen))
+    cat(crayon::yellow("EM", n_em, "out of", n_EM_scen))
 
     } # end if statement for corresponding om and em
   } # end n_em loop
@@ -153,27 +152,28 @@ for(n_om in 1:n_OM_scen) {
 
 stopCluster(cl) 
 
+
 # 
-# ts_plot <- get_RE_precentiles(df = time_series %>% 
-#                                 filter(conv == "Converged", type == "Total Fishing Mortality"), 
-#                               est_val_col = 1, true_val_col = 5,  
-#                               par_name = "Total Recruitment", group_vars = "year")
-# 
-# (est_plot <- plot_RE_ts_ggplot(data = ts_plot, x = year, y = median, 
-#                                lwr_1 = lwr_80, upr_1 = upr_80,
-#                                lwr_2 = lwr_95, upr_2 = upr_95, 
-#                                facet_name = par_name))
-# params %>% 
-#   mutate(RE = (mle_val - t) / t) %>% 
-#   filter(!is.na(t)) %>% 
-#   ggplot(aes(y = RE, fill = type)) +
-#   geom_boxplot() +
-#   ylim(-0.3 , 0.3) +
-#   geom_hline(yintercept = 0, col = "red") +
-#   facet_wrap(~type, scales = "free") +
-#   theme_bw()
-# 
-# params %>% 
-#   mutate(RE = (mle_val - t) / t) %>% 
-#   group_by(type) %>% 
-#   summarize(median = median(RE))
+ts_plot <- get_RE_precentiles(df = time_series %>%
+                                filter(conv == "Converged", type == "Spawning Stock Biomass"),
+                              est_val_col = 1, true_val_col = 5,
+                              par_name = "Total Recruitment", group_vars = "year")
+
+(est_plot <- plot_RE_ts_ggplot(data = ts_plot, x = year, y = median,
+                               lwr_1 = lwr_80, upr_1 = upr_80,
+                               lwr_2 = lwr_95, upr_2 = upr_95,
+                               facet_name = par_name))
+params %>%
+  mutate(RE = (mle_val - t) / t) %>%
+  filter(!is.na(t)) %>%
+  ggplot(aes(y = RE, fill = type)) +
+  geom_boxplot() +
+  ylim(-0.3 , 0.3) +
+  geom_hline(yintercept = 0, col = "red") +
+  facet_wrap(~type, scales = "free") +
+  theme_bw()
+
+params %>%
+  mutate(RE = (mle_val - t) / t) %>%
+  group_by(type) %>%
+  summarize(median = median(RE))

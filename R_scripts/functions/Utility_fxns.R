@@ -378,6 +378,7 @@ get_RE_precentiles <- function(df, est_val_col = 1, true_val_col = 5, par_name =
 #' @param n_years number of years in model
 #' @param ages number of ages in model
 #' @param F_x x% of SPR
+#' @param fish_selex_opt Selex fishery options in EM
 #' @param ntrue_fish_fleets Number of true fishery fleets 
 #' @param nmod_fish_fleets Number of modelled fishery fleets
 #'
@@ -393,6 +394,7 @@ get_quants <- function(sd_rep,
                        n_years, 
                        ages,
                        F_x,
+                       fish_selex_opt,
                        ntrue_fish_fleets,
                        nmod_fish_fleets) {
   
@@ -419,6 +421,93 @@ get_quants <- function(sd_rep,
   for(par in 1:length(par_name)) {
     par_df <- extract_parameter_vals(sd_rep = sd_rep, par = par_name[par], trans = "log") %>%
               dplyr::mutate(type = par_name[par], t = t[par])
+    
+    # Organizing parameter names for fishery selectivity
+    if(par_name[par] == "ln_fish_selpars") {
+      n_sexes <- dim(model_fxn$rep$F_Slx)[4] # number of sexes
+      # 1 fleet options
+      if(sum(fish_selex_opt == "logistic") == 1) {
+        if(n_sexes == 1) {
+          paste_names <- c("F1_a50", "F1_k")
+        } # sex 1
+        if(n_sexes == 2) {
+          paste_names <- c("F1_a50_m", "F1_a50_f", 
+                           "F1_k_m", "F1_k_f")
+        }
+      } # end if only logistic
+      if(sum(fish_selex_opt == "gamma") == 1) {
+        if(n_sexes == 1) {
+          paste_names <- c("F1_delta", "F1_amax")
+        } # sex 1
+        if(n_sexes == 2) {
+          paste_names <- c("F1_delta_m", "F1_delta_f", 
+                           "F1_amax_m", "F1_amax_f")
+        }
+      } # end gamma
+      
+      if(sum(fish_selex_opt == "exp_logistic") == 1) {
+        if(n_sexes == 1) {
+          paste_names <- c("F1_gamma", "F1_alpha", "F1_beta")
+        } # sex 1
+        if(n_sexes == 2) {
+          paste_names <- c("F1_gamma_m", "F1_gamma_f",
+                           "F1_alpha_m", "F1_alpha_f",
+                           "F1_beta_m", "F1_beta_f")
+        }
+      } # end exponential logistic
+      # 2 fleet options
+      if(sum(fish_selex_opt == c("logistic", "logistic")) == 2) {
+        if(n_sexes == 1) {
+          paste_names <- c("F1_a50", "F2_a50", "F1_k", 'F2_k')
+        } # sex 1
+        if(n_sexes == 2) {
+          paste_names <- c("F1_a50_m", "F2_a50_m", 
+                           "F1_a50_f", "F2_a50_f",
+                           "F1_k_m", "F2_k_m", 
+                           "F1_k_f", "F2_k_f")
+        } # 2 sexes
+      } # end if logistic and logistic combination
+      if(sum(fish_selex_opt == c("logistic", "gamma")) == 2) {
+        if(n_sexes == 1) {
+          paste_names <- c("F1_a50", "F2_delta",  
+                           "F1_k", "F2_amax")
+        } # 1 sex
+        if(n_sexes == 2) {
+          paste_names <- c("F1_a50_m", "F2_delta_m", 
+                           "F1_a50_f", "F2_delta_f",
+                           "F1_k_m", "F2_amax_m", 
+                           "F1_k_f", "F2_amax_f")
+        } # 2 sexes
+      } # end if logistic and gamma combination
+      
+      if(sum(fish_selex_opt == c("gamma", "logistic")) == 2) { # if gamma and logistic fleet 1 and 2 
+        if(n_sexes == 1) {
+          paste_names <- c("F1_delta", "F2_a50",  
+                           "F1_amax", "F2_k")
+        } # 1 sex
+        if(n_sexes == 2) {
+          paste_names <- c("F1_delta_m", "F2_a50_m", 
+                           "F1_delta_f", "F2_a50_f", 
+                           "F1_amax_m", "F2_k_m", 
+                           "F1_amax_f", "F2_k_f")
+        } # 2 sexes
+      } # end if gamma and logistic combination
+      
+      par_df$type <- paste_names
+    } # end if fishery selex parameters
+    
+    if(par_name[par] == "ln_srv_selpars") {
+      n_sexes <- dim(model_fxn$rep$S_Slx)[4] # number of sexes
+      if(n_sexes == 1) {
+        paste_names <- c("S1_a50", "S1_k")
+      }  # if nsex = 1
+      if(n_sexes == 2) {
+        paste_names <- c("S1_a50_m", "S1_a50_f",
+                         "S1_k_m", "S1_k_f")
+      } # if nsex = 2
+      par_df$type <- paste_names
+    } # end if survey slx pars
+    
     par_all <- rbind(par_all, par_df)
   } # end par loop
   
@@ -504,3 +593,46 @@ get_quants <- function(sd_rep,
 
 } # end function
 
+#' Title Get Results from simulations (time series and parameters)
+#'
+#' @param om_scenario_path Path to Opearting Model Scenarios
+#'
+#' @return Returns a list of dataframes
+#' @export
+#'
+#' @examples
+get_results <- function(om_scenario_path) {
+  
+  require(here)
+  require(tidyverse)
+  
+  # Get OM Scenarios from OM path
+  om_scenarios <- list.files(om_scenario_path)
+  # Set up empty dataframes
+  param_all <- data.frame()
+  ts_all <- data.frame()
+  
+  # Loop thorugh to extract metrics
+  for(i in 1:length(om_scenarios)) {
+    
+    em_scenarios <- list.files(here(om_scenario_path, om_scenarios[i]))
+    # Remove .Rdata and .pdf from em_scenarios
+    em_scenarios <- em_scenarios[str_detect(em_scenarios, ".RData") == FALSE]
+    em_scenarios <- em_scenarios[str_detect(em_scenarios, ".pdf") == FALSE]
+    
+    for(j in 1:length(em_scenarios)) {
+      # Read in parameters and time series csvs
+      params <- read.csv(here(om_scenario_path, om_scenarios[i], 
+                              em_scenarios[j], "Param_Results.csv"))
+      ts <- read.csv(here(om_scenario_path, om_scenarios[i], 
+                          em_scenarios[j], "TimeSeries_Results.csv"))
+      
+      param_all <- rbind(param_all, params)
+      ts_all <- rbind(ts_all, ts)
+      
+    } # j loop
+  } # i loop
+  
+  return(list(Parameter_Sum = param_all,
+              TimeSeries_Sum = ts_all))
+} # end function

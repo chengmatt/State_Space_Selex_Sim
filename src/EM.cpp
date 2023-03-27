@@ -467,10 +467,12 @@ Type objective_function<Type>::operator() ()
       
       // Get likelihood here
       catch_nLL(y, f) -= use_catch(y, f) * dnorm(log(obs_catches(y, f)),
-                         log(pred_catches(y, f)), catch_sd(f), true);
+                         log(pred_catches(y, f)) - pow(catch_sd(f),2)/2, 
+                         catch_sd(f), true);
       
       SIMULATE{ // Simulate catch
-        obs_catches(y, f) = exp(rnorm(log(pred_catches(y, f)), catch_sd(f) ));
+        obs_catches(y, f) = exp(rnorm(log(pred_catches(y, f)) 
+                              - pow(catch_sd(f),2)/2, catch_sd(f) ));
       } // Simulation statement
       
     } // f loop
@@ -489,10 +491,12 @@ Type objective_function<Type>::operator() ()
       
       // Likelihood calculations
       fish_index_nLL(y, fi) -= use_fish_index(y, fi) * dnorm(log(obs_fish_indices(y, fi)), 
-                               log(pred_fish_indices(y, fi)), fish_sd(fi), true);
+                               log(pred_fish_indices(y, fi)) - pow(fish_sd(fi),2)/2, 
+                               fish_sd(fi), true);
       
       SIMULATE{ // Simulate Fishery Index
-        obs_fish_indices(y, fi) = exp(rnorm(log(pred_fish_indices(y, fi)), fish_sd(fi))); 
+        obs_fish_indices(y, fi) = exp(rnorm(log(pred_fish_indices(y, fi)) 
+                                    - pow(fish_sd(fi),2)/2, fish_sd(fi))); 
       } // Simulation statement
       
     } // fi loop
@@ -504,10 +508,12 @@ Type objective_function<Type>::operator() ()
       
       // Likelihood calculations
       srv_index_nLL(y, si) -= use_srv_index(y, si) * dnorm(log(obs_srv_indices(y, si)), 
-                              log(pred_srv_indices(y, si)), srv_sd(si), true); 
+                              log(pred_srv_indices(y, si)) - pow(srv_sd(si), 2)/2, 
+                              srv_sd(si), true); 
                 
       SIMULATE{ // Simulate Survey Index
-        obs_srv_indices(y, si) = exp(rnorm(log(pred_srv_indices(y, si)), srv_sd(si))); 
+        obs_srv_indices(y, si) = exp(rnorm(log(pred_srv_indices(y, si)) 
+                                    -pow(srv_sd(si), 2)/2, srv_sd(si))); 
       } // Simulation statement
       
     } // y loop

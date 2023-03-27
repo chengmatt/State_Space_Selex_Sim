@@ -18,7 +18,7 @@ idx_obs_error <- function(error, true_index, CV) {
     sd <- sqrt(log((CV^2) + 1))
     
     # Sample!
-    sampled_index <- true_index * exp(rnorm(1, 0, sd))
+    sampled_index <- true_index * exp(rnorm(1, -sd^2/2, sd))
     
   } # if generating via log normal
   

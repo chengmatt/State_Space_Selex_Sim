@@ -251,7 +251,7 @@ simulate_data <- function(fxn_path,
               
               if(s == n_sex) { # Get catch aggregated across ages and sexes, and add lognormal errors
                 Catch_agg[y, f, sim] <- sum(Catch_at_age[y,,f,,sim] * wt_at_age[y,,,sim]) * 
-                                        exp( rnorm(1, 0, sqrt(log(catch_CV[f]^2 + 1))) )
+                                        exp( rnorm(1, -sqrt(log(catch_CV[f]^2 + 1))^2/2, sqrt(log(catch_CV[f]^2 + 1))) )
               } # if we are done w/ looping through sexes
               
               ### Sample Fishery Index and Comps ------------------------------------------
