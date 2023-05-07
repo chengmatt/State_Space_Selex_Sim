@@ -15,11 +15,11 @@ library(tidyverse)
 
 chngpoint <- 24     # Change point for fmort
 chngpoint_end <- 29 # when does change point end
-mean_nat_mort <- 0.1 # Mean M
-min_rel_F1_M <- 0.25 # Min F relative to M
-max_rel_F2_M <- 1.25  # Max F relative to M
-Start_F1 <- 1.25 * mean_nat_mort # Start F1
-Start_F2 <- 0.25 * mean_nat_mort # Start F2
+mean_nat_mort <- 0.108 # Mean M
+min_rel_F1_M <- 0.01 # Min F relative to M
+max_rel_F2_M <- 0.85  # Max F relative to M
+Start_F1 <- 1 * mean_nat_mort # Start F1
+Start_F2 <- 0.01 * mean_nat_mort # Start F2
 Fish_Start_yr <- 0
 n_years <- 50
 
@@ -54,11 +54,11 @@ fleet_change_fast <- data.frame(Fleet1 = F_vec1, Fleet2 = F_vec2, Year = 1:n_yea
 
 chngpoint <- 24     # Change point for fmort
 chngpoint_end <- 49 # when does change point end
-mean_nat_mort <- 0.1 # Mean M
-min_rel_F1_M <- 0.25 # Min F relative to M
-max_rel_F2_M <- 1.25  # Max F relative to M
-Start_F1 <- 1.25 * mean_nat_mort # Start F1
-Start_F2 <- 0.25 * mean_nat_mort # Start F2
+mean_nat_mort <- 0.108 # Mean M
+min_rel_F1_M <- 0.01 # Min F relative to M
+max_rel_F2_M <- 0.85  # Max F relative to M
+Start_F1 <- 1 * mean_nat_mort # Start F1
+Start_F2 <- 0.01 * mean_nat_mort # Start F2
 Fish_Start_yr <- 0
 n_years <- 50
 
@@ -94,15 +94,26 @@ fleet_change_slow <- data.frame(Fleet1 = F_vec1, Fleet2 = F_vec2, Year = 1:n_yea
 # Coerce into dataframe
 fleet_change_all <- rbind(fleet_change_fast, fleet_change_slow)
 
-png(here("figs", "Hypothetical_OM", "Fleet_Str_Change.png"), width = 650, height = 500)
-ggplot(fleet_change_all, aes(x = Year, y = Fs, color = Fleet, lty = Fleet)) +
-  geom_line(size = 1.3) + 
-  scale_color_manual(values = c("#009B77", "#335C58")) +
+# Get aggregate F
+agg_F <- fleet_change_all %>% 
+  group_by(Type, Year) %>% 
+  summarize(Fs = sum(Fs)) %>% 
+  mutate(Fleet = "Aggregate")
+
+# Bind together
+fleet_change_all <- rbind(fleet_change_all, agg_F)
+
+png(here("figs", "Hypothetical_OM", "Fleet_Str_Change.png"), width = 650, height = 350)
+ggplot() +
+  geom_line(fleet_change_all, mapping = aes(x = Year, y = Fs, 
+                                            color = Fleet, lty = Fleet),  size = 1.3) +
+  scale_color_manual(values = c("black", "#009B77", "#B1BC55")) +
+  scale_linetype_manual(values = c(1, 2, 2)) +
   facet_wrap(~Type) +
   theme_bw() +
   labs(x = "Year", y = "Fishing Mortality Rates") +
   ylim(0, 0.15) +
-  theme(legend.position = c(0.08, 0.9),
+  theme(legend.position = c(0.11, 0.45),
         axis.title = element_text(size = 17),
         axis.text = element_text(size = 15, color = "black"),
         legend.title = element_text(size = 17),
@@ -118,22 +129,22 @@ bins <- 1:30
 ### Logistic-Logistic ----------------------------------------------------------------
 
 # Get a50 value males
-a50m1 <- 3
-a50m2 <- 7
-deltam1 <- 0.85
-deltam2 <- 2
+a50m1 <- 8
+a50m2 <- 10
+deltam1 <- 2
+deltam2 <- 2.5
 
 # Get a50 value females
-a50f1 <- 5
-a50f2 <- 13
-deltaf1 <- 1
-deltaf2 <- 2.5
+a50f1 <- 4
+a50f2 <- 6
+deltaf1 <- 0.85
+deltaf2 <- 1
 
 # Compute selex 
-selexm1 <- cbind(1 / (1 + exp(-1 * ((bins - a50m1)/deltam1) )), "Males", "Fleet 1", age = bins)
-selexm2 <- cbind(1 / (1 + exp(-1 * ((bins - a50m2)/deltam2) )) , "Males", "Fleet 2", age = bins)
-selexf1 <- cbind(1 / (1 + exp(-1 * ((bins - a50f1)/deltaf1) )) , "Females", "Fleet 1", age = bins)
-selexf2 <- cbind(1 / (1 + exp(-1 * ((bins - a50f2)/deltaf2) )) , "Females", "Fleet 2", age = bins)
+selexm1 <- cbind(1 / (1 + exp(-1 * ((bins - a50m1)/deltam1) )), "Males", "Fleet 2", age = bins)
+selexm2 <- cbind(1 / (1 + exp(-1 * ((bins - a50m2)/deltam2) )) , "Males", "Fleet 1", age = bins)
+selexf1 <- cbind(1 / (1 + exp(-1 * ((bins - a50f1)/deltaf1) )) , "Females", "Fleet 2", age = bins)
+selexf2 <- cbind(1 / (1 + exp(-1 * ((bins - a50f2)/deltaf2) )) , "Females", "Fleet 1", age = bins)
 
 # Bind these together
 selex_logist <- data.frame(rbind(selexm1, selexm2, selexf1, selexf2), Type = "Logistic-Logistic")
@@ -143,19 +154,19 @@ colnames(selex_logist) <- c("Selex", "Sex", "Fleet", "Age", "Type")
 ### Logistic-Gamma ----------------------------------------------------------
 
 # Gamma parameters
-amaxm2 <- 13
-deltam2 <- 10
-amaxf2 <- 16
-deltaf2 <- 15
+amaxm2 <- 6
+deltam2 <- 7
+amaxf2 <- 4
+deltaf2 <- 6
 
 # Get Selex here
 pm2 <- (0.5 * (sqrt(amaxm2^2 + 4*deltam2^2) - amaxm2)) 
-selexm2 <- cbind((bins/amaxm2) ^ (amaxm2/pm2) * exp((amaxm2 - bins) / pm2), "Males", "Fleet 2", age = bins)
+selexm2 <- cbind((bins/amaxm2) ^ (amaxm2/pm2) * exp((amaxm2 - bins) / pm2), "Males", "Fleet 1", age = bins)
 pf2 <- (0.5 * (sqrt(amaxf2^2 + 4*deltaf2^2) - amaxf2)) 
-selexf2 <- cbind((bins/amaxf2) ^ (amaxf2/pf2) * exp((amaxf2 - bins) / pf2), "Females", "Fleet 2", age = bins)
+selexf2 <- cbind((bins/amaxf2) ^ (amaxf2/pf2) * exp((amaxf2 - bins) / pf2), "Females", "Fleet 1", age = bins)
 
 # Bind these together
-selex_gamma <- data.frame(rbind(selexm1, selexm2, selexf1, selexf2), Type = "Logistic-Gamma")
+selex_gamma <- data.frame(rbind(selexm1, selexm2, selexf1, selexf2), Type = "Gamma-Logistic")
 colnames(selex_gamma) <- c("Selex", "Sex", "Fleet", "Age", "Type")
 
 # Plot Selectivity Scenarios -------------------------------------------------------------------
@@ -177,3 +188,4 @@ ggplot(selex_all, aes(x = as.numeric(Age), y = as.numeric(paste(Selex)), color =
         legend.text = element_text(size = 15),
         strip.text = element_text(size = 17))
 dev.off()
+

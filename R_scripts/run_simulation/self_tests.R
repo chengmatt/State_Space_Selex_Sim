@@ -14,7 +14,7 @@ library(doSNOW)
 library(parallel)
 
 ncores <- detectCores() 
-cl <- makeCluster(ncores - 3)
+cl <- makeCluster(ncores - 2)
 registerDoSNOW(cl)
 
 # Load in all functions into the environment

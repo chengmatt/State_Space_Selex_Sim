@@ -109,7 +109,7 @@ check_model_convergence <- function(mle_optim, sd_rep, mod_rep, min_grad = 0.001
   
   if(sd_rep$pdHess == TRUE & 
      max_grad_val < min_grad &
-     !is.nan(sum(model$sd_rep$sd )) &
+     !is.nan(sum(sd_rep$sd )) &
      !is.nan(mod_rep$rep$jnLL)) convergence = "Converged"
   else convergence = "Not Converged"
   
@@ -345,15 +345,15 @@ get_RE_precentiles <- function(df, est_val_col = 1, true_val_col = 5, par_name =
   
   df <- df %>% 
     group_by(!!! syms(group_vars)) %>% 
-    summarize(median = median(RE), 
-              lwr_100 = quantile(RE, 0),
-              upr_100 = quantile(RE, 1),
-              lwr_95 = quantile(RE, 0.025),
-              upr_95 = quantile(RE, 0.975),
-              lwr_80 = quantile(RE, 0.1),
-              upr_80 = quantile(RE, 0.9),
-              lwr_75 = quantile(RE, 0.125),
-              upr_75 = quantile(RE, 0.875)) %>% 
+    summarize(median = median(RE, na.rm = T), 
+              lwr_100 = quantile(RE, 0, na.rm = T),
+              upr_100 = quantile(RE, 1, na.rm = T),
+              lwr_95 = quantile(RE, 0.025, na.rm = T),
+              upr_95 = quantile(RE, 0.975, na.rm = T),
+              lwr_80 = quantile(RE, 0.1, na.rm = T),
+              upr_80 = quantile(RE, 0.9, na.rm = T),
+              lwr_75 = quantile(RE, 0.125, na.rm = T),
+              upr_75 = quantile(RE, 0.875, na.rm = T)) %>% 
     mutate(par_name = par_name) 
   
   if(str_detect(par_name, "Age")) { # if this is an age variable
@@ -426,7 +426,8 @@ get_quants <- function(sd_rep,
     if(par_name[par] == "ln_fish_selpars") {
       n_sexes <- dim(model_fxn$rep$F_Slx)[4] # number of sexes
       # 1 fleet options
-      if(sum(fish_selex_opt == "logistic") == 1) {
+      if(sum(fish_selex_opt == "logistic") == 1 &
+         length(fish_selex_opt) == 1) {
         if(n_sexes == 1) {
           paste_names <- c("F1_a50", "F1_k")
         } # sex 1
@@ -435,7 +436,8 @@ get_quants <- function(sd_rep,
                            "F1_k_m", "F1_k_f")
         }
       } # end if only logistic
-      if(sum(fish_selex_opt == "gamma") == 1) {
+      if(sum(fish_selex_opt == "gamma") == 1 &
+         length(fish_selex_opt) == 1) {
         if(n_sexes == 1) {
           paste_names <- c("F1_delta", "F1_amax")
         } # sex 1
@@ -445,7 +447,8 @@ get_quants <- function(sd_rep,
         }
       } # end gamma
       
-      if(sum(fish_selex_opt == "exp_logistic") == 1) {
+      if(sum(fish_selex_opt == "exp_logistic") == 1 &
+         length(fish_selex_opt) == 1) {
         if(n_sexes == 1) {
           paste_names <- c("F1_gamma", "F1_alpha", "F1_beta")
         } # sex 1
@@ -456,7 +459,8 @@ get_quants <- function(sd_rep,
         }
       } # end exponential logistic
       # 2 fleet options
-      if(sum(fish_selex_opt == c("logistic", "logistic")) == 2) {
+      if(sum(fish_selex_opt == c("logistic", "logistic")) == 2 &
+         length(fish_selex_opt) == 2) {
         if(n_sexes == 1) {
           paste_names <- c("F1_a50", "F2_a50", "F1_k", 'F2_k')
         } # sex 1
@@ -467,7 +471,8 @@ get_quants <- function(sd_rep,
                            "F1_k_f", "F2_k_f")
         } # 2 sexes
       } # end if logistic and logistic combination
-      if(sum(fish_selex_opt == c("logistic", "gamma")) == 2) {
+      if(sum(fish_selex_opt == c("logistic", "gamma")) == 2 &
+         length(fish_selex_opt) == 2) {
         if(n_sexes == 1) {
           paste_names <- c("F1_a50", "F2_delta",  
                            "F1_k", "F2_amax")
@@ -480,7 +485,8 @@ get_quants <- function(sd_rep,
         } # 2 sexes
       } # end if logistic and gamma combination
       
-      if(sum(fish_selex_opt == c("gamma", "logistic")) == 2) { # if gamma and logistic fleet 1 and 2 
+      if(sum(fish_selex_opt == c("gamma", "logistic")) == 2 &
+         length(fish_selex_opt) == 2) { # if gamma and logistic fleet 1 and 2 
         if(n_sexes == 1) {
           paste_names <- c("F1_delta", "F2_a50",  
                            "F1_amax", "F2_k")
@@ -601,24 +607,28 @@ get_quants <- function(sd_rep,
 #' @export
 #'
 #' @examples
-get_results <- function(om_scenario_path) {
+get_results <- function(om_scenario_path, exclude = NA) {
   
   require(here)
   require(tidyverse)
   
   # Get OM Scenarios from OM path
   om_scenarios <- list.files(om_scenario_path)
-  # Set up empty dataframes
-  param_all <- data.frame()
-  ts_all <- data.frame()
+  # Set up empty list
+  param_om_list <- list()
+  ts_om_list <- list()
   
   # Loop thorugh to extract metrics
-  for(i in 1:length(om_scenarios)) {
+  tryCatch(expr = for(i in 1:length(om_scenarios)) {
     
     em_scenarios <- list.files(here(om_scenario_path, om_scenarios[i]))
     # Remove .Rdata and .pdf from em_scenarios
     em_scenarios <- em_scenarios[str_detect(em_scenarios, ".RData") == FALSE]
     em_scenarios <- em_scenarios[str_detect(em_scenarios, ".pdf") == FALSE]
+    
+    # Pre-allocate list here
+    param_em_list <- list()
+    ts_em_list <- list()
     
     for(j in 1:length(em_scenarios)) {
       # Read in parameters and time series csvs
@@ -627,12 +637,31 @@ get_results <- function(om_scenario_path) {
       ts <- read.csv(here(om_scenario_path, om_scenarios[i], 
                           em_scenarios[j], "TimeSeries_Results.csv"))
       
-      param_all <- rbind(param_all, params)
-      ts_all <- rbind(ts_all, ts)
+      param_em_list[[j]] <- params
+      ts_em_list[[j]] <- ts
       
     } # j loop
-  } # i loop
+    
+    # list to df and put this into an om list
+    param_om_list[[i]] <- data.table::rbindlist(param_em_list)
+    ts_om_list[[i]] <- data.table::rbindlist(ts_em_list)
+    print(i)
+  } , error = function(e){e})
+  
+  param_all <- data.table::rbindlist(param_om_list)
+  ts_all <- data.table::rbindlist(ts_om_list)
   
   return(list(Parameter_Sum = param_all,
               TimeSeries_Sum = ts_all))
 } # end function
+
+# ggplot theme
+theme_matt <- function() {
+  theme_bw() +
+    theme(legend.position = "top",
+          strip.text = element_text(size = 15),
+          axis.title = element_text(size = 15),
+          axis.text= element_text(size = 13, color = "black"),
+          legend.text = element_text(size = 13),
+          legend.title = element_text(size = 15)) 
+}

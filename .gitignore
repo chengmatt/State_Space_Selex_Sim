@@ -4,3 +4,6 @@
 .Ruserdata
 .DS_Store
 *.RData
+output/*.csv
+output/*.Rdata
+output/OM_Scenarios/

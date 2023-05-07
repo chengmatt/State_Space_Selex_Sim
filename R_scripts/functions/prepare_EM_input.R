@@ -423,7 +423,7 @@ prepare_EM_input <- function(years,
   } # end i loop
   
   # put array into our parameter list
-  pars$ln_fish_selpars <- array(log(rnorm(1, 0.1, 0)), dim = c(n_fish_comps, n_sexes, n_fish_blocks, max(n_fish_pars)))
+  pars$ln_fish_selpars <- array(log(rnorm(1, 0.5, 0)), dim = c(n_fish_comps, n_sexes, n_fish_blocks, max(n_fish_pars)))
   
   # Time-Varying Selectivity Options (Fishery)
   if(time_selex == "None") { # No time-varying
