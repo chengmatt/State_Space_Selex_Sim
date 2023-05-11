@@ -66,7 +66,7 @@ for(i in 1:length(unique_oms)) {
   # Filter to relevant components for parameters
   om_scenario_params <- param_df %>% filter(str_detect(OM_Scenario, unique_oms[i]),
                                             !str_detect(EM_Scenario, "0.5|1.0|2.0"), 
-                                            type %in% c("F_0.4", "SSB0", "ABC")) 
+                                            type %in% c("F_0.4", "ABC")) 
   
   # Set order for plot
   if(length(plot_order) == length(unique(om_scenario_params$EM_Scenario))) {
@@ -99,9 +99,9 @@ for(i in 1:length(unique_oms)) {
       scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
       scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
       labs(x = "EM Scenarios", y = "Relative Error", fill = "Time Component",
-           color = "Time Component", title = unique(om_scenario_params$OM_Scenario)) +
+           color = "Time Component", title = unique_oms[i]) +
       theme_matt() +
-      theme(legend.position = "none", title = element_text(size = 20),
+      theme(legend.position = "top", title = element_text(size = 20),
             axis.title.x = element_blank(),
             axis.text.x = element_blank(),
             axis.ticks.x = element_blank()) 
@@ -159,7 +159,7 @@ for(i in 1:length(unique_oms)) {
              title = unique(ts_re_om$OM_Scenario)) +
         theme_matt() +
         # theme(aspect.ratio=1)
-        theme(legend.position = "none", title = element_text(size = 20),
+        theme(legend.position = "top", title = element_text(size = 20),
               axis.text = element_text(size = 13), strip.text = element_text(size = 13)) 
     )
 
