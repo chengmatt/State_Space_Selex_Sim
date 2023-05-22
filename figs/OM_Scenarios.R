@@ -7,6 +7,7 @@
 
 library(here)
 library(tidyverse)
+library(ggpubr)
 
 
 # Fleet Structure Shift ---------------------------------------------------
@@ -104,21 +105,21 @@ agg_F <- fleet_change_all %>%
 fleet_change_all <- rbind(fleet_change_all, agg_F)
 
 png(here("figs", "Hypothetical_OM", "Fleet_Str_Change.png"), width = 650, height = 350)
-ggplot() +
+(fleet_plot <- ggplot() +
   geom_line(fleet_change_all, mapping = aes(x = Year, y = Fs, 
                                             color = Fleet, lty = Fleet),  size = 1.3) +
-  scale_color_manual(values = c("black", "#009B77", "#B1BC55")) +
+  scale_color_manual(values = c("black", "#009B77", "#335C58")) +
   scale_linetype_manual(values = c(1, 2, 2)) +
-  facet_wrap(~Type) +
+  facet_wrap(~Type, ncol = 1) +
   theme_bw() +
-  labs(x = "Year", y = "Fishing Mortality Rates") +
+  labs(x = "Year", y = "Fishing Mortality Rate") +
   ylim(0, 0.15) +
-  theme(legend.position = c(0.11, 0.45),
+  theme(legend.position = "top",
         axis.title = element_text(size = 17),
         axis.text = element_text(size = 15, color = "black"),
         legend.title = element_text(size = 17),
         legend.text = element_text(size = 15),
-        strip.text = element_text(size = 17))
+        strip.text = element_text(size = 17)))
 dev.off()
 
 
@@ -175,17 +176,27 @@ colnames(selex_gamma) <- c("Selex", "Sex", "Fleet", "Age", "Type")
 selex_all <- rbind(selex_logist, selex_gamma)
 
 png(here("figs", "Hypothetical_OM", "Selex_Scenario.png"), width = 650, height = 500)
-ggplot(selex_all, aes(x = as.numeric(Age), y = as.numeric(paste(Selex)), color = Fleet, lty = Fleet)) +
+(selex_plot <- ggplot(selex_all, aes(x = as.numeric(Age), y = as.numeric(paste(Selex)), color = Fleet, lty = Fleet)) +
   geom_line(size = 1.3) + 
   scale_color_manual(values = c("#009B77", "#335C58")) +
   facet_grid(Sex~Type) +
   theme_bw() +
   labs(x = "Ages", y = "Selectivity") +
-  theme(legend.position = c(0.9, 0.1),
+  theme(legend.position = "none",
         axis.title = element_text(size = 17),
         axis.text = element_text(size = 15, color = "black"),
         legend.title = element_text(size = 17),
         legend.text = element_text(size = 15),
-        strip.text = element_text(size = 17))
+        strip.text = element_text(size = 17)))
 dev.off()
 
+
+# Combine plots -----------------------------------------------------------
+
+png(here("figs", "Hypothetical_OM", "OM_Scenarios.png"), width = 1000, height = 750)
+ggarrange(fleet_plot, selex_plot, ncol = 2, 
+          common.legend = TRUE, legend="bottom",
+          labels = c("A", "B"), 
+          font.label = list(size = 25), label.x = 0.02, widths = c(0.8, 1.5))
+dev.off()             
+  
