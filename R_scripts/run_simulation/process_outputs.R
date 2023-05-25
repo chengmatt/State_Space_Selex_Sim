@@ -208,13 +208,7 @@ for(i in 1:length(unique(ts_df$OM_Scenario))) {
       for(s in 1:n_sex) {
         for(a in 1:n_ages) {
           
-          # # Get fleet-related mortality
-          # if(n_fleets == 1){ # losing one dimension w/ 1 fleet
-          #   fleet_mort <- sum(F_t[term_yr, ] * F_Selex[a,s], na.rm = TRUE)
-          # } else{
-          #   fleet_mort <- sum(F_t[term_yr, ] * F_Selex[a,,s], na.rm = TRUE)
-          # } # not one fleet
-          
+          # Exponential survival model 
           if(a < n_ages) { # not plus group
             # Project forward with terminal year survival
             N_proj[a + 1,s] <- NAA[a,s] * exp(-(ZAA[a,s]))

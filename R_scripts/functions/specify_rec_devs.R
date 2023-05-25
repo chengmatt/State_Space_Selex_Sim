@@ -6,8 +6,13 @@
 #' @param Rec_Dev_Type Recruitment deviation type - options are iid or Auto_Cor
 #' @param rho_rec If rec dev type is autocorrelated, then specify a correlation parameter
 #' that is between 0 and 1
+#' @param Fl_Chg_Rec_Pulse Whether or not a recruitment pulse happens during the change in fleet
+#' structure
+#' @param yr_chng When change in fleet structure changes
 
-specify_rec_devs <- function(Rec_Dev_Type, rho_rec = 0) {
+specify_rec_devs <- function(Rec_Dev_Type, rho_rec = 0, 
+                             Fl_Chg_Rec_Pulse = FALSE, 
+                             yr_chng = yr_chng) {
   
   # If correaltion parameter is not between 0 and 1
   if(rho_rec < 0 & rho_rec > 1 & Rec_Dev_Type == "Auto_Cor") stop("Correlation parameter is not between 0 and 1, please respecify!")
@@ -58,6 +63,13 @@ specify_rec_devs <- function(Rec_Dev_Type, rho_rec = 0) {
     
   } # if recruitment deviates are autocorrelated
   
+  # Add recruitment pulse during fleet structure change
+  if(Fl_Chg_Rec_Pulse == TRUE) {
+    for(i in 1:dim(rec_devs)[1]) {
+      rec_devs[yr_chng, i] <- (max(rec_devs[,i]) * 2)
+    } # end i simulation loop
+  } # if statement for recruitment pulse
+      
   # Output rec devs into environment here
   rec_devs <<- rec_devs
   
