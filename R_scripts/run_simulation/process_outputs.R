@@ -17,7 +17,6 @@ dir_out <- here("output", "Summary_Plots") # path to output folder
 dir.create(dir_out)
 
 
-
 # Get Self Test Results ---------------------------------------------------
 
 # Get results from self tests
@@ -42,7 +41,8 @@ param_df <- param_df %>%
     str_detect(EM_Scenario, "5_") ~ "5 Years Post Fl Chg"
   ),
   time_comp = factor(time_comp, levels = c("Terminal", "10 Years Post Fl Chg",
-                                           "5 Years Post Fl Chg")))
+                                           "5 Years Post Fl Chg"))) %>% 
+  data.frame()
 
 # empty dataframe to store all om abc values
 all_om_abc_df <- data.frame()
@@ -83,7 +83,8 @@ for(i in 1:length(unique(ts_df$OM_Scenario))) {
     F40 <- param_df %>% # extract f40 first
       filter(OM_Scenario == unique(ts_df$OM_Scenario)[i],
              sim == j, type == "F_0.4") %>% 
-      dplyr::select(t, time_comp) %>% unique() # get F40 estimated for the OM previously
+      dplyr::select(t, time_comp) %>% unique() %>% 
+      data.frame()# get F40 estimated for the OM previously
     
     # Sort to go from terminal -> 10 yrs -> 15 yrs
     F40 <- F40[match(c("Terminal", "10 Years Post Fl Chg", "5 Years Post Fl Chg"), F40$time_comp, ),]
@@ -174,7 +175,8 @@ for(i in 1:length(unique(ts_df$OM_Scenario))) {
     # Get f40 estimated
     F40 <- param_df %>% # extract f40 first
       filter(OM_Scenario == unique(ts_df$OM_Scenario)[i],
-             EM_Scenario == files[j], type == "F_0.4") 
+             EM_Scenario == files[j], type == "F_0.4") %>% 
+      data.frame()
     
     # Empty dataframe for storage
     em_abc_df <- setNames(data.frame(matrix(ncol = length(names(param_df)) - 1, 
@@ -261,7 +263,8 @@ for(i in 1:length(unique(ts_df$OM_Scenario))) {
 # Left join the om df to the estiamted abc df
 all_em_abc_df <- all_em_abc_df %>% left_join(all_om_abc_df,
                                      by = c("sim", "OM_Scenario", "time_comp")) %>% 
-  mutate(RE = (mle_val - t) / t)
+  mutate(RE = (mle_val - t) / t) %>% 
+  data.frame()
 
 # Now, bind this to parameter summary
 param_df <- rbind(all_em_abc_df, param_df)
@@ -293,6 +296,7 @@ for(i in 1:length(unique(ts_df$OM_Scenario))) {
     
     # Get total biomass estimate from models here
     for(m in 1:length(model_list)) {
+      
       # Get model biomass
       mod_biom <- model_list[[m]]$sd_rep$value[names(model_list[[m]]$sd_rep$value) == "Total_Biom"]
       # Get true biomass values
@@ -309,7 +313,8 @@ for(i in 1:length(unique(ts_df$OM_Scenario))) {
                                      lwr_95 = NA, upr_95 = NA, t = true_biom,
                                      sim = m, conv = convergence_status$Convergence, 
                                      year = 1:length(mod_biom), type = "Total Biomass",
-                                     OM_Scenario = unique_oms[i], EM_Scenario = files[j])
+                                     OM_Scenario = unique_oms[i], EM_Scenario = files[j]) %>% 
+        data.frame()
       
       # Now bind everything together
       biom_list[[m]] <- mod_biom_df_bind
@@ -337,22 +342,35 @@ write.csv(ts_df, here("output", "TimeSeries_Summary.csv"))
 # Get relative error of time series
 ts_pars <- unique(ts_df$type)
 ts_re_df <- data.frame() # empty dataframe to store
+ts_te_df <- data.frame()
 
 # Loop through to extract time series components
 for(i in 1:length(ts_pars)) {
-  # Get time series components here
+  # Get time series components here - relative error
   ts_comp <- get_RE_precentiles(df = ts_df %>% filter(type == ts_pars[i],
                                                       conv == "Converged") %>% data.frame(),
                                 est_val_col = 2, true_val_col = 6,
                                 par_name = ts_pars[i], group_vars = c("year", 
                                                                       "OM_Scenario",
-                                                                      "EM_Scenario"))
+                                                                      "EM_Scenario")) %>% 
+    data.frame()
+  
+  # Get time series components here - total error
+  ts_te_comp <- get_TE_precentiles(df = ts_df %>% filter(type == ts_pars[i],
+                                                      conv == "Converged") %>% data.frame(),
+                                est_val_col = 2, true_val_col = 6,
+                                par_name = ts_pars[i], group_vars = c("year", 
+                                                                      "OM_Scenario",
+                                                                      "EM_Scenario")) %>% 
+    data.frame()
   
   ts_re_df <- rbind(ts_re_df, ts_comp)
+  ts_te_df <- rbind(ts_te_df, ts_te_comp)
   
 } # end i loop
 
 write.csv(ts_re_df, here("output", "TimeSeries_RE.csv"))
+write.csv(ts_te_df, here("output", "TimeSeries_TE.csv"))
 
 
 # Get Selectivity estimates ---------------------------------------------------------

@@ -25,11 +25,11 @@ dir.create(dir_out)
 param_df <- data.table::fread(here("output", "Parameter_Summary.csv")) # parameters
 ts_df <- data.table::fread(here("output", "TimeSeries_Summary.csv")) # time series values 
 ts_re_df <- data.table::fread(here("output", "TimeSeries_RE.csv")) # time series relative error (converged runs only)
+ts_te_df <- data.table::fread(here("output", "TimeSeries_TE.csv")) # time series total error (converged runs only)
 om_slx_df <- data.table::fread(here("output", "OM_Fish_Selex.csv")) # OM Selectivity Values
 em_slx_df <- data.table::fread(here("output", "EM_Fish_Selex.csv")) # EM Selectivity Values
 om_comps_df <- data.table::fread(here("output", "OM_Fish_Comps.csv")) # OM Composition values
 em_comps_df <- data.table::fread(here("output", "EM_Fish_Comps.csv")) # EM Composition values
-
 
 # Unique oms and other components
 unique_oms <- unique(param_df$OM_Scenario) # unique oms
@@ -53,6 +53,7 @@ time_comp = case_when(
   t = as.numeric(t),
   mle_sd = as.numeric(mle_sd),
   RE = (mle_val - t) / t,
+  TE = mle_val - t,
   CV = mle_sd / mle_val,
   time_comp = factor(time_comp, levels = c("5 Years Post Fl Chg", 
                                            "10 Years Post Fl Chg",
@@ -81,20 +82,26 @@ for(i in 1:length(unique_oms)) {
                                          factor(EM_Scenario, 
                                          levels = unique(EM_Scenario)[order]))
   
-  pt_rg <- om_scenario_params %>% 
+  # Point ranges for relative error and total error
+  pt_rg_re <- om_scenario_params %>% 
     group_by(EM_Scenario, time_comp, type) %>% 
     summarize(median = median(RE), 
               lwr_95 = quantile(RE, 0.025),
               upr_95 =  quantile(RE, 0.975))
-    
   
+  pt_rg_te <- om_scenario_params %>% 
+    group_by(EM_Scenario, time_comp, type) %>% 
+    summarize(median = median(TE), 
+              lwr_95 = quantile(TE, 0.025),
+              upr_95 =  quantile(TE, 0.975))
+    
   # plot now!
   print(
-    ggplot(pt_rg, aes(x = factor(EM_Scenario), y = median, ymin = lwr_95, ymax = upr_95,
+    ggplot(pt_rg_re, aes(x = factor(EM_Scenario), y = median, ymin = lwr_95, ymax = upr_95,
                                    color = time_comp, fill = time_comp)) +
       geom_pointrange(position = position_dodge2(width = 1), size = 1.5, linewidth = 1) +
       geom_hline(aes(yintercept = 0), col = "black", lty = 2, size = 0.5, alpha = 1) +
-      facet_grid(type~EM_Scenario, scales = "free") +
+      facet_grid(type~EM_Scenario, scales = "free_x") +
       coord_cartesian(ylim = c(-0.75,0.75)) +
       scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
       scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
@@ -114,6 +121,14 @@ dev.off()
 # Time Series plot -----------------------------------------------------
 
 ts_re_df <-  ts_re_df %>% 
+  mutate(time_comp = case_when(
+    str_detect(EM_Scenario, "Term_") ~ "Terminal",
+    str_detect(EM_Scenario, "10_") ~ "10 Years Post Fl Chg",
+    str_detect(EM_Scenario, "5_") ~ "5 Years Post Fl Chg"
+  ),
+  EM_Scenario = str_remove(EM_Scenario, "Term_|10_|5_"))
+
+ts_te_df <-  ts_te_df %>% 
   mutate(time_comp = case_when(
     str_detect(EM_Scenario, "Term_") ~ "Terminal",
     str_detect(EM_Scenario, "10_") ~ "10 Years Post Fl Chg",
@@ -174,19 +189,11 @@ pdf(here(dir_out, "Convg_Sum.pdf"), width = 25, height = 10)
 
 for(i in 1:length(unique_oms)) {
   
-  # Get convergence statistics here
-  conv_stat <- ts_df %>% 
-    mutate(time_comp = case_when(
-      str_detect(EM_Scenario, "Term_") ~ "Terminal",
-      str_detect(EM_Scenario, "10_") ~ "10 Years Post Fl Chg",
-      str_detect(EM_Scenario, "5_") ~ "5 Years Post Fl Chg"
-    ),
-    EM_Scenario = str_remove(EM_Scenario, "Term_|10_|5_")) %>% 
-    filter(year == 1, type == "Spawning Stock Biomass",
-           OM_Scenario == unique_oms[i],
+  conv_stat <- param_df %>% 
+    filter(type == "F_0.4", OM_Scenario == unique_oms[i],
            !str_detect(EM_Scenario, "0.5|1.0|2.0")) %>% 
     group_by(EM_Scenario, time_comp) %>% 
-    summarize(converged = sum(conv == "Converged") / 200) %>% 
+    summarize(converged = sum(conv == "Converged")/200) %>% 
     mutate(time_comp = factor(time_comp, levels = c("5 Years Post Fl Chg",
                                                     "10 Years Post Fl Chg",
                                                     "Terminal")))
@@ -379,28 +386,6 @@ for(i in 1:length(unique_oms)) {
       theme(title = element_text(size = 20), 
             aspect.ratio = 0.8)
   )
-  
-  # Residuals of comps
-  # print(
-  #   ggplot(plot_df, mapping = aes(x = Age, y = Diff)) +
-  #     geom_line(color = "black", size = 3.3) +
-  #     geom_line(mapping = aes(color = Diff), size = 3) +
-  #     geom_point(pch = 21, color = "black", mapping = aes(fill = Diff),
-  #                size = 5) +
-  #     geom_hline(aes(yintercept = 0), lty = 2, size = 1.5) +
-  #     facet_grid(Sex~EM_Scenario) +
-  #     scale_color_gradient2(midpoint = 0, oob = scales::squish) +
-  #     scale_fill_gradient2(midpoint = 0, oob = scales::squish) +
-  #     guides (fill = guide_colourbar(barwidth = 16, barheight = 1,
-  #                                    title.position = "top"),
-  #             color = guide_colourbar(barwidth = 16, barheight = 1,
-  #                                     title.position = "top")) +
-  #     theme_matt() +
-  #     labs(x = "Age", title = unique_oms[i],
-  #          y = "Difference (Observed - Predicted)",
-  #          fill = "Difference (Observed - Predicted)",
-  #          color = "Difference (Observed - Predicted)") 
-  # )
-  
+
 }
 dev.off()

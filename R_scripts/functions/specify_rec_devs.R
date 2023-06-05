@@ -8,10 +8,12 @@
 #' that is between 0 and 1
 #' @param Fl_Chg_Rec_Pulse Whether or not a recruitment pulse happens during the change in fleet
 #' structure
+#' @param Rec_Pulse_Mult Multiplier for recruitment pulse
 #' @param yr_chng When change in fleet structure changes
 
 specify_rec_devs <- function(Rec_Dev_Type, rho_rec = 0, 
                              Fl_Chg_Rec_Pulse = FALSE, 
+                             Rec_Pulse_Mult = 1,
                              yr_chng = yr_chng) {
   
   # If correaltion parameter is not between 0 and 1
@@ -66,7 +68,8 @@ specify_rec_devs <- function(Rec_Dev_Type, rho_rec = 0,
   # Add recruitment pulse during fleet structure change
   if(Fl_Chg_Rec_Pulse == TRUE) {
     for(i in 1:dim(rec_devs)[1]) {
-      rec_devs[yr_chng, i] <- (max(rec_devs[,i]) * 2)
+      # rec_devs[yr_chng, i] <- (max(rec_devs[,i]) * Rec_Pulse_Mult)
+      rec_devs[yr_chng, i] <- rec_devs[yr_chng, i] + Rec_Pulse_Mult
     } # end i simulation loop
   } # if statement for recruitment pulse
       

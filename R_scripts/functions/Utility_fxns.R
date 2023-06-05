@@ -368,6 +368,51 @@ get_RE_precentiles <- function(df, est_val_col = 1, true_val_col = 5, par_name =
   return(df)
 }
 
+#' Title Return TE percentiles
+#'
+#' @param df dataframe we want to get percentiles from
+#' @param est_val_col column number of estimated mle values
+#' @param true_val_col column number of true values
+#' @param par_name character name that we want to input into the returned dataframe
+#' @param group_vars group_by variable names as strings
+#'
+#' @return dataframe of a range of different percentiles
+#' @export
+#'
+#' @examples
+get_TE_precentiles <- function(df, est_val_col = 1, true_val_col = 5, par_name = NULL,
+                               group_vars) {
+  
+  # Get relative error based on indexed columns
+  TE <- (df[,est_val_col] - df[,true_val_col]) 
+  df <- cbind(df, TE) # Cbind TE
+  names(df)[ncol(df)] <- "TE" # Rename variable
+  
+  df <- df %>% 
+    group_by(!!! syms(group_vars)) %>% 
+    summarize(median = median(TE, na.rm = T), 
+              lwr_100 = quantile(TE, 0, na.rm = T),
+              upr_100 = quantile(TE, 1, na.rm = T),
+              lwr_95 = quantile(TE, 0.025, na.rm = T),
+              upr_95 = quantile(TE, 0.975, na.rm = T),
+              lwr_80 = quantile(TE, 0.1, na.rm = T),
+              upr_80 = quantile(TE, 0.9, na.rm = T),
+              lwr_75 = quantile(TE, 0.125, na.rm = T),
+              upr_75 = quantile(TE, 0.875, na.rm = T)) %>% 
+    mutate(par_name = par_name) 
+  
+  if(str_detect(par_name, "Age")) { # if this is an age variable
+    
+    # Make par_name different such that we can facet wrap later on
+    df$par_name <- paste(df$par_name, "Fleet", df$fleet, "Sex", df$sex)
+    
+    # Drop grouped columns (2nd and 3rd column - fleet and sex)
+    df <- df[,-c(2:3)]
+  }
+  
+  return(df)
+}
+
 
 #' Title To extract estiamted and true values from model runs
 #'

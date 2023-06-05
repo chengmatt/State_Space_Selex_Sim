@@ -14,7 +14,7 @@ library(doSNOW)
 library(parallel)
 
 ncores <- detectCores() 
-cl <- makeCluster(ncores - 2)
+cl <- makeCluster(ncores - 3)
 registerDoSNOW(cl)
 
 # Load in all functions into the environment
@@ -120,8 +120,7 @@ for(n_om in 1:n_OM_scen) {
      
      # Combine objects to save
      all_obj_list <- list(model, quants_df$Par_df, quants_df$TS_df)
-     
-     # all_obj_list
+     all_obj_list
    } # end foreach loop
     
     # After we're done running EMs, output objects to save in folder

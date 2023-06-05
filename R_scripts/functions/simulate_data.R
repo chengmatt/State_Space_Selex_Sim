@@ -17,6 +17,7 @@
 #' @param yr_chng_end If we are simulating a fleet structure change, when do we want this fleet structure change
 #' to end. Applicable for (Const_Ramp_Const, Contrast_Const)
 #' @param Fl_Chg_Rec_Pulse Boolean - whether or not we want a recruitment pulse to occur during the fleet structure change
+#' @param Rec_Pulse_Mult Multiplier for recruitment pulse
 #' @param fish_likelihood Fishery com positional likelihood
 #' @param srv_likelihood Survey compositional likelihood
 #' @param Input_N_Fish_Time Whether Neff for the fisheries remain constant, or vary as a function of time (Constant or F_Vary)
@@ -51,7 +52,8 @@ simulate_data <- function(fxn_path,
                           F_type,
                           yr_chng, 
                           yr_chng_end,
-                          Fl_Chg_Rec_Pulse,
+                          Fl_Chg_Rec_Pulse = FALSE,
+                          Rec_Pulse_Mult = 1,
                           fish_likelihood,
                           srv_likelihood = "multinomial",
                           Input_Fish_N_Max, 
@@ -117,7 +119,8 @@ simulate_data <- function(fxn_path,
   
   # Specify recruitment deviates here
   specify_rec_devs(Rec_Dev_Type = Rec_Dev_Type, rho_rec = rho_rec, 
-                   Fl_Chg_Rec_Pulse = Fl_Chg_Rec_Pulse, yr_chng = yr_chng) 
+                   Fl_Chg_Rec_Pulse = Fl_Chg_Rec_Pulse, yr_chng = yr_chng,
+                   Rec_Pulse_Mult = Rec_Pulse_Mult) 
   
   # Specify selectivity parameterizations here
   specify_selex(fish_selex = fish_selex, srv_selex = srv_selex, 

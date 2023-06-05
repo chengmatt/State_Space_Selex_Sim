@@ -76,7 +76,7 @@ for(n_om in 1:n_OM_scen) {
                                                             nrow = length(years), 
                                                             ncol = 1),
                                 use_fish_index = FALSE,
-                                Fish_Comp_Like_Model = c("multinomial", "multinomial"),
+                                Fish_Comp_Like_Model = c("multinomial"),
                                 Srv_Comp_Like_Model = c("multinomial"),
                                 rec_model = "BH", 
                                 F_Slx_Model_Input = fish_selex_opt,
@@ -112,7 +112,6 @@ for(n_om in 1:n_OM_scen) {
       
       # Combine objects to save
       all_obj_list <- list(model, quants_df$Par_df, quants_df$TS_df)
-      
       all_obj_list
     } # end foreach loop
 
@@ -152,28 +151,3 @@ for(n_om in 1:n_OM_scen) {
 
 stopCluster(cl) 
 
-
-# 
-ts_plot <- get_RE_precentiles(df = time_series %>%
-                                filter(conv == "Converged", type == "Spawning Stock Biomass"),
-                              est_val_col = 1, true_val_col = 5,
-                              par_name = "Total Recruitment", group_vars = "year")
-
-(est_plot <- plot_RE_ts_ggplot(data = ts_plot, x = year, y = median,
-                               lwr_1 = lwr_80, upr_1 = upr_80,
-                               lwr_2 = lwr_95, upr_2 = upr_95,
-                               facet_name = par_name))
-params %>%
-  mutate(RE = (mle_val - t) / t) %>%
-  filter(!is.na(t)) %>%
-  ggplot(aes(y = RE, fill = type)) +
-  geom_boxplot() +
-  ylim(-0.3 , 0.3) +
-  geom_hline(yintercept = 0, col = "red") +
-  facet_wrap(~type, scales = "free") +
-  theme_bw()
-
-params %>%
-  mutate(RE = (mle_val - t) / t) %>%
-  group_by(type) %>%
-  summarize(median = median(RE))
