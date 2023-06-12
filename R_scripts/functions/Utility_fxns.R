@@ -438,6 +438,7 @@ get_TE_precentiles <- function(df, est_val_col = 1, true_val_col = 5, par_name =
 
 get_quants <- function(
                        model_fxn,
+                       sd_rep, 
                        sim, 
                        sex_ratio,
                        conv, 
@@ -445,7 +446,6 @@ get_quants <- function(
                        n_sex,
                        ages,
                        F_x,
-                       sd_rep, 
                        fish_selex_opt,
                        ntrue_fish_fleets,
                        nmod_fish_fleets) {
@@ -475,96 +475,96 @@ get_quants <- function(
               dplyr::mutate(type = par_name[par], t = t[par])
     
     # Organizing parameter names for fishery selectivity
-    if(par_name[par] == "ln_fish_selpars") {
-      n_sexes <- dim(model_fxn$rep$F_Slx)[4] # number of sexes
-      # 1 fleet options
-      if(sum(fish_selex_opt == "logistic") == 1 &
-         length(fish_selex_opt) == 1) {
-        if(n_sexes == 1) {
-          paste_names <- c("F1_a50", "F1_k")
-        } # sex 1
-        if(n_sexes == 2) {
-          paste_names <- c("F1_a50_m", "F1_a50_f", 
-                           "F1_k_m", "F1_k_f")
-        }
-      } # end if only logistic
-      if(sum(fish_selex_opt == "gamma") == 1 &
-         length(fish_selex_opt) == 1) {
-        if(n_sexes == 1) {
-          paste_names <- c("F1_delta", "F1_amax")
-        } # sex 1
-        if(n_sexes == 2) {
-          paste_names <- c("F1_delta_m", "F1_delta_f", 
-                           "F1_amax_m", "F1_amax_f")
-        }
-      } # end gamma
-      
-      if(sum(fish_selex_opt == "exp_logistic") == 1 &
-         length(fish_selex_opt) == 1) {
-        if(n_sexes == 1) {
-          paste_names <- c("F1_gamma", "F1_alpha", "F1_beta")
-        } # sex 1
-        if(n_sexes == 2) {
-          paste_names <- c("F1_gamma_m", "F1_gamma_f",
-                           "F1_alpha_m", "F1_alpha_f",
-                           "F1_beta_m", "F1_beta_f")
-        }
-      } # end exponential logistic
-      # 2 fleet options
-      if(sum(fish_selex_opt == c("logistic", "logistic")) == 2 &
-         length(fish_selex_opt) == 2) {
-        if(n_sexes == 1) {
-          paste_names <- c("F1_a50", "F2_a50", "F1_k", 'F2_k')
-        } # sex 1
-        if(n_sexes == 2) {
-          paste_names <- c("F1_a50_m", "F2_a50_m", 
-                           "F1_a50_f", "F2_a50_f",
-                           "F1_k_m", "F2_k_m", 
-                           "F1_k_f", "F2_k_f")
-        } # 2 sexes
-      } # end if logistic and logistic combination
-      if(sum(fish_selex_opt == c("logistic", "gamma")) == 2 &
-         length(fish_selex_opt) == 2) {
-        if(n_sexes == 1) {
-          paste_names <- c("F1_a50", "F2_delta",  
-                           "F1_k", "F2_amax")
-        } # 1 sex
-        if(n_sexes == 2) {
-          paste_names <- c("F1_a50_m", "F2_delta_m", 
-                           "F1_a50_f", "F2_delta_f",
-                           "F1_k_m", "F2_amax_m", 
-                           "F1_k_f", "F2_amax_f")
-        } # 2 sexes
-      } # end if logistic and gamma combination
-      
-      if(sum(fish_selex_opt == c("gamma", "logistic")) == 2 &
-         length(fish_selex_opt) == 2) { # if gamma and logistic fleet 1 and 2 
-        if(n_sexes == 1) {
-          paste_names <- c("F1_delta", "F2_a50",  
-                           "F1_amax", "F2_k")
-        } # 1 sex
-        if(n_sexes == 2) {
-          paste_names <- c("F1_delta_m", "F2_a50_m", 
-                           "F1_delta_f", "F2_a50_f", 
-                           "F1_amax_m", "F2_k_m", 
-                           "F1_amax_f", "F2_k_f")
-        } # 2 sexes
-      } # end if gamma and logistic combination
-      
-      par_df$type <- paste_names
-    } # end if fishery selex parameters
-    
-    if(par_name[par] == "ln_srv_selpars") {
-      n_sexes <- dim(model_fxn$rep$S_Slx)[4] # number of sexes
-      if(n_sexes == 1) {
-        paste_names <- c("S1_a50", "S1_k")
-      }  # if nsex = 1
-      if(n_sexes == 2) {
-        paste_names <- c("S1_a50_m", "S1_a50_f",
-                         "S1_k_m", "S1_k_f")
-      } # if nsex = 2
-      par_df$type <- paste_names
-    } # end if survey slx pars
+    # if(par_name[par] == "ln_fish_selpars") {
+    #   n_sexes <- dim(model_fxn$rep$F_Slx)[4] # number of sexes
+    #   # 1 fleet options
+    #   if(sum(fish_selex_opt == "logistic") == 1 &
+    #      length(fish_selex_opt) == 1) {
+    #     if(n_sexes == 1) {
+    #       paste_names <- c("F1_a50", "F1_k")
+    #     } # sex 1
+    #     if(n_sexes == 2) {
+    #       paste_names <- c("F1_a50_m", "F1_a50_f", 
+    #                        "F1_k_m", "F1_k_f")
+    #     }
+    #   } # end if only logistic
+    #   if(sum(fish_selex_opt == "gamma") == 1 &
+    #      length(fish_selex_opt) == 1) {
+    #     if(n_sexes == 1) {
+    #       paste_names <- c("F1_delta", "F1_amax")
+    #     } # sex 1
+    #     if(n_sexes == 2) {
+    #       paste_names <- c("F1_delta_m", "F1_delta_f", 
+    #                        "F1_amax_m", "F1_amax_f")
+    #     }
+    #   } # end gamma
+    #   
+    #   if(sum(fish_selex_opt == "exp_logistic") == 1 &
+    #      length(fish_selex_opt) == 1) {
+    #     if(n_sexes == 1) {
+    #       paste_names <- c("F1_gamma", "F1_alpha", "F1_beta")
+    #     } # sex 1
+    #     if(n_sexes == 2) {
+    #       paste_names <- c("F1_gamma_m", "F1_gamma_f",
+    #                        "F1_alpha_m", "F1_alpha_f",
+    #                        "F1_beta_m", "F1_beta_f")
+    #     }
+    #   } # end exponential logistic
+    #   # 2 fleet options
+    #   if(sum(fish_selex_opt == c("logistic", "logistic")) == 2 &
+    #      length(fish_selex_opt) == 2) {
+    #     if(n_sexes == 1) {
+    #       paste_names <- c("F1_a50", "F2_a50", "F1_k", 'F2_k')
+    #     } # sex 1
+    #     if(n_sexes == 2) {
+    #       paste_names <- c("F1_a50_m", "F2_a50_m", 
+    #                        "F1_a50_f", "F2_a50_f",
+    #                        "F1_k_m", "F2_k_m", 
+    #                        "F1_k_f", "F2_k_f")
+    #     } # 2 sexes
+    #   } # end if logistic and logistic combination
+    #   if(sum(fish_selex_opt == c("logistic", "gamma")) == 2 &
+    #      length(fish_selex_opt) == 2) {
+    #     if(n_sexes == 1) {
+    #       paste_names <- c("F1_a50", "F2_delta",  
+    #                        "F1_k", "F2_amax")
+    #     } # 1 sex
+    #     if(n_sexes == 2) {
+    #       paste_names <- c("F1_a50_m", "F2_delta_m", 
+    #                        "F1_a50_f", "F2_delta_f",
+    #                        "F1_k_m", "F2_amax_m", 
+    #                        "F1_k_f", "F2_amax_f")
+    #     } # 2 sexes
+    #   } # end if logistic and gamma combination
+    #   
+    #   if(sum(fish_selex_opt == c("gamma", "logistic")) == 2 &
+    #      length(fish_selex_opt) == 2) { # if gamma and logistic fleet 1 and 2 
+    #     if(n_sexes == 1) {
+    #       paste_names <- c("F1_delta", "F2_a50",  
+    #                        "F1_amax", "F2_k")
+    #     } # 1 sex
+    #     if(n_sexes == 2) {
+    #       paste_names <- c("F1_delta_m", "F2_a50_m", 
+    #                        "F1_delta_f", "F2_a50_f", 
+    #                        "F1_amax_m", "F2_k_m", 
+    #                        "F1_amax_f", "F2_k_f")
+    #     } # 2 sexes
+    #   } # end if gamma and logistic combination
+    #   
+    #   par_df$type <- paste_names
+    # } # end if fishery selex parameters
+    # 
+    # if(par_name[par] == "ln_srv_selpars") {
+    #   n_sexes <- dim(model_fxn$rep$S_Slx)[4] # number of sexes
+    #   if(n_sexes == 1) {
+    #     paste_names <- c("S1_a50", "S1_k")
+    #   }  # if nsex = 1
+    #   if(n_sexes == 2) {
+    #     paste_names <- c("S1_a50_m", "S1_a50_f",
+    #                      "S1_k_m", "S1_k_f")
+    #   } # if nsex = 2
+    #   par_df$type <- paste_names
+    # } # end if survey slx pars
     
     par_all <- rbind(par_all, par_df)
   } # end par loop

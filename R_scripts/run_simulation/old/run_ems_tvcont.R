@@ -49,7 +49,7 @@ for(n_om in 1:n_OM_scen) {
     # Pre-processing for EM
     n_fleets <- em_scenarios$n_fleets[n_em] # Get number of fleets
     years <- 1:em_scenarios$n_years[n_em] # Get vector of years
-      fish_selex_opt <- unlist(strsplit(em_scenarios$Selex[n_em], ",")) # get fishery selectivity options
+    fish_selex_opt <- unlist(strsplit(em_scenarios$Selex[n_em], ",")) # get fishery selectivity options
     time_selex <- em_scenarios$Time_Selex[n_em] # Get time-varying selectivity options
     time_selex_npars <- em_scenarios$Time_Selex_Npars[n_em] # Number of time-varying selectivity parameters 
     if(time_selex_npars == "NA") time_selex_npars <- NULL # replace with NULL

@@ -12,8 +12,6 @@ library(doSNOW)
 library(parallel)
 
 ncores <- detectCores() 
-cl <- makeCluster(ncores - 2)
-registerDoSNOW(cl)
 
 # Load in all functions into the environment
 fxn_path <- here("R_scripts", "functions")
@@ -107,7 +105,7 @@ for(n_om in 1:n_OM_scen) {
       # Run EM model here and get sdrep
       model <- run_EM(data = input$data, parameters = input$parameters, 
                       map = input$map,  
-                      n.newton = 3, 
+                      n.newton = 1, 
                       silent = TRUE, getsdrep = TRUE)
       
       # Check model convergence
@@ -161,10 +159,27 @@ for(n_om in 1:n_OM_scen) {
     time_series <- time_series %>% dplyr::mutate(OM_Scenario = om_scenarios$OM_Scenarios[n_om],
                                                  EM_Scenario = em_scenarios$EM_Scenario[n_em])
     
+    # Also, get AIC results
+    AIC_df <- data.frame()
+    # Get convergence summary here
+    Convergence = params %>% group_by(sim) %>% summarize(conv = unique(conv))
+    
+    for(s in 1:n_sims) {
+      # Get AIC here
+      AIC_df_tmp <- data.frame(
+        AIC = TMB_AIC(model_list[[s]]$mle_optim),
+        OM_Scenario = om_scenarios$OM_Scenarios[n_om],
+        EM_Scenario = em_scenarios$EM_Scenario[n_em],
+        sim = s, conv = Convergence$conv[s]
+      )
+      AIC_df <- rbind(AIC_df, AIC_df_tmp)
+    } # end s sim AIC loop
+
     # Now, output these as csvs
+    write.csv(AIC_df, here(em_path_res, "AIC_Results.csv"))
     write.csv(params, here(em_path_res, "Param_Results.csv"))
     write.csv(time_series, here(em_path_res, "TimeSeries_Results.csv"))
-    
+
     # Progress
     cat(crayon::green("OM", n_om, "out of", n_OM_scen))
     cat(crayon::yellow("EM", n_em, "out of", n_EM_scen))
