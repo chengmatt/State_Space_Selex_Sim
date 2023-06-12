@@ -420,8 +420,11 @@ get_TE_precentiles <- function(df, est_val_col = 1, true_val_col = 5, par_name =
 #' @param sd_rep sd report from TMB
 #' @param model_fxn model_fxn from tmb
 #' @param sim simulation number
+#' @param sex_ratio Sex ratio
+#' @param mod_mean_rec Modelled mean recruitment
 #' @param conv convergence statistic
 #' @param n_years number of years in model
+#' @param n_sex Number of sexes in model
 #' @param ages number of ages in model
 #' @param F_x x% of SPR
 #' @param fish_selex_opt Selex fishery options in EM
@@ -433,13 +436,16 @@ get_TE_precentiles <- function(df, est_val_col = 1, true_val_col = 5, par_name =
 #'
 #' @examples
 
-get_quants <- function(sd_rep, 
+get_quants <- function(
                        model_fxn,
                        sim, 
+                       sex_ratio,
                        conv, 
                        n_years, 
+                       n_sex,
                        ages,
                        F_x,
+                       sd_rep, 
                        fish_selex_opt,
                        ntrue_fish_fleets,
                        nmod_fish_fleets) {
@@ -447,15 +453,15 @@ get_quants <- function(sd_rep,
   # Define parameters we want to get
   par_name <- c("ln_q_srv", 
                 "ln_RecPars", 
-                "ln_srv_selpars", 
-                "ln_fish_selpars",
+                # "ln_srv_selpars", 
+                # "ln_fish_selpars",
                 "fixed_sel_re_fish")
   
   # True quantities
   t <- c(mean(q_Surv), # Catchability
          r0, # Virgin Recruitment
-         NA,  # Srv selex
-         NA,  # Fish selex
+         # NA,  # Srv selex
+         # NA,  # Fish selex
          NA) # Fish selex variance pars
   
   # Empty dataframe
@@ -584,6 +590,9 @@ get_quants <- function(sd_rep,
 
   est_Selex <- model_fxn$rep$F_Slx[years[length(years)],,,1] # selectivity only for females
   
+
+# Reference Points --------------------------------------------------------
+
   # Get estaimted Fx% value
   Fx_val <- get_Fx_refpt(ages = ages,
                           MortAA = Mort_at_age[length(years),,sim], 
@@ -601,18 +610,56 @@ get_quants <- function(sd_rep,
                            WAA = wt_at_age[length(years),,1,sim],  # females
                            Terminal_F = fish_mort[length(years),,sim],
                            F_x = F_x)
-
+  
+  # Get ABC here from the model
+  ABC_val <- get_ABC_refpt(Fx_proj = Fx_val, # F projeciton value
+                           terminal_yr = length(years), # Terminal year of the assessment
+                           sex_ratio = sex_ratio, # Assumed sex ratio
+                           n_ages = length(ages),  # Number of ages
+                           n_sex = n_sex,  # Number of sexes
+                           n_fleets = nmod_fish_fleets,  # Number of fishery fleets
+                           mean_rec =   mean(sd_rep$value[names(sd_rep$value) == "Total_Rec"]),  # mean recruitment
+                           term_NAA = model_fxn$rep$NAA[length(years),,], # terminal year NAA
+                           term_F_Slx = array(model_fxn$rep$F_Slx[length(years),,,], # # termianl yera selex
+                                              dim = c(length(ages), nmod_fish_fleets, n_sex)), 
+                           term_F =  matrix(exp(sd_rep$par.fixed[names(sd_rep$par.fixed) == "ln_Fy"]), # terminal year F
+                                            ncol = nmod_fish_fleets, nrow = length(years))[length(years), ], 
+                           MortAA = Mort_at_age[length(years),,sim], # natural mortality at age
+                           WAA = wt_at_age[length(years),,,sim]  ) # weight at age
+  
+  # Get true ABC from the OMs
+  true_ABC <- get_ABC_refpt(Fx_proj = true_f40, # F projeciton value
+                            terminal_yr = length(years), # Terminal year of the assessment
+                            sex_ratio = sex_ratio, # Assumed sex ratio
+                            n_ages = length(ages),  # Number of ages
+                            n_sex = n_sex,  # Number of sexes
+                            n_fleets = ntrue_fish_fleets,  # Number of fishery fleets
+                            mean_rec = mean(rec_total[,sim], na.rm = TRUE), # mean recruitment
+                            term_NAA = N_at_age[length(years),,,sim], # terminal year NAA
+                            term_F_Slx = array(Fish_selex_at_age[length(years),,,,sim], 
+                                               dim = c(length(ages), ntrue_fish_fleets, n_sex)), # terminal year selex
+                            term_F = fish_mort[length(years),,sim], # terminal year F
+                            MortAA = Mort_at_age[length(years),,sim], # natural mortality
+                            WAA = wt_at_age[length(years),,,sim]  ) # weight at age
+  
   # Create empty df for Fx% to rbind to par all dataframe
   F_df <- data.frame(matrix(ncol = length(names(par_all))))
   colnames(F_df) <- names(par_all) # replace colnames in empty df
+  ABC_df <- data.frame(matrix(ncol = length(names(par_all))))
+  colnames(ABC_df) <- names(par_all) # replace colnames in empty df
   
   # Now, input into empty dataframe
   F_df <- F_df %>% dplyr::mutate(mle_val = Fx_val, 
                                  type = paste("F", F_x, sep = "_"),
                                  t = true_f40)
   
+  # Do the same for ABC estimates
+  ABC_df <- ABC_df %>% dplyr::mutate(mle_val = ABC_val, 
+                                     type = "ABC",
+                                     t = true_ABC)
+  
   # Now, bind all quantities of interest into one df
-  par_all <- rbind(F_df, par_all)
+  par_all <- rbind(F_df, ABC_df, par_all)
   
   # Input idenitfier and converence stats
   par_all <- par_all %>% dplyr::mutate(conv = conv, sim = sim)

@@ -437,16 +437,16 @@ prepare_EM_input <- function(years,
   # need to do slightly different starting values here, b/c exp_logistic is a lil finicky
   if(sum(reshape2::melt(F_Slx_Model_Input)$value == "exp_logistic") == 0) { 
     # if we don't have exponential logistic or double logistic
-    pars$ln_fish_selpars <- array(log(rnorm(1, 6, 0)), 
+    pars$ln_fish_selpars <- array(log(rnorm(1, 4, 0)), 
                                   dim = c(n_fish_comps, n_sexes, 
                                           n_fish_blocks, max(n_fish_pars)))
   } else{
     pars$ln_fish_selpars <- array(0, dim = c(n_fish_comps, n_sexes, 
                                           n_fish_blocks, max(n_fish_pars)))
     
-    pars$ln_fish_selpars[,,,1] <- log(0.05) # gamma parameter
-    pars$ln_fish_selpars[,,,2] <- log(0.6) # alpha parameter - doming
-    pars$ln_fish_selpars[,,,3] <- log(10) # beta parameter - rough peak area
+    pars$ln_fish_selpars[,,,1] <- log(0.5) # gamma parameter
+    pars$ln_fish_selpars[,,,2] <- log(0.05) # alpha parameter - doming
+    pars$ln_fish_selpars[,,,3] <- log(12) # beta parameter - rough peak area
   }  # if we have an exponential logistic
   
   # Time-Varying Selectivity Options (Fishery)

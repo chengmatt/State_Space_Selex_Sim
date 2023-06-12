@@ -1,8 +1,7 @@
-# Purpose: To run self-tests of OM and EM, but with different number of years for data i.e., 5, 10, and Terminal year
-# following change in fleet structure
-# Note: All EMs run here are 2 fleet models
+# Purpose: To run EMs that are 1 Fleet, and are either time-invariant or time-blocks
 # Creator: Matthew LH. Cheng
-# Date 3/23/23
+# Date: 6/12/23
+
 
 # Set up ------------------------------------------------------------------
 rm(list=ls()) # remove objects prior to running
@@ -27,7 +26,7 @@ compile_tmb(wd = here("src"), cpp = "EM.cpp")
 
 # Read in OM and EM Scenarios
 om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v2.xlsx"), sheet = "OM")
-em_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_old_v1.xlsx"), sheet = "EM_Self_Tests")
+em_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v2.xlsx"), sheet = "EM_1Fl_TI_Blk")
 
 # Read in spreadsheet for life history parameters
 lh_path <- here("input", "Sablefish_Inputs.xlsx")
@@ -38,28 +37,61 @@ n_EM_scen <- length(em_scenarios$EM_Scenario)
 
 for(n_om in 1:n_OM_scen) {
   
+  # Load OM -----------------------------------------------------------------
+  
   # Load in OM data
   om_path <- here("output", "OM_Scenarios", om_scenarios$OM_Scenarios[n_om])
   load(here(om_path, paste(om_scenarios$OM_Scenarios[n_om],".RData",sep = "")))
   list2env(oms,globalenv()) # output into global environment
-
+  
   for(n_em in 1:n_EM_scen) {
     
-      # Pre-processing for EM
-      n_fleets <- em_scenarios$n_fleets[n_em] # Get number of fleets
-      years <- 1:em_scenarios$n_years[n_em] # Get vector of years
-      fish_selex_opt <- unlist(strsplit(em_scenarios$Selex[n_em], ",")) # get fishery selectivity options
-      time_selex <- em_scenarios$Time_Selex[n_em] # Get time-varying selectivity options
-      time_selex_npars <- em_scenarios$Time_Selex_Npars[n_em] # Number of time-varying selectivity parameters 
-      if(time_selex_npars == "NA") time_selex_npars <- NULL # replace with NULL
-      om_application <- unlist(strsplit(em_scenarios$OM_Application[n_em], ",")) # EMs to apply to particular OM cases
-      
-      # Only run simulations if OM corresponds with an EM
-    if(sum(om_application %in% c(om_scenarios$OM_Scenarios[n_om])) >= 1) {
-      
-      sim_models <- foreach(sim = 1:n_sims, 
-                            .packages = c("TMB", "here", "tidyverse")) %dopar% {
+    # Pre-process EM ----------------------------------------------------------
+    
+    # Pre-processing to specify EM here
+    n_fleets <- em_scenarios$n_fleets[n_em] # Number of fleets to model
+    
+    # Specify year options - differs if it is Fast vs Slow OM Scenario
+    years_opt <- as.numeric(unlist(strsplit(em_scenarios$n_years[n_em], ",")) )
+    if(str_detect(om_scenarios$OM_Scenarios[n_om], "Fast")) years <- 1:years_opt[1]
+    if(str_detect(om_scenarios$OM_Scenarios[n_om], "Slow")) years <- 1:years_opt[2]
+    
+    time_selex <- em_scenarios$Time_Selex[n_em] # Get time-varying selectivity options
+    time_selex_npars <- em_scenarios$Time_Selex_Npars[n_em] # Number of time-varying selectivity parameters 
+    if(time_selex_npars == "NA") time_selex_npars <- NULL # replace with NULL
+    time_block_boolean <- em_scenarios$Time_Block[n_em] # whether or not time-blocking is present
+    fish_selex_opt <- unlist(strsplit(em_scenarios$Selex[n_em], ",")) # get fishery selectivity options
 
+    # Set up time-blocking structure here for fishery
+    if(time_block_boolean == FALSE) { # No Time Blocking
+      F_Slx_Blocks_Input <- matrix(c(rep(0)), nrow = length(years), ncol = n_fleets)
+      
+      # munge into matrix format here
+      fish_selex_opt <- matrix(c(rep(fish_selex_opt, length(years))), 
+                               nrow = length(years), ncol = n_fleets)
+    } # end if no time-block
+    
+    # if we have time blocking
+    if(time_block_boolean == TRUE) { 
+      # set up blocking structure
+      F_Slx_Blocks_Input <- matrix(c(rep(0, 25), rep(1, length(years) - 25)), 
+                                   nrow = length(years), ncol = n_fleets)
+      
+      # set up matrix for specifying selex form at a given block
+      fish_selex_opt <- matrix(c(rep(fish_selex_opt[1], 25), 
+                                 rep(fish_selex_opt[2], length(years) - 25)), 
+                                 nrow = length(years), ncol = n_fleets)
+    } # end if Time-block true
+    
+    # Register cluster here
+    cl <- makeCluster(ncores - 2)
+    registerDoSNOW(cl)
+    
+    # Run Simulation ----------------------------------------------------------
+    
+    sim_models <- foreach(sim = 1:n_sims, 
+    .packages = c("TMB", "here", "tidyverse")) %dopar% {
+      
       compile_tmb(wd = here("src"), cpp = "EM.cpp")
       
       # Prepare inputs for EM
@@ -70,9 +102,7 @@ for(n_om in 1:n_OM_scen) {
                                 catch_cv = rep(0.01, n_fleets),
                                 
                                 # Selectivity Blocks
-                                F_Slx_Blocks_Input = matrix(c(rep(0)),
-                                                            nrow = length(years),
-                                                            ncol = n_fleets), # fishery blocks
+                                F_Slx_Blocks_Input = F_Slx_Blocks_Input, # fishery blocks
                                 S_Slx_Blocks_Input = matrix(c(0), # selectivity blocks
                                                             nrow = length(years), 
                                                             ncol = 1),
@@ -80,26 +110,21 @@ for(n_om in 1:n_OM_scen) {
                                 Fish_Comp_Like_Model = c("multinomial"),
                                 Srv_Comp_Like_Model = c("multinomial"),
                                 rec_model = "BH", 
-                                F_Slx_Model_Input = matrix(
-                                  c(rep("logistic", 50), rep("logistic", 50)),
-                                  nrow = 50, ncol = 2
-                                  
-                                ),
+                                F_Slx_Model_Input = fish_selex_opt,
                                 S_Slx_Model_Input = c("logistic"), # logistic
                                 time_selex = time_selex, 
                                 n_time_selex_pars = time_selex_npars,
                                 fix_pars = c( "ln_SigmaRec", 
                                               "ln_q_fish", 
                                               "ln_h", 
-                                              "ln_M"),
-                                sim = sim)
+                                              "ln_M"), sim = sim)
       
       # Run EM model here and get sdrep
       model <- run_EM(data = input$data, parameters = input$parameters, 
-                                      map = input$map,  
-                                      n.newton = 3, 
-                                      silent = TRUE, getsdrep = TRUE)
-
+                      map = input$map,  
+                      n.newton = 3, 
+                      silent = TRUE, getsdrep = TRUE)
+      
       # Check model convergence
       convergence_status <- check_model_convergence(mle_optim = model$mle_optim,
                                                     mod_rep = model$model_fxn,
@@ -125,6 +150,8 @@ for(n_om in 1:n_OM_scen) {
       all_obj_list
     } # end foreach loop
 
+    stopCluster(cl) # stop cluster
+    
     # After we're done running EMs, output objects to save in folder
     
     # Pre-processing here
@@ -152,23 +179,10 @@ for(n_om in 1:n_OM_scen) {
     # Now, output these as csvs
     write.csv(params, here(em_path_res, "Param_Results.csv"))
     write.csv(time_series, here(em_path_res, "TimeSeries_Results.csv"))
+    
+    # Progress
     cat(crayon::green("OM", n_om, "out of", n_OM_scen))
     cat(crayon::yellow("EM", n_em, "out of", n_EM_scen))
-
-    } # end if statement for corresponding om and em
+    
   } # end n_em loop
 } # end n_om loop
-
-stopCluster(cl) 
-
-conv_vec <- vector() 
-for(i in 1:length(sim_models)) {
-  if(i==1) plot(sim_models[[i]][[1]]$model_fxn$rep$F_Slx[1,,2,2], ylim = c(0,1))
-  else lines(sim_models[[i]][[1]]$model_fxn$rep$F_Slx[1,,2,2], ylim = c(0,1))
-  conv_vec[i] <- unique(sim_models[[i]][[2]]$conv)
-}
-
-a = params %>% 
-  filter(type == "ABC") %>% 
-  summarize(re = (mle_val - t) / t)
-
