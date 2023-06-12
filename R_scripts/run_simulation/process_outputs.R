@@ -81,7 +81,7 @@ for(i in 1:length(unique(ts_df$OM_Scenario))) {
     # Get FABC projection values here - these should be the same for some cases (i.e., fratio is constant) 
     # but can change if the fleet structure change is slow.
     F40 <- param_df %>% # extract f40 first
-      filter(OM_Scenario == unique(ts_df$OM_Scenario)[i],
+      filter(OM_Scenario == unique(param_df$OM_Scenario)[i],
              sim == j, type == "F_0.4") %>% 
       dplyr::select(t, time_comp) %>% unique() %>% 
       data.frame()# get F40 estimated for the OM previously
@@ -270,72 +270,72 @@ all_em_abc_df <- all_em_abc_df %>% left_join(all_om_abc_df,
 param_df <- rbind(all_em_abc_df, param_df)
 write.csv(param_df, here("output", "Parameter_Summary.csv"), row.names = FALSE)
 
-# Get Total Biomass -------------------------------------------------------
-
-# Get total biomass estimates
-total_biom_df <- list()
-for(i in 1:length(unique(ts_df$OM_Scenario))) {
-  
-  # List files in folder
-  files <- list.files(here(om_scenario_path, unique_oms[i]))
-  # Load in OM data
-  load(here(om_scenario_path, unique_oms[i], paste(unique_oms[i], ".RData", sep = "")))
-  # Remove.RData and .pdf
-  files <- files[str_detect(files, ".RData|.pdf") == FALSE]
-  
-  # Pre-allocate list for EMs within OMs
-  em_biom_list <- list()
-  
-  for(j in 1:length(files)) {
-    
-    # Load in .RData from model runs
-    load(here(om_scenario_path, unique_oms[i], files[j], paste(files[j], ".RData", sep = "")))
-    
-    # Pre-allocate list object here
-    biom_list <- list()
-    
-    # Get total biomass estimate from models here
-    for(m in 1:length(model_list)) {
-      
-      # Get model biomass
-      mod_biom <- model_list[[m]]$sd_rep$value[names(model_list[[m]]$sd_rep$value) == "Total_Biom"]
-      # Get true biomass values
-      true_biom <- rowSums(oms$Biom_at_age[1:length(mod_biom),,,m])
-      
-      # Check convergence here
-      convergence_status <- check_model_convergence(mle_optim = model_list[[m]]$mle_optim,
-                                                    mod_rep = model_list[[m]]$model_fxn,
-                                                    sd_rep = model_list[[m]]$sd_rep,
-                                                    min_grad = 0.01)
-      
-      # Now, stick this into a dataframe
-      mod_biom_df_bind <- data.frame(X = NA, mle_val = mod_biom, mle_se = NA,
-                                     lwr_95 = NA, upr_95 = NA, t = true_biom,
-                                     sim = m, conv = convergence_status$Convergence, 
-                                     year = 1:length(mod_biom), type = "Total Biomass",
-                                     OM_Scenario = unique_oms[i], EM_Scenario = files[j]) %>% 
-        data.frame()
-      
-      # Now bind everything together
-      biom_list[[m]] <- mod_biom_df_bind
-      
-    } # end m loop
-    
-    # Turn from list to dataframe
-    mod_biom_df <- data.table::rbindlist(biom_list)
-    em_biom_list[[j]] <- mod_biom_df # put biomass dataframes from EMs into list
-    print(j)
-  } # end j loop
-  
-  # turn em list from list into dataframe
-  em_biom_df <- data.table::rbindlist(em_biom_list)
-  total_biom_df[[i]] <- em_biom_df # put biomass dataframes from ems into om list
-  print(i)
-} # end i loop
-
-# Bind together and write out csv
-ts_df <- rbind(data.table::rbindlist(total_biom_df), ts_df)
-write.csv(ts_df, here("output", "TimeSeries_Summary.csv"))
+# # Get Total Biomass -------------------------------------------------------
+# 
+# # Get total biomass estimates
+# total_biom_df <- list()
+# for(i in 1:length(unique(ts_df$OM_Scenario))) {
+#   
+#   # List files in folder
+#   files <- list.files(here(om_scenario_path, unique_oms[i]))
+#   # Load in OM data
+#   load(here(om_scenario_path, unique_oms[i], paste(unique_oms[i], ".RData", sep = "")))
+#   # Remove.RData and .pdf
+#   files <- files[str_detect(files, ".RData|.pdf") == FALSE]
+#   
+#   # Pre-allocate list for EMs within OMs
+#   em_biom_list <- list()
+#   
+#   for(j in 1:length(files)) {
+#     
+#     # Load in .RData from model runs
+#     load(here(om_scenario_path, unique_oms[i], files[j], paste(files[j], ".RData", sep = "")))
+#     
+#     # Pre-allocate list object here
+#     biom_list <- list()
+#     
+#     # Get total biomass estimate from models here
+#     for(m in 1:length(model_list)) {
+#       
+#       # Get model biomass
+#       mod_biom <- model_list[[m]]$sd_rep$value[names(model_list[[m]]$sd_rep$value) == "Total_Biom"]
+#       # Get true biomass values
+#       true_biom <- rowSums(oms$Biom_at_age[1:length(mod_biom),,,m])
+#       
+#       # Check convergence here
+#       convergence_status <- check_model_convergence(mle_optim = model_list[[m]]$mle_optim,
+#                                                     mod_rep = model_list[[m]]$model_fxn,
+#                                                     sd_rep = model_list[[m]]$sd_rep,
+#                                                     min_grad = 0.01)
+#       
+#       # Now, stick this into a dataframe
+#       mod_biom_df_bind <- data.frame(X = NA, mle_val = mod_biom, mle_se = NA,
+#                                      lwr_95 = NA, upr_95 = NA, t = true_biom,
+#                                      sim = m, conv = convergence_status$Convergence, 
+#                                      year = 1:length(mod_biom), type = "Total Biomass",
+#                                      OM_Scenario = unique_oms[i], EM_Scenario = files[j]) %>% 
+#         data.frame()
+#       
+#       # Now bind everything together
+#       biom_list[[m]] <- mod_biom_df_bind
+#       
+#     } # end m loop
+#     
+#     # Turn from list to dataframe
+#     mod_biom_df <- data.table::rbindlist(biom_list)
+#     em_biom_list[[j]] <- mod_biom_df # put biomass dataframes from EMs into list
+#     print(j)
+#   } # end j loop
+#   
+#   # turn em list from list into dataframe
+#   em_biom_df <- data.table::rbindlist(em_biom_list)
+#   total_biom_df[[i]] <- em_biom_df # put biomass dataframes from ems into om list
+#   print(i)
+# } # end i loop
+# 
+# # Bind together and write out csv
+# ts_df <- rbind(data.table::rbindlist(total_biom_df), ts_df)
+# write.csv(ts_df, here("output", "TimeSeries_Summary.csv"))
 
 # Get time series summaries -----------------------------------------------
 

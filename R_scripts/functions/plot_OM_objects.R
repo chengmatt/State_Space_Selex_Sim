@@ -181,7 +181,49 @@ print(
     labs(x = "Age",y = "Catch") +
     xlim(Fish_Start_yr[1], n_years-1)
 )
-  
+
+# Combine fleets aggregated
+print(
+  catch_df %>% 
+    group_by(Year, Sim) %>% 
+    summarize(Catch = sum(Catch)) %>% 
+    ggplot(aes(x = as.numeric(Year), y = Catch, group = Sim)) +
+    geom_line(size = 1.5, color = "grey", alpha = 0.75) +
+    theme_bw() +
+    theme(legend.position = "none") +
+    labs(x = "Age",y = "Fleet Aggregated Catch") +
+    xlim(Fish_Start_yr[1], n_years-1)    
+)
+
+# Harvest Rate
+harv_df <- reshape2::melt(Harvest_Rate)
+names(harv_df) <- c("Year", "Fleet","Sim", "Harvest_Rate")
+
+# Fleet specific Harvest rate
+print(
+  harv_df %>% 
+    ggplot(aes(x = as.numeric(Year), y = Harvest_Rate, group = Sim)) +
+    geom_line(size = 1.5, color = "grey", alpha = 0.75) +
+    theme_bw() +
+    facet_wrap(~Fleet) +
+    theme(legend.position = "none") +
+    labs(x = "Age",y = "Harvest Rate") +
+    xlim(Fish_Start_yr[1], n_years-1)
+)
+
+# Aggregated harvest rate
+print(
+  harv_df %>% 
+    group_by(Year, Sim) %>% 
+    summarize(Harvest_Rate = sum(Harvest_Rate)) %>% 
+    ggplot(aes(x = as.numeric(Year), y = Harvest_Rate, group = Sim)) +
+    geom_line(size = 1.5, color = "grey", alpha = 0.75) +
+    theme_bw() +
+    theme(legend.position = "none") +
+    labs(x = "Age",y = "Aggregated Harvest Rate") +
+    xlim(Fish_Start_yr[1], n_years-1)
+)
+
 
 # Composition data --------------------------------------------------------
 

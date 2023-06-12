@@ -45,7 +45,7 @@ Type objective_function<Type>::operator() ()
   
   // ASSESSMENT CONTROLS ----------------------------------------------
   DATA_INTEGER(rec_model); // Recruitment model, == 0 Mean Recruitment
-  DATA_IVECTOR(F_Slx_model); // Fishery Selectivity Model, == 0 Logistic n_fleets
+  DATA_IMATRIX(F_Slx_model); // Fishery Selectivity Model, dim = year, fleet
   DATA_IMATRIX(F_Slx_Blocks); // Fishery Selectivity Time Blocks, n_years * n_fish_comps; 
   // this is set up such that the selectivity within a fleet and across sexes is constant
   DATA_IVECTOR(S_Slx_model); // Survey Selectivity Model, == 0 Logistic n_fleets 
@@ -109,14 +109,17 @@ Type objective_function<Type>::operator() ()
   matrix<Type> pred_catches(n_years, n_fleets); // Predicted fishery catches
   
   // Stored Quantities
-  array<Type> NAA(n_years + 1, n_ages, n_sexes); // Numbers at age; n_years + 1 (forward projection)
+  array<Type> NAA(n_years + 1, n_ages, n_sexes); // Numbers at age; n_years + 1 
   array<Type> ZAA(n_years, n_ages, n_sexes); // Total Mortality
   array<Type> SAA(n_years, n_ages, n_sexes); // Survival at age
   array<Type> FAA(n_years, n_ages, n_fleets, n_sexes); // Fishing Mortality
   array<Type> sum_FAA(n_years, n_ages, n_sexes); // Fishing mortality summed across fleets
   matrix<Type> F_y(n_years, n_fleets); // Fishing Mortality by year and fleet
+  matrix<Type> Exploit_Biom(n_years, n_fleets); // Exploitable Biomass for a given fleet
+  matrix<Type> Harvest_Rate(n_years, n_fleets); // Harvest rate calculations for a given fleet
   array<Type> CAA(n_years, n_ages, n_fleets, n_sexes); // Catch at Age
   vector<Type> Total_Fy(n_years); // Total F summed across fleets
+  vector<Type> Total_Harvest_Rate(n_years); // Total harvest rate
   vector<Type> Total_Rec(n_years); // Total Recruitment
   vector<Type> Total_Biom(n_years); // Total Biomass
   vector<Type> SSB(n_years); // Spawning stock biomass; n_years + 1 (forward projection)
@@ -147,10 +150,6 @@ Type objective_function<Type>::operator() ()
   srv_index_nLL.setZero();
   fish_comp_nLL.setZero();
   srv_comp_nLL.setZero();
-  
-  // TESTING
-  // DATA_MATRIX(N1_Sex_Test);
-  // DATA_INTEGER(ssb0_dat);
   
   // MODEL STRUCTURE ----------------------------------------------
   // y = year, a = age, s = sex; in general, f = fishery fleet, sf = survey fleet
@@ -212,8 +211,8 @@ Type objective_function<Type>::operator() ()
           Type fish_age_idx = ages(a);
           
           // Get selex value
-          F_Slx(y,a,f,s) = Get_Selex(fish_age_idx, F_Slx_model(f), tmp_ln_fish_selpars);
-          
+          F_Slx(y,a,f,s) = Get_Selex(fish_age_idx, F_Slx_model(y,f), tmp_ln_fish_selpars);
+           
         } // a loop
       } // s loop
     } // f loop
@@ -356,7 +355,7 @@ Type objective_function<Type>::operator() ()
      
    } // end year loop
   
-  // Catch ----------------------------------------------
+  // Catch and Related Quantities ----------------------------------------------
   pred_catches.setZero(); // set zero
   for(int f = 0; f < n_fleets; f++) {
     for(int y = 0; y < n_years; y++) {
@@ -367,11 +366,19 @@ Type objective_function<Type>::operator() ()
           CAA(y, a, f, s) = NAA(y, a, s) * (Type(1.0) - exp(-ZAA(y, a, s))) *
                            (FAA(y, a, f, s) / ZAA(y, a, s));
           
+          // Compute Exploitable Biomass; N * Selex * WAA
+          Exploit_Biom(y, f) += NAA(y, a, s) * F_Slx(y, a, f, s) * WAA(y, a, s); 
+            
           // Get Aggregated Catch - Increment catch in biomass
           pred_catches(y, f) += ( CAA(y, a, f, s) * WAA(y, a, s) );
           
         } // a loop
       } // s loop
+      
+      // Get Harvest Rates calculations here
+      Harvest_Rate(y, f) = pred_catches(y, f) / Exploit_Biom(y, f);
+      // Get Total Harvest rate here
+      Total_Harvest_Rate(y) += Harvest_Rate(y, f);
       
     } // y loop
   } // f loop
@@ -600,6 +607,8 @@ Type objective_function<Type>::operator() ()
   REPORT(pred_catches); // Aggregate Catch by fleet
   REPORT(pred_srv_indices); // Survey Indices
   REPORT(pred_fish_indices); // Fishery Indices
+  REPORT(Exploit_Biom); // Exploitable Biomass
+  REPORT(Harvest_Rate); // Harvest Rates
   REPORT(F_Slx); // Fishery Selectivity
   REPORT(S_Slx); // Survey Selectivity
   REPORT(pred_fish_age_comps); // Predicted fishery age comps
@@ -623,6 +632,8 @@ Type objective_function<Type>::operator() ()
   ADREPORT(Depletion); 
   ADREPORT(Total_Fy);
   ADREPORT(Total_Rec);
+  ADREPORT(Total_Harvest_Rate);
+  ADREPORT(Exploit_Biom); 
   ADREPORT(Total_Biom);
   ADREPORT(ssb0);
   ADREPORT(Fish_Neff);

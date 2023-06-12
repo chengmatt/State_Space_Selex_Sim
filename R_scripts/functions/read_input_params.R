@@ -4,8 +4,9 @@
 # Date: 10/30/22
 
 #' @param spreadsheet_path Path to input spreadsheet
+#' @param n_years Number of years we want our OM to run for
 
-read_params_create_OM_objects <- function(spreadsheet_path) {
+read_params_create_OM_objects <- function(spreadsheet_path, n_years) {
   
   require(readxl)
   require(tidyverse)
@@ -19,7 +20,6 @@ read_params_create_OM_objects <- function(spreadsheet_path) {
   
   # Read in and save objects in our environment
   n_sims <<- ctl$Value[ctl$Par == "n_sims"] # Number of simulations
-  n_years <<- ctl$Value[ctl$Par == "n_years"] # Number of years
   N_1 <<- ctl$Value[ctl$Par == "N_1"] # Numbers at year 1 in first age of recruitment
   n_sex <<- ctl$Value[ctl$Par == "n_sex"] # Numbers of sexes
   n_fish_fleets <<- ctl$Value[ctl$Par == "n_fish_fleets"] # Numbers of fishery fleets

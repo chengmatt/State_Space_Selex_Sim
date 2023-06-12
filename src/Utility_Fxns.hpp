@@ -63,7 +63,6 @@ Type Get_Selex(Type age,
 
     // Return selectivity
     selex = first * second * (third/fourth);
-
   }
   
   return selex;

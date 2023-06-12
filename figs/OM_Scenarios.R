@@ -83,9 +83,10 @@ change_F2_const <- seq((max_rel_F2_M * mean_nat_mort), (max_rel_F2_M * mean_nat_
 # Make F vector here
 F_vec1 <- as.numeric(c(constant_F1, change_F1[-1], change_F1_const[-1]))
 F_vec2 <- as.numeric(c(constant_F2, change_F2[-1], change_F2_const[-1]))
-
+F_vec1 <- c(F_vec1, rep(0.0010800, 20))
+F_vec2 <- c(F_vec2, rep(0.0918000, 20))
 # Coerce into dataframe
-fleet_change_slow <- data.frame(Fleet1 = F_vec1, Fleet2 = F_vec2, Year = 1:n_years,
+fleet_change_slow <- data.frame(Fleet1 = F_vec1, Fleet2 = F_vec2, Year = 1:70,
                                 Type = "Slow") %>% 
   pivot_longer(cols = c(Fleet1, Fleet2), names_to = "Fleet", values_to = "Fs")
 
@@ -130,13 +131,13 @@ bins <- 1:30
 ### Logistic-Logistic ----------------------------------------------------------------
 
 # Get a50 value males
-a50m1 <- 8
+a50m1 <- 5
 a50m2 <- 10
-deltam1 <- 2
+deltam1 <- 1
 deltam2 <- 2.5
 
 # Get a50 value females
-a50f1 <- 4
+a50f1 <- 3
 a50f2 <- 6
 deltaf1 <- 0.85
 deltaf2 <- 1
@@ -155,19 +156,52 @@ colnames(selex_logist) <- c("Selex", "Sex", "Fleet", "Age", "Type")
 ### Logistic-Gamma ----------------------------------------------------------
 
 # Gamma parameters
-amaxm2 <- 6
-deltam2 <- 7
-amaxf2 <- 4
-deltaf2 <- 6
+amaxm2 <- 16
+deltam2 <- 8
+amaxf2 <- 13
+deltaf2 <- 10
 
 # Get Selex here
-pm2 <- (0.5 * (sqrt(amaxm2^2 + 4*deltam2^2) - amaxm2)) 
-selexm2 <- cbind((bins/amaxm2) ^ (amaxm2/pm2) * exp((amaxm2 - bins) / pm2), "Males", "Fleet 1", age = bins)
-pf2 <- (0.5 * (sqrt(amaxf2^2 + 4*deltaf2^2) - amaxf2)) 
-selexf2 <- cbind((bins/amaxf2) ^ (amaxf2/pf2) * exp((amaxf2 - bins) / pf2), "Females", "Fleet 1", age = bins)
+pm2 <- (0.5 * (sqrt(amaxm2^2 + 4*deltam2^2) - amaxm2))
+selex_m2 <- cbind((bins/amaxm2) ^ (amaxm2/pm2) * exp((amaxm2 - bins) / pm2), "Males", "Fleet 1", age = bins)
+pf2 <- (0.5 * (sqrt(amaxf2^2 + 4*deltaf2^2) - amaxf2))
+selex_f2 <- cbind((bins/amaxf2) ^ (amaxf2/pf2) * exp((amaxf2 - bins) / pf2), "Females", "Fleet 1", age = bins)
+
+# Exponential Logistic parameters
+# Get alpha_f2 value
+# alpha_f2 <- 0.6  # Degree of doming
+# # Get beta_f2 value
+# beta_f2 <- 8
+# # Get gamma_f2 value
+# gamma_f2 <- 0.05
+# 
+# # Define parts of the equation
+# first_f2 = (1 / (1 - gamma_f2)) 
+# second_f2 = ((1 - gamma_f2) / gamma_f2)^gamma_f2
+# third_f2 = exp( alpha_f2 * gamma_f2 * (beta_f2 - bins ) )
+# fourth_f2 = 1 + exp(alpha_f2 * (beta_f2 - bins))
+# 
+# # Calculate selectivity here
+# selex_f2 = cbind(first_f2 * second_f2 * (third_f2/fourth_f2), "Females", "Fleet 1", age = bins)
+# 
+# # Get alpha_m2 value
+# alpha_m2 <- 0.5  # Degree of doming
+# # Get beta_m2 value
+# beta_m2 <- 12
+# # Get gamma_m2 value
+# gamma_m2 <- 0.1
+# 
+# # Define parts of the equation
+# first_m2 = (1 / (1 - gamma_m2)) 
+# second_m2 = ((1 - gamma_m2) / gamma_m2)^gamma_m2
+# third_m2 = exp( alpha_m2 * gamma_m2 * (beta_m2 - bins ) )
+# fourth_m2 = 1 + exp(alpha_m2 * (beta_m2 - bins))
+# 
+# # Calculate selectivity here
+# selex_m2 = cbind(first_m2 * second_m2 * (third_m2/fourth_m2), "Males", "Fleet 1", age = bins)
 
 # Bind these together
-selex_gamma <- data.frame(rbind(selexm1, selexm2, selexf1, selexf2), Type = "Gamma-Logistic")
+selex_gamma <- data.frame(rbind(selexm1, selex_m2, selexf1, selex_f2), Type = "Logistic-Gamma")
 colnames(selex_gamma) <- c("Selex", "Sex", "Fleet", "Age", "Type")
 
 # Plot Selectivity Scenarios -------------------------------------------------------------------

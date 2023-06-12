@@ -17,7 +17,7 @@ source(here(fxn_path, "prepare_EM_input.R"))
 dir.create(here("output", "OM_Scenarios"))
 
 # Read in OM scenarios
-om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios.xlsx"), sheet = "OM")
+om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v2.xlsx"), sheet = "OM")
 
 # Read in spreadsheet for life history parameters
 lh_path <- here("input", "Sablefish_Inputs.xlsx")
@@ -26,7 +26,7 @@ lh_path <- here("input", "Sablefish_Inputs.xlsx")
 n_OM_scen <- length(om_scenarios$OM_Scenarios)
 
 for(n_om in 1:n_OM_scen) {
-  
+
   # Operating Model Loop + Set Up -------------------------------------------
   
   # Create file directory to save model outputs
@@ -34,6 +34,8 @@ for(n_om in 1:n_OM_scen) {
   dir.create(om_path)
   
   # Pre-Processing
+  n_years <- om_scenarios$n_years[n_om] # number of years to run om for
+  yr_chng_end <- om_scenarios$yr_chng_end[n_om] # the year we want the fleet transition to finish
   F_type <- c(om_scenarios$Fl_1_Ftype[n_om], om_scenarios$Fl_2_Ftype[n_om]) # Get Fishing Mortality Pattern
   Start_F <- c(om_scenarios$Fl_1_StartF[n_om], om_scenarios$Fl_2_StartF[n_om])  # Get Starting Fs
   Max_Rel_F_M <- c(om_scenarios$Fl_1_MaxRelM[n_om], om_scenarios$Fl_2_MaxRelM[n_om]) # Get max F relative to M
@@ -43,20 +45,27 @@ for(n_om in 1:n_OM_scen) {
   Srv_CV <- om_scenarios$Srv_CV[n_om] # Survey Index CV
   Fish_Selex_Opt <- c(om_scenarios$Fl_1_Selex[n_om], om_scenarios$Fl_2_Selex[n_om]) # Fishery Selectivity Options
   
-  # Selectivity parameters for Fleet 1 Males, followed by Females
-  Fish_Fleet1_SelPars <- c(om_scenarios$Fl_1_Slx_Par1_M[n_om], 
-                           om_scenarios$Fl_1_Slx_Par2_M[n_om],
-                           om_scenarios$Fl_1_Slx_Par1_F[n_om], 
-                           om_scenarios$Fl_1_Slx_Par2_F[n_om])
+  # Selectivity parameters for Fleet 1 Females, followed by Males
+  Fish_Fleet1_SelPars <- c(om_scenarios$Fl_1_Slx_Par1_F[n_om], 
+                           om_scenarios$Fl_1_Slx_Par2_F[n_om],
+                           om_scenarios$Fl_1_Slx_Par1_M[n_om], 
+                           om_scenarios$Fl_1_Slx_Par2_M[n_om])
   
-  # Selectivity parameters for Fleet 2 Males, followed by Females
-  Fish_Fleet2_SelPars <- c(om_scenarios$Fl_2_Slx_Par1_M[n_om], 
+  # Selectivity parameters for Fleet 2 Females, followed by Males
+  Fish_Fleet2_SelPars <- c(om_scenarios$Fl_2_Slx_Par1_F[n_om], 
+                           om_scenarios$Fl_2_Slx_Par2_F[n_om],
+                           om_scenarios$Fl_2_Slx_Par3_F[n_om],
+                           om_scenarios$Fl_2_Slx_Par1_M[n_om], 
                            om_scenarios$Fl_2_Slx_Par2_M[n_om],
-                           om_scenarios$Fl_2_Slx_Par1_F[n_om], 
-                           om_scenarios$Fl_2_Slx_Par2_F[n_om])  
+                           om_scenarios$Fl_2_Slx_Par3_M[n_om])  
+  
+  # Remove NAs if no 3 parameters in selex
+  # Fish_Fleet2_SelPars <- Fish_Fleet2_SelPars[Fish_Fleet2_SelPars != "NA"]
+  
   # Simulate data here
   oms <- simulate_data(fxn_path = fxn_path, 
-                spreadsheet_path = lh_path, 
+                spreadsheet_path = lh_path,
+                n_years = n_years,
                 
                 # Biological controls
                 rec_type = "BH",
@@ -69,8 +78,9 @@ for(n_om in 1:n_OM_scen) {
                 Start_F = Start_F, 
                 max_rel_F_M = Max_Rel_F_M, 
                 desc_rel_F_M = c(NULL, NULL), 
-                yr_chng = c(25, 25), 
-                yr_chng_end = c(30, 30),
+                
+                yr_chng = rep(25, n_fleets), # when the fleet transition begins
+                yr_chng_end = rep(yr_chng_end, n_fleets), # when we want the flee transition to stop
                 fish_likelihood = "multinomial",
                 Input_Fish_N_Max = Input_Fish_N_Max, 
                 fish_CV = c(0.1, 0.1), # not really used
@@ -104,5 +114,3 @@ for(n_om in 1:n_OM_scen) {
           file_name = "OM_Plots.pdf")
   
 } # end n_om loop
-
-

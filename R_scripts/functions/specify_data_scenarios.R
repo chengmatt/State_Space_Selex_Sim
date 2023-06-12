@@ -50,22 +50,17 @@ fish_surv_data_scenarios <- function(Fish_Start_yr, Surv_Start_yr, Input_Fish_N_
   
     for(f in 1:n_fish_fleets) {
       
-      # Calculate scalar such that the max fish mort results in the desired Neff
-      F_scalar[f] <- Input_Fish_N_Max[f] / (Input_Fish_N_Max[f] * max(fish_mort[,f,], na.rm = TRUE)) 
+      # Scale this up so that there is a linear ramp increase with bounds of minimum and maximum
+      scaled_vector <- floor(
+        ((fish_mort[,f,1] - min(fish_mort[,f,1], na.rm =T)) / 
+           (max(fish_mort[,f,1], na.rm =T) - min(fish_mort[,f,1], na.rm =T))) * 
+          (Input_Fish_N_Max[f]  - Input_N_Fish_Fixed[f]) + Input_N_Fish_Fixed[f]
+      )
       
-      for(y in 1:(n_years-1)) {
-
-          # Scale N_effs by relative fishing mortality rates - fix sim index at 1,
-          # because these will remain constant across simulations
-          fish_Input_N_mat[y,f] <- floor(Input_Fish_N_Max[f] * F_scalar[f] * fish_mort[y,f,1])
-          
-          # Fix Neff at a specified value for those that are < said specified value
-          if(fish_Input_N_mat[y,f] < Input_N_Fish_Fixed[f]) fish_Input_N_mat[y,f] <- Input_N_Fish_Fixed[f]
-
-      } # end year loop
+      # Input into matrix
+      fish_Input_N_mat[,f] <- scaled_vector
       
     } # end fleet loop
-    
   } # effective sample sizes vary as a function of fishery specific Fs
   
   # create empty matrix for survey Neff
@@ -73,7 +68,6 @@ fish_surv_data_scenarios <- function(Fish_Start_yr, Surv_Start_yr, Input_Fish_N_
   
   # specify matrix for survey neff
   for(sf in 1:n_srv_fleets) {
-    
     for(y in 1:(n_years-1)) {
       
       if(y < Surv_Start_yr[sf]) {
@@ -81,8 +75,8 @@ fish_surv_data_scenarios <- function(Fish_Start_yr, Surv_Start_yr, Input_Fish_N_
       } else{
         srv_Input_N_mat[y,sf] <- Input_Srv_N_Max[sf]
       }
-    }
-    
+      
+    } # end y loop
   } # end sf loop
   
   # output into environment

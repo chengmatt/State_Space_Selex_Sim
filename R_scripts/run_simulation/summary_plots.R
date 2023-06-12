@@ -65,9 +65,9 @@ pdf(here(dir_out, "Param_Sum.pdf"), width = 25, height = 10)
 for(i in 1:length(unique_oms)) {
   
   # Filter to relevant components for parameters
-  om_scenario_params <- param_df %>% filter(str_detect(OM_Scenario, unique_oms[i]),
+  om_scenario_params <- param_df %>% filter(OM_Scenario == unique_oms[i],
                                             !str_detect(EM_Scenario, "0.5|1.0|2.0"), 
-                                            type %in% c("F_0.4", "ABC")) 
+                                            type %in% c("F_0.4", "ABC"))
   
   # Set order for plot
   if(length(plot_order) == length(unique(om_scenario_params$EM_Scenario))) {
@@ -89,12 +89,6 @@ for(i in 1:length(unique_oms)) {
               lwr_95 = quantile(RE, 0.025),
               upr_95 =  quantile(RE, 0.975))
   
-  pt_rg_te <- om_scenario_params %>% 
-    group_by(EM_Scenario, time_comp, type) %>% 
-    summarize(median = median(TE), 
-              lwr_95 = quantile(TE, 0.025),
-              upr_95 =  quantile(TE, 0.975))
-    
   # plot now!
   print(
     ggplot(pt_rg_re, aes(x = factor(EM_Scenario), y = median, ymin = lwr_95, ymax = upr_95,
@@ -117,6 +111,8 @@ for(i in 1:length(unique_oms)) {
 } #end i
 
 dev.off()
+
+
 
 # Time Series plot -----------------------------------------------------
 

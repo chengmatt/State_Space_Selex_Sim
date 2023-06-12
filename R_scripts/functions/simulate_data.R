@@ -5,6 +5,7 @@
 
 #' @param fxn_path Path to folder where all functions are coded in
 #' @param spreadsheet_path Path to life-history parameter spreadsheet
+#' @param n_years Number of years we want to run the simulation for
 #' @param check_equil Whether or not we want to check if population is at equilibrium
 #' @param rec_type Recruitment dynamics (specify as "mean_rec" for mean recruitment of "BH" for Beverton-Holt)
 #' @param Start_F Starting F vector
@@ -42,6 +43,7 @@
 
 simulate_data <- function(fxn_path, 
                           spreadsheet_path, 
+                          n_years, 
                           check_equil = FALSE,
                           rec_type = "mean_rec",
                           Start_F,
@@ -85,7 +87,7 @@ simulate_data <- function(fxn_path,
   for(i in 1:length(files)) source(here(fxn_path, files[i]))
   
   # Read in parameters from our spreadsheet
-  read_params_create_OM_objects(spreadsheet_path = spreadsheet_path)
+  read_params_create_OM_objects(spreadsheet_path = spreadsheet_path, n_years = n_years)
   
   # Get fishing mortality pattern
   get_Fs(Start_F = Start_F, 
@@ -217,7 +219,8 @@ simulate_data <- function(fxn_path,
         
         # Update quantities here
         Biom_at_age[y,,,sim] <- N_at_age[y,,,sim] * wt_at_age[y,,,sim] # Calculate Biomass at age 
-        
+        Total_Biom[y,sim] <- sum(Biom_at_age[y,,,sim], na.rm = TRUE) # Calculate total biomass
+
         # Now, update SSB (only females matter so indexing 1 for the sex dimension)
         SSB[y,sim] <- sum(mat_at_age[y,,1,sim] * Biom_at_age[y,,1,sim], na.rm = TRUE)
         
@@ -257,7 +260,11 @@ simulate_data <- function(fxn_path,
               
               if(s == n_sex) { # Get catch aggregated across ages and sexes, and add lognormal errors
                 Catch_agg[y, f, sim] <- sum(Catch_at_age[y,,f,,sim] * wt_at_age[y,,,sim]) * 
-                                        exp( rnorm(1, -sqrt(log(catch_CV[f]^2 + 1))^2/2, sqrt(log(catch_CV[f]^2 + 1))) )
+                                        exp( rnorm(1, -sqrt(log(catch_CV[f]^2 + 1))^2/2, sqrt(log(catch_CV[f]^2 + 1))) ) # bias correction here
+              
+               # Calculate harvest rate here
+               Harvest_Rate[y, f, sim] <- sum(Catch_at_age[y,,f,,sim] * wt_at_age[y,,,sim]) / # Catch / Exploitable Biomass
+                                          sum(N_at_age[y,,s,sim] * Fish_selex_at_age[y,,f,s,sim] * wt_at_age[y,,,sim])
               } # if we are done w/ looping through sexes
               
               ### Sample Fishery Index and Comps ------------------------------------------
@@ -334,6 +341,8 @@ simulate_data <- function(fxn_path,
   N_at_age <<- N_at_age
   Biom_at_age <<- Biom_at_age
   SSB <<- SSB
+  Total_Biom <<- Total_Biom
+  Harvest_Rate <<- Harvest_Rate
   rec_total <<- rec_total
   Catch_at_age <<- Catch_at_age
   Catch_agg <<- Catch_agg
@@ -348,7 +357,7 @@ simulate_data <- function(fxn_path,
   DM_Srv_Param <<- DM_Srv_Param
   init_age_devs <<- init_age_devs
   
-  om_list <- list(N_at_age = N_at_age, Biom_at_age = Biom_at_age,
+  om_list <- list(N_at_age = N_at_age, Biom_at_age = Biom_at_age, Total_Biom = Total_Biom, Harvest_Rate = Harvest_Rate,
                   SSB = SSB, rec_total = rec_total, Catch_at_age = Catch_at_age, Catch_agg = Catch_agg,
                   Fishery_Index = Fishery_Index, Fish_Age_Comps = Fish_Age_Comps,
                   Fishery_Index_Agg = Fishery_Index_Agg, Survey_Index = Survey_Index,

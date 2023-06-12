@@ -5,6 +5,7 @@
 #' Title Prepares data inputs for the EM 
 #'
 #' @param years vector of years
+#' @param ages vector of ages
 #' @param catch_cv vector of catch CVs
 #' @param F_Slx_Blocks_Input matrix of when you want to block
 #' @param S_Slx_Blocks_Input same as above
@@ -16,7 +17,8 @@
 #' @param Fish_Comp_Like_Model Fishery composition likelihoods ("multinomial" or "dirichlet_multinomial")
 #' @param Srv_Comp_Like_Model Survey composition likelihoods ("multinomial" or "dirichlet_multinomial")
 #' @param rec_model recruitment model == 0 (mean recruitment)
-#' @param F_Slx_Model_Input Fishery selectivity model character (logistic, gamma, double_logistic)
+#' @param F_Slx_Model_Input Fishery selectivity model character (logistic, gamma, double_logistic, exp_logistic). Needs to be a matrix dimensioned by
+#' bn_years x n_fleets
 #' @param S_Slx_Model_Input same as above
 #' @param time_selex Type of time-varying to do (Options are: None, RW)
 #' @param fix_pars What parameters we want to fix
@@ -29,6 +31,7 @@
 #' @examples
 #' Note that n_years here refers to all the rows of the array
 prepare_EM_input <- function(years,
+                             ages,
                              Fish_Start_yr = 1,
                              n_fleets, 
                              catch_cv,
@@ -204,16 +207,21 @@ prepare_EM_input <- function(years,
   
   # Selectivity options ------------------------------------------------------
   
-  F_Slx_model <- vector()
+  # For the fishery selectivity models, we want this as a matrix so we can time-block and switch
+  # over to a different selectivity form. 
+  F_Slx_model <- matrix(data = NA, nrow = length(years), ncol = n_fleets)
   S_Slx_model <- vector()
   
   # Fishery selex model input
-  for(i in 1:n_fleets) {
-    if(F_Slx_Model_Input[i] == "logistic") F_Slx_model[i] <- 0
-    if(F_Slx_Model_Input[i] == "gamma") F_Slx_model[i] <- 1
-    if(F_Slx_Model_Input[i] == "double_logistic") F_Slx_model[i] <- 2
-    if(F_Slx_Model_Input[i] == "exp_logistic") F_Slx_model[i] <- 3
-  } # end loop for selectivity model input for fishery
+  for(y in 1:n_years) {
+    for(i in 1:n_fleets) {
+      if(F_Slx_Model_Input[y,i] == "logistic") F_Slx_model[y, i] <- 0
+      if(F_Slx_Model_Input[y,i] == "gamma") F_Slx_model[y, i] <- 1
+      if(F_Slx_Model_Input[y,i] == "double_logistic") F_Slx_model[y, i] <- 2
+      if(F_Slx_Model_Input[y,i] == "exp_logistic") F_Slx_model[y, i] <- 3
+      if(F_Slx_Model_Input[y,i] == "normal") F_Slx_model[y, i] <- 4
+    } # end i loop (fleets)
+  } # end y loop (years)
   
   # Survey selex model input
   for(i in 1:n_srv_comps) {
@@ -221,6 +229,7 @@ prepare_EM_input <- function(years,
     if(S_Slx_Model_Input[i] == "gamma") S_Slx_model[i] <- 1
     if(S_Slx_Model_Input[i] == "double_logistic") S_Slx_model[i] <- 2
     if(S_Slx_Model_Input[i] == "exp_logistic") S_Slx_model[i] <- 3
+    if(S_Slx_Model_Input[i] == "normal") S_Slx_model[i] <- 4
   } # end loop for selectivity model input for survey
   
   # Specify selectivity blocks here
@@ -405,6 +414,7 @@ prepare_EM_input <- function(years,
   for(i in 1:length(S_Slx_Model_Input)) {
     if(S_Slx_Model_Input[i] == "logistic") n_srv_pars[i] <- 2
     if(S_Slx_Model_Input[i] == "gamma") n_srv_pars[i] <- 2
+    if(S_Slx_Model_Input[i] == "normal") n_srv_pars[i] <- 2
     if(S_Slx_Model_Input[i] == "exp_logistic") n_srv_pars[i] <- 3
     if(S_Slx_Model_Input[i] == "double_logistic") n_srv_pars[i] <- 4
   } # end i loop
@@ -418,12 +428,26 @@ prepare_EM_input <- function(years,
   for(i in 1:length(F_Slx_Model_Input)) {
     if(F_Slx_Model_Input[i] == "logistic") n_fish_pars[i] <- 2
     if(F_Slx_Model_Input[i] == "gamma") n_fish_pars[i] <- 2
+    if(F_Slx_Model_Input[i] == "normal") n_fish_pars[i] <- 2
     if(F_Slx_Model_Input[i] == "exp_logistic") n_fish_pars[i] <- 3
     if(F_Slx_Model_Input[i] == "double_logistic") n_fish_pars[i] <- 4
   } # end i loop
   
   # put array into our parameter list
-  pars$ln_fish_selpars <- array(log(rnorm(1, 0.1, 0)), dim = c(n_fish_comps, n_sexes, n_fish_blocks, max(n_fish_pars)))
+  # need to do slightly different starting values here, b/c exp_logistic is a lil finicky
+  if(sum(reshape2::melt(F_Slx_Model_Input)$value == "exp_logistic") == 0) { 
+    # if we don't have exponential logistic or double logistic
+    pars$ln_fish_selpars <- array(log(rnorm(1, 6, 0)), 
+                                  dim = c(n_fish_comps, n_sexes, 
+                                          n_fish_blocks, max(n_fish_pars)))
+  } else{
+    pars$ln_fish_selpars <- array(0, dim = c(n_fish_comps, n_sexes, 
+                                          n_fish_blocks, max(n_fish_pars)))
+    
+    pars$ln_fish_selpars[,,,1] <- log(0.05) # gamma parameter
+    pars$ln_fish_selpars[,,,2] <- log(0.6) # alpha parameter - doming
+    pars$ln_fish_selpars[,,,3] <- log(10) # beta parameter - rough peak area
+  }  # if we have an exponential logistic
   
   # Time-Varying Selectivity Options (Fishery)
   if(time_selex == "None") { # No time-varying
@@ -465,6 +489,42 @@ prepare_EM_input <- function(years,
     map <- c(map_par, map)
     
   } # end i
+  
+  # Parameter mapping for time-blocking purposes in fishery selectivity here
+  if(length(unique(n_fish_pars)) > 1) { # only do this if there is more than 2 unique selex forms w/ different params
+    
+    # Get dummy selex array we can manipulate
+    fish_selpars_array <- pars$ln_fish_selpars
+    # Get unique number of fishery selex pars
+    unique_fish_pars <- unique(n_fish_pars)
+
+    # Figure out which block is the missing parameter here
+    blk_missing <- which(unique_fish_pars != max(n_fish_pars))
+    # Now replace this with a unique identifier so we know to
+    # put an NA in the parameter mapping here.
+    fish_selpars_array[,,blk_missing, max(n_fish_pars)] <- NA
+    
+    # now, vectorize this 
+    fish_selpars_vec <- as.vector(fish_selpars_array)
+    
+    # now, map this out
+    map_fish_selpars <- vector()
+    counter <- 1
+    for(i in 1:length(fish_selpars_vec)) {
+      # If this is an NA, input this as an NA
+      if(is.na(fish_selpars_vec[i])) map_fish_selpars[i] <- NA
+      else {
+        # input counter into vector here to identify parameter to estimate
+        map_fish_selpars[i] <- counter
+        counter <- counter + 1
+      } # else statement
+    } # end i loop
+    
+    # Turn into factor and input into mapping list
+    ln_fish_selpars <- factor(map_fish_selpars)
+    map <- rlist::list.append(map, ln_fish_selpars = ln_fish_selpars)
+    
+  } # time block mapping
   
   return(list(data = data, parameters = pars, map = map))
   

@@ -28,6 +28,21 @@ create_OM_objects <<- function(n_years, ages, n_fish_fleets, n_sex, n_sims) {
                           c(paste("Sim",1:n_sims)) # Simulation 
                         ))
   
+  # Total biomass
+  Total_Biom <<- array(dim = c(n_years, n_sims), 
+                dimnames = list( # Set up dimensions names
+                  c(paste("Year", 1:n_years, sep = "_")), # Years 
+                  c(paste("Sim",1:n_sims)) # Simulation 
+                ))
+  
+  # Harvest Rate
+  Harvest_Rate <<- array(dim = c(n_years, n_fish_fleets, n_sims), 
+                       dimnames = list( # Set up dimensions names
+                         c(paste("Year", 1:n_years, sep = "_")), # Years 
+                         c(paste("Fish_Fleet", 1:n_fish_fleets, sep  = "_")), # Number of fishery fleets
+                         c(paste("Sim",1:n_sims)) # Simulation 
+                       ))
+  
   # SSB across years
   SSB <<- array(dim = c(n_years, n_sims), 
                dimnames = list( # Set up dimensions names

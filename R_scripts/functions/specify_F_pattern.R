@@ -91,6 +91,21 @@ specify_F_pattern <- function(Start_F, Fish_Start_yr, F_type, n_years, max_rel_F
     
   } # if fleet structure is constant and increases after
   
+  if(F_type == "Const_Inc_or_Dec_Plat") { # Constant and Increasing or Decreasing F type followed by a plateau
+    
+    # Change point for fmort
+    chngpoint <- yr_chng
+    # F stays constant initially
+    constant_F <- seq(Start_F, Start_F, length.out = length(Fish_Start_yr:chngpoint))
+    # Change point for F
+    change_F <- seq(Start_F, (max_rel_F_M * mean_nat_mort), length.out = length(chngpoint:(yr_chng_end-1)))
+    # F vector 
+    F_vec <- c(constant_F, 
+               change_F[-1],  # Removing the first year from this sequence in change F
+               rep(change_F[length(chngpoint:yr_chng_end)-1], length(yr_chng_end:(n_years-1))))
+    
+  } # if fleet structure is constant and increases after
+  
   if(F_type == "Const_Ramp_Const") { # Constant, Ramp (can be increase or decrease), 
     # and then remains constant
     

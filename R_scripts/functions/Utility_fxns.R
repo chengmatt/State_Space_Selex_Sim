@@ -108,6 +108,7 @@ check_model_convergence <- function(mle_optim, sd_rep, mod_rep, min_grad = 0.001
   max_grad_par <- names(sd_rep$par.fixed)[which.max(abs(sd_rep$gradient.fixed))]
   
   if(sd_rep$pdHess == TRUE & 
+     mle_optim$convergence == 0 &
      max_grad_val < min_grad &
      !is.nan(sum(sd_rep$sd )) &
      !is.nan(mod_rep$rep$jnLL)) convergence = "Converged"
@@ -638,7 +639,18 @@ get_quants <- function(sd_rep,
     dplyr::mutate(t = (SSB[years,sim]/ssb0), sim = sim, conv = conv, year = years,
            type = "Depletion")
   
-  ts_all <- rbind(rec_df, ssb_df, f_df, depletion_df)
+  # Get total biomass
+  total_biom_df <- extract_ADREP_vals(sd_rep = sd_rep, par = "Total_Biom") %>%
+    dplyr::mutate(t = Total_Biom[years, sim], sim = sim, conv = conv, year = years,
+                  type = "Total Biomass")
+  
+  # Get Harvest Rate
+  total_harv_rate_df <- extract_ADREP_vals(sd_rep = sd_rep, par = "Total_Harvest_Rate") %>%
+    dplyr::mutate(t = rowSums(matrix(Harvest_Rate[years,,sim], ncol = ntrue_fish_fleets)),
+                  sim = sim, conv = conv, year = years,
+                  type = "Total Biomass")
+
+  ts_all <- rbind(rec_df, ssb_df, f_df, depletion_df, total_biom_df, total_harv_rate_df)
   
   return(list(TS_df = ts_all, Par_df = par_all))
 
@@ -709,4 +721,15 @@ theme_matt <- function() {
           axis.text= element_text(size = 13, color = "black"),
           legend.text = element_text(size = 13),
           legend.title = element_text(size = 15)) 
+}
+
+# Get AIC values here
+TMB_AIC <- function(optim_model) {
+  # Get number of parameters 
+  k <- length(optim_model[["par"]])
+  # Extract objective function
+  nLL <- optim_model[["objective"]]
+  # Calculate AIC
+  margAIC <- 2*(k+nLL)
+  return(margAIC)
 }
