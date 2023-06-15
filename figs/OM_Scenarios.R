@@ -131,15 +131,15 @@ bins <- 1:30
 ### Logistic-Logistic ----------------------------------------------------------------
 
 # Get a50 value males
-a50m1 <- 5
+a50m1 <- 6
 a50m2 <- 10
 deltam1 <- 1
-deltam2 <- 2.5
+deltam2 <- 1.5
 
 # Get a50 value females
 a50f1 <- 3
-a50f2 <- 6
-deltaf1 <- 0.85
+a50f2 <- 7
+deltaf1 <- 0.5
 deltaf2 <- 1
 
 # Compute selex 
@@ -156,9 +156,9 @@ colnames(selex_logist) <- c("Selex", "Sex", "Fleet", "Age", "Type")
 ### Logistic-Gamma ----------------------------------------------------------
 
 # Gamma parameters
-amaxm2 <- 16
-deltam2 <- 8
-amaxf2 <- 13
+amaxm2 <- 18
+deltam2 <- 8.5
+amaxf2 <- 14
 deltaf2 <- 10
 
 # Get Selex here

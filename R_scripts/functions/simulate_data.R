@@ -137,7 +137,7 @@ simulate_data <- function(fxn_path,
   for(sim in 1:n_sims) {
     
     # Create deviations for initial age-structure
-    init_age_devs[,sim] <- exp(rnorm((length(ages)-1),- (sigma_rec^2/2),sigma_rec)) 
+    init_age_devs[,sim] <- exp(rnorm(length(ages),- (sigma_rec^2/2),sigma_rec)) 
     
     # Check equilibrium -------------------------------------------------------
     if(check_equil == TRUE) {
@@ -159,11 +159,9 @@ simulate_data <- function(fxn_path,
         
         for(s in 1:n_sex) { # Loop through to propagate according to sex ratio
           # Not plus group
-          N_at_age[y,-max(ages),s,sim] <- r0 * exp(-Mort_at_age[y,-max(ages),sim] * (ages[-max(ages)]-1)) * 
-                                          init_age_devs[-max(ages),sim] * sex_ratio[y, s]
-          # # Plus group
-          N_at_age[y,max(ages),s,sim] <- (r0 * (exp(-Mort_at_age[y,max(ages),sim] * (ages[max(ages)]-1)) /
-                                                  (1 - exp(-Mort_at_age[y,max(ages),sim])))) * sex_ratio[y, s]
+          N_at_age[y,,s,sim] <- r0 * exp(-Mort_at_age[y,,sim] * (ages-1)) * 
+                                          init_age_devs[,sim] * sex_ratio[y, s]
+
         } # end s loop
       } # end if statement for start year of the fishery
       
@@ -260,7 +258,7 @@ simulate_data <- function(fxn_path,
               
               if(s == n_sex) { # Get catch aggregated across ages and sexes, and add lognormal errors
                 Catch_agg[y, f, sim] <- sum(Catch_at_age[y,,f,,sim] * wt_at_age[y,,,sim]) * 
-                                        exp( rnorm(1, -sqrt(log(catch_CV[f]^2 + 1))^2/2, sqrt(log(catch_CV[f]^2 + 1))) ) # bias correction here
+                                        exp( rnorm(1, 0, sqrt(log(catch_CV[f]^2 + 1))) ) # bias correction here
               
                # Calculate harvest rate here
                Harvest_Rate[y, f, sim] <- sum(Catch_at_age[y,,f,,sim] * wt_at_age[y,,,sim]) / # Catch / Exploitable Biomass

@@ -35,6 +35,7 @@ for(n_om in 1:n_OM_scen) {
   
   # Pre-Processing
   n_years <- om_scenarios$n_years[n_om] # number of years to run om for
+  n_fleets <- om_scenarios$n_fleets[n_om] # number of fleets (fishery)
   yr_chng_end <- om_scenarios$yr_chng_end[n_om] # the year we want the fleet transition to finish
   F_type <- c(om_scenarios$Fl_1_Ftype[n_om], om_scenarios$Fl_2_Ftype[n_om]) # Get Fishing Mortality Pattern
   Start_F <- c(om_scenarios$Fl_1_StartF[n_om], om_scenarios$Fl_2_StartF[n_om])  # Get Starting Fs
@@ -54,14 +55,9 @@ for(n_om in 1:n_OM_scen) {
   # Selectivity parameters for Fleet 2 Females, followed by Males
   Fish_Fleet2_SelPars <- c(om_scenarios$Fl_2_Slx_Par1_F[n_om], 
                            om_scenarios$Fl_2_Slx_Par2_F[n_om],
-                           om_scenarios$Fl_2_Slx_Par3_F[n_om],
                            om_scenarios$Fl_2_Slx_Par1_M[n_om], 
-                           om_scenarios$Fl_2_Slx_Par2_M[n_om],
-                           om_scenarios$Fl_2_Slx_Par3_M[n_om])  
-  
-  # Remove NAs if no 3 parameters in selex
-  # Fish_Fleet2_SelPars <- Fish_Fleet2_SelPars[Fish_Fleet2_SelPars != "NA"]
-  
+                           om_scenarios$Fl_2_Slx_Par2_M[n_om])  
+
   # Simulate data here
   oms <- simulate_data(fxn_path = fxn_path, 
                 spreadsheet_path = lh_path,
@@ -87,7 +83,7 @@ for(n_om in 1:n_OM_scen) {
                 Input_N_Fish_Time = "F_Vary", 
                 Input_N_Fish_Fixed = Input_N_Fish_Fixed, # min of Neff comps when allowed to vary
                 catch_CV = c(0.0, 0.0), 
-                q_Mean_Fish = c(0.05, 0.05), # not really used
+                q_Mean_Fish = c(0.01, 0.01),
                 
                 # Survey Controls
                 Surv_Start_yr = c(1),  

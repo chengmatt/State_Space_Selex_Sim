@@ -58,13 +58,13 @@ add_newton <- function(n.newton, ad_model, mle_optim) {
 #'
 #' @examples
 
-run_EM <- function(data, parameters, map, n.newton, random = NULL,
+run_EM <- function(data, parameters, map, n.newton = 0, random = NULL,
                    iter.max = 1e6, eval.max = 1e6, 
                    silent = TRUE, getsdrep = TRUE) {
   
   # Make AD Function here
   model_fxn <- TMB::MakeADFun(data, parameters, map, random = random,
-                              DLL="EM", silent = silent, 
+                              DLL="EM", silent = silent,  
                               checkParameterOrder = TRUE, tracepar = TRUE)
   
   # Optimize model here w/ nlminb
@@ -89,6 +89,7 @@ run_EM <- function(data, parameters, map, n.newton, random = NULL,
 #' Title Check TMB Model Convergence (PD Hessian and parameter gradients)
 #'
 #' @param mle_optim MLE optimized object by nlminb or optim
+#' @param model_obj Model object
 #' @param sd_rep sd report object from TMB 
 #' @param min_grad Minimum gradient we want to determine convergence
 #' @param mod_rep Model object with report stored in the list
@@ -99,7 +100,7 @@ run_EM <- function(data, parameters, map, n.newton, random = NULL,
 #'
 #' @examples
 
-check_model_convergence <- function(mle_optim, sd_rep, mod_rep, min_grad = 0.001) {
+check_model_convergence <- function(mle_optim, sd_rep, mod_rep, min_grad = 0.0001) {
   
   # Maximum gradient of the model
   max_grad_val <- max(abs(sd_rep$gradient.fixed))
@@ -107,12 +108,37 @@ check_model_convergence <- function(mle_optim, sd_rep, mod_rep, min_grad = 0.001
   # Parameter with maximum gradient
   max_grad_par <- names(sd_rep$par.fixed)[which.max(abs(sd_rep$gradient.fixed))]
   
+  # Calculate Hessian, and check eigen values + invertibility
+  calculate_hessian = tryCatch(expr = optimHess(mod_rep$par,
+                                                fn = mod_rep$fn, 
+                                                gr = mod_rep$gr)
+                               , error = function(e){e})
+  
+  calc_Hessian = T # Assuming True Hessian. Turns to false if any of the
+  # checks below fail.
+  if(inherits(calculate_hessian,"error")) {
+    cat("Hessian calculation: ", calculate_hessian$message,"\n")
+    calc_Hessian = F
+  } else {
+    ## invert hessian
+    if(any("matrix" %in% class(try(solve(calculate_hessian),silent=TRUE))) == FALSE) {
+      cat("Hessian matrix not invertible (not positive definite): 
+          probably due to singularity. Check the eigen values to find 
+          possible problematic parameters\n")
+      calc_Hessian = F
+    } # invert hessian
+  } # else
+
   if(sd_rep$pdHess == TRUE & 
+     calc_Hessian == T & 
      mle_optim$convergence == 0 &
      max_grad_val < min_grad &
-     !is.nan(sum(sd_rep$sd )) &
-     !is.nan(mod_rep$rep$jnLL)) convergence = "Converged"
-  else convergence = "Not Converged"
+     is.finite(sum(sd_rep$sd )) &
+     is.finite(mod_rep$rep$jnLL)) {
+    convergence = "Converged"
+  } else {
+    convergence = "Not Converged"
+    }
   
   return(list(Convergence = convergence, 
               Max_Grad = max_grad_val, 
@@ -414,6 +440,51 @@ get_TE_precentiles <- function(df, est_val_col = 1, true_val_col = 5, par_name =
   return(df)
 }
 
+#' Title Return MARE percentiles
+#'
+#' @param df dataframe we want to get percentiles from
+#' @param est_val_col column number of estimated mle values
+#' @param true_val_col column number of true values
+#' @param par_name character name that we want to input into the returned dataframe
+#' @param group_vars group_by variable names as strings
+#'
+#' @return dataframe of a range of different percentiles
+#' @export
+#'
+#' @examples
+get_ARE_precentiles <- function(df, est_val_col = 1, true_val_col = 5, par_name = NULL,
+                               group_vars) {
+  
+  # Get relative error based on indexed columns
+  ARE <- abs(df[,est_val_col] - df[,true_val_col]) 
+  df <- cbind(df, ARE) # Cbind TE
+  names(df)[ncol(df)] <- "ARE" # Rename variable
+  
+  df <- df %>% 
+    group_by(!!! syms(group_vars)) %>% 
+    summarize(median = median(ARE, na.rm = T), 
+              lwr_100 = quantile(ARE, 0, na.rm = T),
+              upr_100 = quantile(ARE, 1, na.rm = T),
+              lwr_95 = quantile(ARE, 0.025, na.rm = T),
+              upr_95 = quantile(ARE, 0.975, na.rm = T),
+              lwr_80 = quantile(ARE, 0.1, na.rm = T),
+              upr_80 = quantile(ARE, 0.9, na.rm = T),
+              lwr_75 = quantile(ARE, 0.125, na.rm = T),
+              upr_75 = quantile(ARE, 0.875, na.rm = T)) %>% 
+    mutate(par_name = par_name) 
+  
+  if(str_detect(par_name, "Age")) { # if this is an age variable
+    
+    # Make par_name different such that we can facet wrap later on
+    df$par_name <- paste(df$par_name, "Fleet", df$fleet, "Sex", df$sex)
+    
+    # Drop grouped columns (2nd and 3rd column - fleet and sex)
+    df <- df[,-c(2:3)]
+  }
+  
+  return(df)
+}
+
 
 #' Title To extract estiamted and true values from model runs
 #'
@@ -588,10 +659,9 @@ get_quants <- function(
     est_TermF <- exp(sd_rep$par.fixed[names(model$sd_rep$par.fixed) == "ln_Fy"])[c(length(years))]
   } # else statement
 
-  est_Selex <- model_fxn$rep$F_Slx[years[length(years)],,,1] # selectivity only for females
-  
-
 # Reference Points --------------------------------------------------------
+  
+  est_Selex <- model_fxn$rep$F_Slx[years[length(years)],,,1] # selectivity only for females
 
   # Get estaimted Fx% value
   Fx_val <- get_Fx_refpt(ages = ages,
@@ -695,7 +765,7 @@ get_quants <- function(
   total_harv_rate_df <- extract_ADREP_vals(sd_rep = sd_rep, par = "Total_Harvest_Rate") %>%
     dplyr::mutate(t = rowSums(matrix(Harvest_Rate[years,,sim], ncol = ntrue_fish_fleets)),
                   sim = sim, conv = conv, year = years,
-                  type = "Total Biomass")
+                  type = "Total Harvest Rate")
 
   ts_all <- rbind(rec_df, ssb_df, f_df, depletion_df, total_biom_df, total_harv_rate_df)
   
@@ -719,12 +789,14 @@ get_results <- function(om_scenario_path, exclude = NA) {
   # Get OM Scenarios from OM path
   om_scenarios <- list.files(om_scenario_path)
   # Set up empty list
-  param_om_list <- list()
-  ts_om_list <- list()
+  param_em_all_list <- list()
+  ts_em_all_list <- list()
+  aic_em_all_list <- list()
   
   # Loop thorugh to extract metrics
   tryCatch(expr = for(i in 1:length(om_scenarios)) {
     
+    # List out all EM Scenarios
     em_scenarios <- list.files(here(om_scenario_path, om_scenarios[i]))
     # Remove .Rdata and .pdf from em_scenarios
     em_scenarios <- em_scenarios[str_detect(em_scenarios, ".RData") == FALSE]
@@ -733,6 +805,7 @@ get_results <- function(om_scenario_path, exclude = NA) {
     # Pre-allocate list here
     param_em_list <- list()
     ts_em_list <- list()
+    aic_em_list <- list()
     
     for(j in 1:length(em_scenarios)) {
       # Read in parameters and time series csvs
@@ -740,23 +813,29 @@ get_results <- function(om_scenario_path, exclude = NA) {
                               em_scenarios[j], "Param_Results.csv"))
       ts <- read.csv(here(om_scenario_path, om_scenarios[i], 
                           em_scenarios[j], "TimeSeries_Results.csv"))
+      aic <- read.csv(here(om_scenario_path, om_scenarios[i], 
+                            em_scenarios[j], "AIC_Results.csv"))
       
       param_em_list[[j]] <- params
       ts_em_list[[j]] <- ts
+      aic_em_list[[j]] <- aic
       
     } # j loop
     
     # list to df and put this into an om list
-    param_om_list[[i]] <- data.table::rbindlist(param_em_list)
-    ts_om_list[[i]] <- data.table::rbindlist(ts_em_list)
+    param_em_all_list[[i]] <- data.table::rbindlist(param_em_list)
+    ts_em_all_list[[i]] <- data.table::rbindlist(ts_em_list)
+    aic_em_all_list[[i]] <- data.table::rbindlist(aic_em_list)
     print(i)
   } , error = function(e){e})
   
-  param_all <- data.table::rbindlist(param_om_list)
-  ts_all <- data.table::rbindlist(ts_om_list)
+  param_all <- data.table::rbindlist(param_em_all_list)
+  ts_all <- data.table::rbindlist(ts_em_all_list)
+  aic_all <- data.table::rbindlist(aic_em_all_list)
   
   return(list(Parameter_Sum = param_all,
-              TimeSeries_Sum = ts_all))
+              TimeSeries_Sum = ts_all,
+              AIC_Sum = aic_all))
 } # end function
 
 # ggplot theme

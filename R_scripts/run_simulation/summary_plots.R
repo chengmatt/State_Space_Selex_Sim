@@ -22,10 +22,16 @@ dir_out <- here("output", "Summary_Plots") # path to output folder
 dir.create(dir_out)
 
 # read in csvs
+
+# Parameter and Time Series Summaries
 param_df <- data.table::fread(here("output", "Parameter_Summary.csv")) # parameters
 ts_df <- data.table::fread(here("output", "TimeSeries_Summary.csv")) # time series values 
 ts_re_df <- data.table::fread(here("output", "TimeSeries_RE.csv")) # time series relative error (converged runs only)
 ts_te_df <- data.table::fread(here("output", "TimeSeries_TE.csv")) # time series total error (converged runs only)
+ts_are_df <- data.table::fread(here("output", "TimeSeries_ARE.csv")) # time series abs relative error (converged runs only)
+AIC_df <- data.table::fread(here("output", "AIC_Convergence_Summary.csv")) # time series total error (converged runs only)
+
+# Selectivity and Comps
 om_slx_df <- data.table::fread(here("output", "OM_Fish_Selex.csv")) # OM Selectivity Values
 em_slx_df <- data.table::fread(here("output", "EM_Fish_Selex.csv")) # EM Selectivity Values
 om_comps_df <- data.table::fread(here("output", "OM_Fish_Comps.csv")) # OM Composition values
@@ -36,27 +42,15 @@ unique_oms <- unique(param_df$OM_Scenario) # unique oms
 ts_pars <- unique(ts_re_df$par_name) # unique parameter names
  
 # Get plot order for EM models
-plot_order <- c("2Fl", "1Fl_L_TI", "1Fl_Gam_TI", "1Fl_ExpL_TI",
-                "1Fl_L_TVBlk", "1Fl_Gam_TVBlk", "1Fl_ExpL_TVBlk",
-                "1Fl_L_TVCont", "1Fl_Gam_TVCont", "1Fl_ExpL_TVCont")
+plot_order <- c("2Fl_LL", "2Fl_LGam", "2Fl_LExpL", "1Fl_L_TI", "1Fl_Gam_TI", "1Fl_ExpL_TI",
+                "1Fl_LL_Blk", "1Fl_LGam_Blk", "1Fl_LExpL_Blk",
+                "1Fl_L_RW", "1Fl_Gam_RW", "1Fl_ExpL_RW")
 
 # Parameter Summary plot -------------------------------------------------------------
 param_df <-  param_df %>% 
   mutate(
-time_comp = case_when(
-      str_detect(EM_Scenario, "Term_") ~ "Terminal",
-      str_detect(EM_Scenario, "10_") ~ "10 Years Post Fl Chg",
-      str_detect(EM_Scenario, "5_") ~ "5 Years Post Fl Chg"
-    ),
-  EM_Scenario = str_remove(EM_Scenario, "Term_|10_|5_"),
-  mle_val = as.numeric(mle_val),
-  t = as.numeric(t),
-  mle_sd = as.numeric(mle_sd),
-  RE = (mle_val - t) / t,
-  TE = mle_val - t,
-  CV = mle_sd / mle_val,
-  time_comp = factor(time_comp, levels = c("5 Years Post Fl Chg", 
-                                           "10 Years Post Fl Chg",
+  EM_Scenario = str_remove(EM_Scenario, 'Term_|TrxE_|Int_'),
+  time_comp = factor(time_comp, levels = c("Fleet Intersect", "Fleet Trans End",
                                            "Terminal"))) %>% 
   filter(conv == "Converged") # only converged runs
 
@@ -96,7 +90,7 @@ for(i in 1:length(unique_oms)) {
       geom_pointrange(position = position_dodge2(width = 1), size = 1.5, linewidth = 1) +
       geom_hline(aes(yintercept = 0), col = "black", lty = 2, size = 0.5, alpha = 1) +
       facet_grid(type~EM_Scenario, scales = "free_x") +
-      coord_cartesian(ylim = c(-0.75,0.75)) +
+      coord_cartesian(ylim = c(-0.4,0.4)) +
       scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
       scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
       labs(x = "EM Scenarios", y = "Relative Error", fill = "Time Component",
@@ -116,21 +110,30 @@ dev.off()
 
 # Time Series plot -----------------------------------------------------
 
+# Quick munging here
 ts_re_df <-  ts_re_df %>% 
   mutate(time_comp = case_when(
-    str_detect(EM_Scenario, "Term_") ~ "Terminal",
-    str_detect(EM_Scenario, "10_") ~ "10 Years Post Fl Chg",
-    str_detect(EM_Scenario, "5_") ~ "5 Years Post Fl Chg"
+    str_detect(EM_Scenario, "Term_") ~ "Terminal", # Terminal Year
+    str_detect(EM_Scenario, "TrxE") ~ "Fleet Trans End", # Fleet Transition End
+    str_detect(EM_Scenario, "Int") ~ "Fleet Intersect" # Fleet Transition Intersects
   ),
-  EM_Scenario = str_remove(EM_Scenario, "Term_|10_|5_"))
-
+  EM_Scenario = str_remove(EM_Scenario, 'Term_|TrxE_|Int_'))
+  
 ts_te_df <-  ts_te_df %>% 
   mutate(time_comp = case_when(
-    str_detect(EM_Scenario, "Term_") ~ "Terminal",
-    str_detect(EM_Scenario, "10_") ~ "10 Years Post Fl Chg",
-    str_detect(EM_Scenario, "5_") ~ "5 Years Post Fl Chg"
+    str_detect(EM_Scenario, "Term_") ~ "Terminal", # Terminal Year
+    str_detect(EM_Scenario, "TrxE") ~ "Fleet Trans End", # Fleet Transition End
+    str_detect(EM_Scenario, "Int") ~ "Fleet Intersect" # Fleet Transition Intersects
   ),
-  EM_Scenario = str_remove(EM_Scenario, "Term_|10_|5_"))
+  EM_Scenario = str_remove(EM_Scenario, 'Term_|TrxE_|Int_'))
+
+ts_are_df <-  ts_are_df %>% 
+  mutate(time_comp = case_when(
+    str_detect(EM_Scenario, "Term_") ~ "Terminal", # Terminal Year
+    str_detect(EM_Scenario, "TrxE") ~ "Fleet Trans End", # Fleet Transition End
+    str_detect(EM_Scenario, "Int") ~ "Fleet Intersect" # Fleet Transition Intersects
+  ),
+  EM_Scenario = str_remove(EM_Scenario, 'Term_|TrxE_|Int_'))
   
 pdf(here(dir_out, "TS_Sum.pdf"), width = 25, height = 10)
 
@@ -138,22 +141,22 @@ for(i in 1:length(unique_oms)) {
   
     # Relative error of time series
     ts_re_om <- ts_re_df %>% filter(OM_Scenario == unique_oms[i],
-                                    !str_detect(EM_Scenario, "0.5|1.0|2.0"))
+                                    !str_detect(EM_Scenario, "0.5|1.0|2.0"),
+                                    par_name %in% c("Spawning Stock Biomass",
+                                                    "Total Biomass",
+                                                    "Total Recruitment"))
     
     # Set order for plot
-    if(length(plot_order) == length(unique(ts_re_om$EM_Scenario))) {
       order <- vector()
       for(o in 1:length(plot_order)) {
         order[o] <- which(grepl(plot_order[o], x = unique(ts_re_om$EM_Scenario)))
       } # end o loop
-    } # end if
-    
+
     # Now relevel factor for organizing plot
     ts_re_om <- ts_re_om %>% 
       mutate(EM_Scenario = factor(EM_Scenario, levels = unique(EM_Scenario)[order]),
-             time_comp = factor(time_comp, levels = c("5 Years Post Fl Chg",
-                                           "10 Years Post Fl Chg",
-                                           "Terminal")))
+             time_comp = factor(time_comp, levels = c("Fleet Intersect", "Fleet Trans End",
+                                                      "Terminal")))
     
     # Now loop through each time series component and print the plot out
     print(
@@ -163,7 +166,7 @@ for(i in 1:length(unique_oms)) {
         geom_line(linewidth = 2, alpha = 1, aes(color = time_comp)) +
         geom_hline(aes(yintercept = 0), col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
         facet_grid(par_name~EM_Scenario) +
-        coord_cartesian(ylim = c(-0.75,0.75)) +
+        coord_cartesian(ylim = c(-0.4,0.4)) +
         scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
         scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
         labs(x = "Year", y = paste("RE"), fill = "Time", color = "Time",
@@ -185,23 +188,26 @@ pdf(here(dir_out, "Convg_Sum.pdf"), width = 25, height = 10)
 
 for(i in 1:length(unique_oms)) {
   
-  conv_stat <- param_df %>% 
-    filter(type == "F_0.4", OM_Scenario == unique_oms[i],
-           !str_detect(EM_Scenario, "0.5|1.0|2.0")) %>% 
+  conv_stat <- AIC_df %>% 
+    mutate(time_comp = case_when(
+      str_detect(EM_Scenario, "Term_") ~ "Terminal", # Terminal Year
+      str_detect(EM_Scenario, "TrxE") ~ "Fleet Trans End", # Fleet Transition End
+      str_detect(EM_Scenario, "Int") ~ "Fleet Intersect" # Fleet Transition Intersects
+    ),
+      EM_Scenario = str_remove(EM_Scenario, 'Term_|TrxE_|Int_'),
+      time_comp = factor(time_comp, levels = c("Fleet Intersect", "Fleet Trans End",
+                                                    "Terminal"))) %>% 
+    filter(!str_detect(EM_Scenario, "0.5|1.0|2.0"),
+           OM_Scenario == unique_oms[i]) %>% 
     group_by(EM_Scenario, time_comp) %>% 
-    summarize(converged = sum(conv == "Converged")/200) %>% 
-    mutate(time_comp = factor(time_comp, levels = c("5 Years Post Fl Chg",
-                                                    "10 Years Post Fl Chg",
-                                                    "Terminal")))
-  
+    summarize(converged = sum(conv == "Converged")/200)
+
   # Set order for plot
-  if(length(plot_order) == length(unique(conv_stat$EM_Scenario))) {
     order <- vector()
     for(o in 1:length(plot_order)) {
       order[o] <- which(grepl(plot_order[o], x = unique(conv_stat$EM_Scenario)))
     } # end o loop
-  } # end if
-  
+
   # relvel factors
   conv_stat$EM_Scenario <- factor(conv_stat$EM_Scenario, 
                                   levels = c(unique(conv_stat$EM_Scenario)[order]))
@@ -229,7 +235,117 @@ for(i in 1:length(unique_oms)) {
 }
 
 dev.off()
+
+
+# AIC Plot ----------------------------------------------------------------
+
+AIC_df <- AIC_df %>% 
+  mutate(time_comp = case_when(
+    str_detect(EM_Scenario, "Term_") ~ "Terminal", # Terminal Year
+    str_detect(EM_Scenario, "TrxE") ~ "Fleet Trans End", # Fleet Transition End
+    str_detect(EM_Scenario, "Int") ~ "Fleet Intersect" # Fleet Transition Intersects
+  ),
+  EM_Scenario = str_remove(EM_Scenario, 'Term_|TrxE_|Int_'),
+  time_comp = factor(time_comp, levels = c("Fleet Intersect", "Fleet Trans End",
+                                           "Terminal")))
+
+# filter to 2 fleet models (different data)
+twofleet_aic <- AIC_df %>% 
+  filter(str_detect(EM_Scenario, "2Fl_")) %>% 
+  group_by(sim, OM_Scenario, time_comp) %>% 
+  mutate(min = min(AIC),
+         min_AIC = ifelse(AIC == min, 1, 0)) %>% 
+  group_by(OM_Scenario, EM_Scenario, time_comp) %>% 
+  summarize(n_minAIC = sum(min_AIC) / 200) %>% 
+  mutate(fleet = "2 Fleet")
+
+# filter to 1 fleet models
+onefleet_aic <- AIC_df %>% 
+  filter(str_detect(EM_Scenario, "1Fl_"),
+         !str_detect(EM_Scenario, "0.5|1.0|2.0")) %>% 
+  group_by(sim, OM_Scenario, time_comp) %>% 
+  mutate(min = min(AIC),
+         min_AIC = ifelse(AIC == min, 1, 0)) %>% 
+  group_by(OM_Scenario, EM_Scenario, time_comp) %>% 
+  summarize(n_minAIC = sum(min_AIC) / 200) %>% 
+  mutate(fleet = "1 Fleet")
+
+# AIC plot
+pdf(file = here(dir_out, "AIC_SummaryPlot.pdf"), width = 10, height = 7)
+# Two fleet plot
+(twofleet_plot <- ggplot(twofleet_aic, 
+                        aes(x = OM_Scenario, y = EM_Scenario, fill = n_minAIC,
+                        label = round(n_minAIC, 2))) +
+  geom_tile(alpha = 0.85) +
+  geom_text(size = 5) +
+  facet_grid(~time_comp, scales = "free") +
+  scale_fill_viridis_c() +
+  theme(legend.position = "top")) 
+
+# One fleet plot
+(onefleet_plot <- ggplot(onefleet_aic, 
+                        aes(x = OM_Scenario, y = EM_Scenario, fill = n_minAIC,
+                       label = round(n_minAIC, 2))) +
+  geom_tile(alpha = 0.85) +
+  geom_text(size = 6) +
+  facet_grid(~time_comp, scales = "free") +
+  scale_fill_viridis_c() +
+  theme_test() +
+  theme(legend.position = "top")) 
   
+dev.off()
+
+
+# Min Max Solution Plot ---------------------------------------------------
+
+minmax_df <- ts_are_df %>% 
+  filter(!str_detect(EM_Scenario, "0.5|1.0|2.0"),
+         # Get terminal year of peels/EMs
+           (year %in% c(50) & str_detect(OM_Scenario, "Fast_") ) & str_detect(EM_Scenario, "Term_") |
+           (year %in% c(70) & str_detect(OM_Scenario, "Slow_") ) & str_detect(EM_Scenario, "Term_") |
+           (year %in% c(30) & str_detect(OM_Scenario, "Fast_") ) & str_detect(EM_Scenario, "TrxE_") |
+           (year %in% c(50) & str_detect(OM_Scenario, "Slow_") ) & str_detect(EM_Scenario, "TrxE_") |
+           (year %in% c(28) & str_detect(OM_Scenario, "Fast_") ) & str_detect(EM_Scenario, "Int_") |
+           (year %in% c(39) & str_detect(OM_Scenario, "Slow_") ) & str_detect(EM_Scenario, "Int_"),
+         par_name %in% c("Total Recruitment",
+                         "Spawning Stock Biomass",
+                         "Total Biomass")) %>% 
+  mutate(time_comp = case_when(
+    str_detect(EM_Scenario, "Term_") ~ "Terminal", # Terminal Year
+    str_detect(EM_Scenario, "TrxE_") ~ "Fleet Trans End", # Fleet Transition End
+    str_detect(EM_Scenario, "Int_") ~ "Fleet Intersect" # Fleet Transition Intersects
+  ),
+  time_comp = factor(time_comp, levels = c("Fleet Intersect", "Fleet Trans End",
+                                           "Terminal")),
+  EM_Scenario = str_remove(EM_Scenario, 'Term_|TrxE_|Int_')) %>% 
+  data.frame() %>%
+  group_by(EM_Scenario, time_comp, par_name) %>%
+  mutate(max_median = max(median)) %>% # find the maximum median MARE
+  ungroup()
+
+# Find the minimum maximum median value
+min_max_medians <- minmax_df %>%
+  group_by(par_name, time_comp) %>%
+  summarize(min_max_medians = min(max_median))
+
+# Now left join this
+minmax_df = minmax_df %>% 
+  left_join(min_max_medians, by = c("par_name", "time_comp"))
+
+# Plot!
+pdf(file = here(dir_out, "MinMax_Summary.pdf"), width = 15, height = 10)
+ggplot(minmax_df, aes(x = factor(OM_Scenario), y = factor(EM_Scenario), 
+              fill = median, label = round(median, 2))) +
+  geom_tile(alpha = 0.85) +
+  geom_text(color = ifelse(minmax_df$median == minmax_df$max_median &
+                             minmax_df$median != minmax_df$min_max_medians, "red", 
+                           ifelse(a$median == minmax_df$min_max_medians, "green", "black")),
+            size = 5.5) +
+  facet_grid(par_name~time_comp, scales = "free_y") +
+  scale_fill_viridis_c() +
+  theme_test()
+dev.off()
+
 # Selectivity plots -------------------------------------------------------
 
 # Subset to first year for OMs
@@ -242,20 +358,25 @@ om_slx_df_sub <- om_slx_df %>%
 # Filter only to terminal years of terminal, 10, 5
 # Also do some residual munging on the dataframe
 trunc_em <- em_slx_df %>% 
-  filter(Year %in% c(30, 35, 50),
-         !str_detect(EM_Scenario, "0.5|1.0|2.0"),
-         conv == "Converged") %>% 
+  filter(!str_detect(EM_Scenario, "0.5|1.0|2.0"),
+           (Year %in% c(50) & str_detect(OM_Scenario, "Fast_") ) & str_detect(EM_Scenario, "Term_") |
+           (Year %in% c(70) & str_detect(OM_Scenario, "Slow_") ) & str_detect(EM_Scenario, "Term_") |
+           (Year %in% c(30) & str_detect(OM_Scenario, "Fast_") ) & str_detect(EM_Scenario, "TrxE_") |
+           (Year %in% c(50) & str_detect(OM_Scenario, "Slow_") ) & str_detect(EM_Scenario, "TrxE_") |
+           (Year %in% c(28) & str_detect(OM_Scenario, "Fast_") ) & str_detect(EM_Scenario, "Int_") |
+           (Year %in% c(39) & str_detect(OM_Scenario, "Slow_") ) & str_detect(EM_Scenario, "Int_"),
+            conv == "Converged") %>% 
   mutate(time_comp = case_when(
-    Year == 50 ~ "Terminal",
-    Year == 35 ~ "10 Years Post Fl Chg",
-    Year == 30 ~ "5 Years Post Fl Chg"
+    str_detect(EM_Scenario, "Term_") ~ "Terminal", # Terminal Year
+    str_detect(EM_Scenario, "TrxE") ~ "Fleet Trans End", # Fleet Transition End
+    str_detect(EM_Scenario, "Int") ~ "Fleet Intersect" # Fleet Transition Intersects
   ),
-  time_comp = factor(time_comp, levels = c('5 Years Post Fl Chg', "10 Years Post Fl Chg",
-                                           "Terminal")),
+  time_comp = factor(time_comp, levels = c("Fleet Intersect", "Fleet Trans End",
+                               "Terminal")),
   Sex = case_when(
     str_detect(Sex, "1") ~ "Female",
     str_detect(Sex, "2") ~ "Male"), 
-  EM_Scenario = str_remove(EM_Scenario, "Term_|10_|5_"))
+  EM_Scenario = str_remove(EM_Scenario, "Term_|TrxE_|Int_"))
 
 pdf(here(dir_out, "Selex_Sum.pdf"), width = 22, height = 5)
 
@@ -272,13 +393,11 @@ for(i in 1:length(unique_oms)) {
     filter(OM_Scenario == unique_oms[i])
     
   # Set order for plot
-  if(length(plot_order) == length(unique(em_plot_df$EM_Scenario))) {
   order <- vector()
   for(o in 1:length(plot_order)) {
     order[o] <- which(grepl(plot_order[o], x = unique(em_plot_df$EM_Scenario)))
   } # end o loop
-} # end if
-  
+
   # Now relevel factor for organizing plot
   em_plot_df$EM_Scenario <- factor(em_plot_df$EM_Scenario, levels = unique(em_plot_df$EM_Scenario)[order])
   

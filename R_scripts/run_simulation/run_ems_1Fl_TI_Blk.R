@@ -118,19 +118,19 @@ for(n_om in 1:n_OM_scen) {
                                               "ln_M"), sim = sim)
       
       # Run EM model here and get sdrep
-      model <- run_EM(data = input$data, parameters = input$parameters, 
+      tryCatch(expr = model <- run_EM(data = input$data, parameters = input$parameters, 
                       map = input$map,  
-                      n.newton = 1, 
-                      silent = TRUE, getsdrep = TRUE)
+                      n.newton = 3,
+                      silent = TRUE, getsdrep = TRUE), error = function(e){e}) 
       
       # Check model convergence
-      convergence_status <- check_model_convergence(mle_optim = model$mle_optim,
+      tryCatch(expr = convergence_status <- check_model_convergence(mle_optim = model$mle_optim,
                                                     mod_rep = model$model_fxn,
                                                     sd_rep = model$sd_rep,
-                                                    min_grad = 0.001)
+                                                    min_grad = 0.001), error = function(e){e}) 
       
       # Get quantities
-      quants_df <- get_quants(sd_rep = model$sd_rep,
+      tryCatch(expr = quants_df <- get_quants(sd_rep = model$sd_rep,
                               model_fxn = model$model_fxn, 
                               sim = sim,  
                               n_sex = n_sex, 
@@ -141,12 +141,14 @@ for(n_om in 1:n_OM_scen) {
                               ntrue_fish_fleets = dim(Fish_Age_Comps)[3], 
                               nmod_fish_fleets = input$data$n_fleets,
                               ages = ages, 
-                              F_x = 0.4)
+                              F_x = 0.4), error = function(e){e}) 
       
       # Combine objects to save
-      all_obj_list <- list(model, quants_df$Par_df, quants_df$TS_df)
-      all_obj_list
-    } # end foreach loop
+      tryCatch(expr = all_obj_list <- list(model, 
+                                           quants_df$Par_df, 
+                                           quants_df$TS_df), error = function(e){e}) 
+
+    }# end foreach loop
 
     stopCluster(cl) # stop cluster
     
@@ -201,3 +203,4 @@ for(n_om in 1:n_OM_scen) {
     
   } # end n_em loop
 } # end n_om loop
+

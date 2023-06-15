@@ -289,13 +289,8 @@ Type objective_function<Type>::operator() ()
     for(int s = 0; s < n_sexes; s++){
       // TESTING
       // NAA(0, a, s) = exp(ln_N1Devs(a)) * Sex_Ratio(s);
-      if(a < n_ages - 1) { // not plus group
-        NAA(0, a, s) = exp(ln_N1Devs(a)) * exp(ln_RecPars(0) -(SigmaRec2/Type(2))) *
+        NAA(0, a, s) = exp(ln_N1Devs(a)) * exp(ln_RecPars(0)) *
                        exp(-M * Type(a)) * Sex_Ratio(s);
-      } else{
-        NAA(0, a, s) = exp(ln_RecPars(0)) * exp(-M * Type(a)) /
-                          (1 - exp(-M)) * Sex_Ratio(s);
-      } // plus group
     } // end s loop 
   } // end a loop
    
@@ -310,7 +305,7 @@ Type objective_function<Type>::operator() ()
            Type ln_MeanRec = ln_RecPars(0); // Mean Recruitment parameter
            NAA(y, 0, s) = exp( ln_MeanRec + ln_RecDevs(y-1) -(SigmaRec2/Type(2)))  * Sex_Ratio(s);
          } // if for rec_model == 0
-         
+          
          if(rec_model == 1) { // Beverton Holt Recruitment
            
            // Define parameters 
@@ -323,7 +318,7 @@ Type objective_function<Type>::operator() ()
            Type ln_BH_tmp_rec = log(BH_first_part/BH_sec_part); // Deterministic BH in log space
            
            // Get recruitment with process error here
-           NAA(y, 0, s) =  exp(ln_BH_tmp_rec + ln_RecDevs(y - 1) -(SigmaRec2/Type(2)))  * Sex_Ratio(s);
+           NAA(y, 0, s) =  exp(ln_BH_tmp_rec + ln_RecDevs(y - 1))  * Sex_Ratio(s);
            
          } // if BH Recruitment
        } // only estimate recruitment if y >= 1
@@ -538,8 +533,8 @@ Type objective_function<Type>::operator() ()
       for(int s = 0; s < n_sexes; s++) {
         
         // Pre-processing - extract out quantities
-        vector<Type> obs_fish_age = obs_fish_age_comps.col(s).col(fc).transpose().col(y); // Pull out observed vector
-        vector<Type> pred_fish_age = pred_fish_age_comps.col(s).col(fc).transpose().col(y); // Pull out predicted vector 
+        vector<Type> obs_fish_age = obs_fish_age_comps.col(s).col(fc).transpose().col(y) + 1e-03; // Pull out observed vector
+        vector<Type> pred_fish_age = pred_fish_age_comps.col(s).col(fc).transpose().col(y) + 1e-03; // Pull out predicted vector 
         Type Fish_Input_N = obs_fish_age_Input_N(y, fc, s); // Input Sample Size
         Type ln_fish_theta = ln_DM_Fish_Param(fc, s); // Dispersion parameter if needed
         
@@ -547,10 +542,10 @@ Type objective_function<Type>::operator() ()
         fish_comp_nLL(y, fc, s) -= use_fish_comps(y, fc, s) * 
                                    get_acomp_nLL(obs_fish_age, pred_fish_age, Fish_Input_N,
                                                  ln_fish_theta, fish_comp_likelihoods(fc, s), true);
-        
+         
         // Get effective sample sizes
         Fish_Neff(y, fc, s) = get_Neff(Fish_Input_N, ln_fish_theta, fish_comp_likelihoods(fc, s));
-
+ 
       } // s loop
     } // y loop
   } // fc loop
@@ -583,11 +578,11 @@ Type objective_function<Type>::operator() ()
   
   // Recruitment and derived quantities ---------------------------------------------
   for(int y = 0; y < ln_RecDevs.size(); y++) { 
-    rec_nLL -= dnorm(ln_RecDevs(y), Type(0), SigmaRec, true);
+    rec_nLL -= dnorm(ln_RecDevs(y), -(SigmaRec2/Type(2)), SigmaRec, true);
   } // Penalty for all recruitment deviations
   
   for(int y = 0; y < ln_N1Devs.size(); y++) {
-    rec_nLL -= dnorm(ln_N1Devs(y), Type(0), SigmaRec, true);
+    rec_nLL -= dnorm(ln_N1Devs(y), -(SigmaRec2/Type(2)), SigmaRec, true);
   } // Penalty for all recruitment deviations
   
   // Calculate Depletion at time 0

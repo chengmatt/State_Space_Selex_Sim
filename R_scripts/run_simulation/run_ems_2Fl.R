@@ -3,7 +3,6 @@
 # Date 6/12/23
 
 # Set up ------------------------------------------------------------------
-rm(list=ls()) # remove objects prior to running
 
 library(here)
 library(tidyverse)
@@ -11,6 +10,7 @@ library(TMB)
 library(doSNOW)
 library(parallel)
 
+rm(list=ls()) # remove objects prior to running
 ncores <- detectCores() 
 
 # Load in all functions into the environment
@@ -70,11 +70,11 @@ for(n_om in 1:n_OM_scen) {
     
 # Run Simulation ----------------------------------------------------------
 
-    sim_models <- foreach(sim = 1:n_sims, 
+    sim_models <- foreach(sim = 1:n_sims,
                           .packages = c("TMB", "here", "tidyverse")) %dopar% {
                             
       compile_tmb(wd = here("src"), cpp = "EM.cpp")
-      
+
       # Prepare inputs for EM
       input <- prepare_EM_input(years = years,
                                 n_fleets = n_fleets, 
@@ -102,20 +102,21 @@ for(n_om in 1:n_OM_scen) {
                                               "ln_h", 
                                               "ln_M"), sim = sim)
       
+
       # Run EM model here and get sdrep
-      model <- run_EM(data = input$data, parameters = input$parameters, 
-                      map = input$map,  
-                      n.newton = 1, 
-                      silent = TRUE, getsdrep = TRUE)
+      tryCatch(expr = model <- run_EM(data = input$data, parameters = input$parameters, 
+                      map = input$map,   
+                      n.newton = 3,
+                      silent = TRUE, getsdrep = TRUE), error = function(e){e}) 
       
       # Check model convergence
-      convergence_status <- check_model_convergence(mle_optim = model$mle_optim,
+      tryCatch(expr = convergence_status <- check_model_convergence(mle_optim = model$mle_optim,
                                                     mod_rep = model$model_fxn,
                                                     sd_rep = model$sd_rep,
-                                                    min_grad = 0.001)
+                                                    min_grad = 0.001), error = function(e){e}) 
       
       # Get quantities
-      quants_df <- get_quants(sd_rep = model$sd_rep,
+      tryCatch(expr = quants_df <- get_quants(sd_rep = model$sd_rep,
                               model_fxn = model$model_fxn, 
                               sim = sim,  
                               n_sex = n_sex, 
@@ -126,11 +127,10 @@ for(n_om in 1:n_OM_scen) {
                               ntrue_fish_fleets = dim(Fish_Age_Comps)[3], 
                               nmod_fish_fleets = input$data$n_fleets,
                               ages = ages, 
-                              F_x = 0.4)
+                              F_x = 0.4), error = function(e){e}) 
       
       # Combine objects to save
-      all_obj_list <- list(model, quants_df$Par_df, quants_df$TS_df)
-      all_obj_list
+      tryCatch(expr = all_obj_list <- list(model, quants_df$Par_df,  quants_df$TS_df), error = function(e){e}) 
     } # end foreach loop
     
     stopCluster(cl) # stop cluster
