@@ -59,7 +59,7 @@ add_newton <- function(n.newton, ad_model, mle_optim) {
 #' @examples
 
 run_EM <- function(data, parameters, map, n.newton = 0, random = NULL,
-                   iter.max = 1e6, eval.max = 1e6, 
+                   iter.max = 3e5, eval.max = 3e5, 
                    silent = TRUE, getsdrep = TRUE) {
   
   # Make AD Function here
@@ -108,29 +108,29 @@ check_model_convergence <- function(mle_optim, sd_rep, mod_rep, min_grad = 0.000
   # Parameter with maximum gradient
   max_grad_par <- names(sd_rep$par.fixed)[which.max(abs(sd_rep$gradient.fixed))]
   
-  # Calculate Hessian, and check eigen values + invertibility
-  calculate_hessian = tryCatch(expr = optimHess(mod_rep$par,
-                                                fn = mod_rep$fn, 
-                                                gr = mod_rep$gr)
-                               , error = function(e){e})
-  
-  calc_Hessian = T # Assuming True Hessian. Turns to false if any of the
-  # checks below fail.
-  if(inherits(calculate_hessian,"error")) {
-    cat("Hessian calculation: ", calculate_hessian$message,"\n")
-    calc_Hessian = F
-  } else {
-    ## invert hessian
-    if(any("matrix" %in% class(try(solve(calculate_hessian),silent=TRUE))) == FALSE) {
-      cat("Hessian matrix not invertible (not positive definite): 
-          probably due to singularity. Check the eigen values to find 
-          possible problematic parameters\n")
-      calc_Hessian = F
-    } # invert hessian
-  } # else
+  # # Calculate Hessian, and check eigen values + invertibility
+  # calculate_hessian = tryCatch(expr = optimHess(mod_rep$par,
+  #                                               fn = mod_rep$fn, 
+  #                                               gr = mod_rep$gr)
+  #                              , error = function(e){e})
+  # 
+  # calc_Hessian = T # Assuming True Hessian. Turns to false if any of the
+  # # checks below fail.
+  # if(inherits(calculate_hessian,"error")) {
+  #   cat("Hessian calculation: ", calculate_hessian$message,"\n")
+  #   calc_Hessian = F
+  # } else {
+  #   ## invert hessian
+  #   if(any("matrix" %in% class(try(solve(calculate_hessian),silent=TRUE))) == FALSE) {
+  #     cat("Hessian matrix not invertible (not positive definite): 
+  #         probably due to singularity. Check the eigen values to find 
+  #         possible problematic parameters\n")
+  #     calc_Hessian = F
+  #   } # invert hessian
+  # } # else
 
   if(sd_rep$pdHess == TRUE & 
-     calc_Hessian == T & 
+     # calc_Hessian == T & 
      mle_optim$convergence == 0 &
      max_grad_val < min_grad &
      is.finite(sum(sd_rep$sd )) &
@@ -456,7 +456,7 @@ get_ARE_precentiles <- function(df, est_val_col = 1, true_val_col = 5, par_name 
                                group_vars) {
   
   # Get relative error based on indexed columns
-  ARE <- abs(df[,est_val_col] - df[,true_val_col]) 
+  ARE <- abs(df[,est_val_col] - df[,true_val_col]) / df[,true_val_col]
   df <- cbind(df, ARE) # Cbind TE
   names(df)[ncol(df)] <- "ARE" # Rename variable
   
@@ -526,7 +526,7 @@ get_quants <- function(
                 "ln_RecPars", 
                 # "ln_srv_selpars", 
                 # "ln_fish_selpars",
-                "fixed_sel_re_fish")
+                "ln_fixed_sel_re_fish")
   
   # True quantities
   t <- c(mean(q_Surv), # Catchability

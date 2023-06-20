@@ -131,13 +131,12 @@ simulate_data <- function(fxn_path,
   # Specify sex ratios
   specify_sex(f_ratio = f_ratio, m_ratio = m_ratio) 
   
-  
   # Simulation Loop ---------------------------------------------------------
   
   for(sim in 1:n_sims) {
     
     # Create deviations for initial age-structure
-    init_age_devs[,sim] <- exp(rnorm(length(ages),- (sigma_rec^2/2),sigma_rec)) 
+    init_age_devs[,sim] <- exp(rnorm((length(ages)-1),- (sigma_rec^2/2),sigma_rec)) 
     
     # Check equilibrium -------------------------------------------------------
     if(check_equil == TRUE) {
@@ -159,9 +158,11 @@ simulate_data <- function(fxn_path,
         
         for(s in 1:n_sex) { # Loop through to propagate according to sex ratio
           # Not plus group
-          N_at_age[y,,s,sim] <- r0 * exp(-Mort_at_age[y,,sim] * (ages-1)) * 
-                                          init_age_devs[,sim] * sex_ratio[y, s]
-
+          N_at_age[y,-max(ages),s,sim] <- r0 * exp(-Mort_at_age[y,-max(ages),sim] * (ages[-max(ages)]-1)) * 
+            init_age_devs[-max(ages),sim] * sex_ratio[y, s]
+          # # Plus group
+          N_at_age[y,max(ages),s,sim] <- (r0 * (exp(-Mort_at_age[y,max(ages),sim] * (ages[max(ages)]-1)) /
+                                                  (1 - exp(-Mort_at_age[y,max(ages),sim])))) * sex_ratio[y, s]
         } # end s loop
       } # end if statement for start year of the fishery
       
@@ -170,7 +171,7 @@ simulate_data <- function(fxn_path,
         if(rec_type == "BH") { # do beverton holt recruitment
           # Now generate new recruits with the updated SSB
           rec_total[y,sim] <- beverton_holt_recruit(ssb = SSB[y - 1,sim], h = h, r0 = r0) * 
-                              exp(rec_devs[y,sim])
+            exp(rec_devs[y,sim])
         } # if statement for BH
         
         if(rec_type == "mean_rec") {

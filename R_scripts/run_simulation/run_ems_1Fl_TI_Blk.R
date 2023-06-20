@@ -13,6 +13,9 @@ library(doSNOW)
 library(parallel)
 
 ncores <- detectCores() 
+# Register cluster here
+cl <- makeCluster(ncores - 2)
+registerDoSNOW(cl)
 
 # Load in all functions into the environment
 fxn_path <- here("R_scripts", "functions")
@@ -81,14 +84,10 @@ for(n_om in 1:n_OM_scen) {
                                  nrow = length(years), ncol = n_fleets)
     } # end if Time-block true
     
-    # Register cluster here
-    cl <- makeCluster(ncores - 2)
-    registerDoSNOW(cl)
-    
     # Run Simulation ----------------------------------------------------------
     
-    sim_models <- foreach(sim = 1:n_sims, 
-    .packages = c("TMB", "here", "tidyverse")) %dopar% {
+    sim_models <- foreach(sim = 1:n_sims,
+                          .packages = c("TMB", "here", "tidyverse")) %dopar% {
       
       compile_tmb(wd = here("src"), cpp = "EM.cpp")
       
@@ -120,7 +119,6 @@ for(n_om in 1:n_OM_scen) {
       # Run EM model here and get sdrep
       tryCatch(expr = model <- run_EM(data = input$data, parameters = input$parameters, 
                       map = input$map,  
-                      n.newton = 3,
                       silent = TRUE, getsdrep = TRUE), error = function(e){e}) 
       
       # Check model convergence
@@ -150,8 +148,6 @@ for(n_om in 1:n_OM_scen) {
 
     }# end foreach loop
 
-    stopCluster(cl) # stop cluster
-    
     # After we're done running EMs, output objects to save in folder
     
     # Pre-processing here
@@ -203,4 +199,7 @@ for(n_om in 1:n_OM_scen) {
     
   } # end n_em loop
 } # end n_om loop
+
+stopCluster(cl) # stop cluster
+
 

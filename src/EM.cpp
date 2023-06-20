@@ -88,7 +88,7 @@ Type objective_function<Type>::operator() ()
   
   // Random effects for fishery selectivity
   PARAMETER_ARRAY(ln_fish_selpars_re); // Fishery Selectivity Parameters, n_years * n_ages * n_fish_comps * n_sexes
-  PARAMETER_ARRAY(fixed_sel_re_fish); // Correlations and sigma random effects
+  PARAMETER_ARRAY(ln_fixed_sel_re_fish); // Correlations and sigma random effects
   // n_fixed_re_pars * n_fish_comps * n_sexes
   
   // Fishery Selectivity Random Effects Array Dimensions
@@ -166,7 +166,7 @@ Type objective_function<Type>::operator() ()
           for(int y = 0; y < n_re_years; y++) {
             // penalize deviations
             fish_sel_re_nLL -= dnorm(ln_fish_selpars_re(y, p, f, s), 
-                                     Type(0.0), fixed_sel_re_fish(p, f, s), true);
+                                     Type(0.0), exp(ln_fixed_sel_re_fish(p, f, s)), true);
           } // y loop
         } // p loop
       } // end random walk if statement
@@ -289,8 +289,13 @@ Type objective_function<Type>::operator() ()
     for(int s = 0; s < n_sexes; s++){
       // TESTING
       // NAA(0, a, s) = exp(ln_N1Devs(a)) * Sex_Ratio(s);
-        NAA(0, a, s) = exp(ln_N1Devs(a)) * exp(ln_RecPars(0)) *
-                       exp(-M * Type(a)) * Sex_Ratio(s);
+      if(a < n_ages - 1) { // not plus group
+        NAA(0, a, s) = exp(ln_N1Devs(a)) * exp(ln_RecPars(0) -(SigmaRec2/Type(2))) *
+          exp(-M * Type(a)) * Sex_Ratio(s);
+      } else{
+        NAA(0, a, s) = exp(ln_RecPars(0)) * exp(-M * Type(a)) /
+          (1 - exp(-M)) * Sex_Ratio(s);
+      } // plus group
     } // end s loop 
   } // end a loop
    
@@ -469,12 +474,10 @@ Type objective_function<Type>::operator() ()
       
       // Get likelihood here
       catch_nLL(y, f) -= use_catch(y, f) * dnorm(log(obs_catches(y, f)),
-                         log(pred_catches(y, f)) - pow(catch_sd(f),2)/2, 
-                         catch_sd(f), true);
+                         log(pred_catches(y, f)), catch_sd(f), true);
       
       SIMULATE{ // Simulate catch
-        obs_catches(y, f) = exp(rnorm(log(pred_catches(y, f)) 
-                              - pow(catch_sd(f),2)/2, catch_sd(f) ));
+        obs_catches(y, f) = exp(rnorm(log(pred_catches(y, f)), catch_sd(f) ));
       } // Simulation statement
       
     } // f loop
@@ -533,8 +536,8 @@ Type objective_function<Type>::operator() ()
       for(int s = 0; s < n_sexes; s++) {
         
         // Pre-processing - extract out quantities
-        vector<Type> obs_fish_age = obs_fish_age_comps.col(s).col(fc).transpose().col(y) + 1e-03; // Pull out observed vector
-        vector<Type> pred_fish_age = pred_fish_age_comps.col(s).col(fc).transpose().col(y) + 1e-03; // Pull out predicted vector 
+        vector<Type> obs_fish_age = obs_fish_age_comps.col(s).col(fc).transpose().col(y); // Pull out observed vector
+        vector<Type> pred_fish_age = pred_fish_age_comps.col(s).col(fc).transpose().col(y); // Pull out predicted vector 
         Type Fish_Input_N = obs_fish_age_Input_N(y, fc, s); // Input Sample Size
         Type ln_fish_theta = ln_DM_Fish_Param(fc, s); // Dispersion parameter if needed
         

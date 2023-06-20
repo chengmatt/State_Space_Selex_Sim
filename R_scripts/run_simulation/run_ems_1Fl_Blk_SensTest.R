@@ -24,7 +24,8 @@ for(i in 1:length(files)) source(here(fxn_path, files[i]))
 compile_tmb(wd = here("src"), cpp = "EM.cpp")
 
 # Read in OM and EM Scenarios
-om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v2.xlsx"), sheet = "OM")
+om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v2.xlsx"), sheet = "OM") %>% 
+  filter(str_detect(OM_Scenarios, "Fast_"))
 em_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v2.xlsx"), sheet = "EM_Fast_Blk_SensTest")
 
 # Read in spreadsheet for life history parameters
@@ -55,7 +56,6 @@ for(n_om in 1:n_OM_scen) {
     time_selex <- em_scenarios$Time_Selex[n_em] # Get time-varying selectivity options
     time_selex_npars <- em_scenarios$Time_Selex_Npars[n_em] # Number of time-varying selectivity parameters 
     if(time_selex_npars == "NA") time_selex_npars <- NULL # replace with NULL
-    time_block_boolean <- em_scenarios$Time_Block[n_em] # whether or not time-blocking is present
     fish_selex_opt <- unlist(strsplit(em_scenarios$Selex[n_em], ",")) # get fishery selectivity options
     
     # set up time period increments we want to block through
@@ -109,7 +109,6 @@ for(n_om in 1:n_OM_scen) {
         # Run EM model here and get sdrep
         tryCatch(expr = model <- run_EM(data = input$data, parameters = input$parameters, 
                         map = input$map,  
-                        n.newton = 5,
                         silent = TRUE, getsdrep = TRUE), error = function(e){e}) 
         
         # Check model convergence

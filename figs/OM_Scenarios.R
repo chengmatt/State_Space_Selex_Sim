@@ -109,13 +109,13 @@ png(here("figs", "Hypothetical_OM", "Fleet_Str_Change.png"), width = 650, height
 (fleet_plot <- ggplot() +
   geom_line(fleet_change_all, mapping = aes(x = Year, y = Fs, 
                                             color = Fleet, lty = Fleet),  size = 1.3) +
-  scale_color_manual(values = c("black", "#009B77", "#335C58")) +
-  scale_linetype_manual(values = c(1, 2, 2)) +
+  scale_color_manual(values = c("black", "red", "blue")) +
+  scale_linetype_manual(values = c(1, 2, 1)) +
   facet_wrap(~Type, ncol = 1) +
   theme_bw() +
   labs(x = "Year", y = "Fishing Mortality Rate") +
   ylim(0, 0.15) +
-  theme(legend.position = "top",
+  theme(legend.position = "top", 
         axis.title = element_text(size = 17),
         axis.text = element_text(size = 15, color = "black"),
         legend.title = element_text(size = 17),
@@ -131,16 +131,16 @@ bins <- 1:30
 ### Logistic-Logistic ----------------------------------------------------------------
 
 # Get a50 value males
-a50m1 <- 6
-a50m2 <- 10
-deltam1 <- 1
-deltam2 <- 1.5
+a50m1 <- 8.5
+a50m2 <- 12.5
+deltam1 <- 2.25
+deltam2 <- 1.25
 
 # Get a50 value females
-a50f1 <- 3
-a50f2 <- 7
-deltaf1 <- 0.5
-deltaf2 <- 1
+a50f1 <- 5.5
+a50f2 <- 9.5
+deltaf1 <- 1.75
+deltaf2 <- 1.15
 
 # Compute selex 
 selexm1 <- cbind(1 / (1 + exp(-1 * ((bins - a50m1)/deltam1) )), "Males", "Fleet 2", age = bins)
@@ -156,10 +156,10 @@ colnames(selex_logist) <- c("Selex", "Sex", "Fleet", "Age", "Type")
 ### Logistic-Gamma ----------------------------------------------------------
 
 # Gamma parameters
-amaxm2 <- 18
-deltam2 <- 8.5
-amaxf2 <- 14
-deltaf2 <- 10
+amaxm2 <- 20
+deltam2 <- 7
+amaxf2 <- 17
+deltaf2 <- 8
 
 # Get Selex here
 pm2 <- (0.5 * (sqrt(amaxm2^2 + 4*deltam2^2) - amaxm2))
@@ -167,38 +167,6 @@ selex_m2 <- cbind((bins/amaxm2) ^ (amaxm2/pm2) * exp((amaxm2 - bins) / pm2), "Ma
 pf2 <- (0.5 * (sqrt(amaxf2^2 + 4*deltaf2^2) - amaxf2))
 selex_f2 <- cbind((bins/amaxf2) ^ (amaxf2/pf2) * exp((amaxf2 - bins) / pf2), "Females", "Fleet 1", age = bins)
 
-# Exponential Logistic parameters
-# Get alpha_f2 value
-# alpha_f2 <- 0.6  # Degree of doming
-# # Get beta_f2 value
-# beta_f2 <- 8
-# # Get gamma_f2 value
-# gamma_f2 <- 0.05
-# 
-# # Define parts of the equation
-# first_f2 = (1 / (1 - gamma_f2)) 
-# second_f2 = ((1 - gamma_f2) / gamma_f2)^gamma_f2
-# third_f2 = exp( alpha_f2 * gamma_f2 * (beta_f2 - bins ) )
-# fourth_f2 = 1 + exp(alpha_f2 * (beta_f2 - bins))
-# 
-# # Calculate selectivity here
-# selex_f2 = cbind(first_f2 * second_f2 * (third_f2/fourth_f2), "Females", "Fleet 1", age = bins)
-# 
-# # Get alpha_m2 value
-# alpha_m2 <- 0.5  # Degree of doming
-# # Get beta_m2 value
-# beta_m2 <- 12
-# # Get gamma_m2 value
-# gamma_m2 <- 0.1
-# 
-# # Define parts of the equation
-# first_m2 = (1 / (1 - gamma_m2)) 
-# second_m2 = ((1 - gamma_m2) / gamma_m2)^gamma_m2
-# third_m2 = exp( alpha_m2 * gamma_m2 * (beta_m2 - bins ) )
-# fourth_m2 = 1 + exp(alpha_m2 * (beta_m2 - bins))
-# 
-# # Calculate selectivity here
-# selex_m2 = cbind(first_m2 * second_m2 * (third_m2/fourth_m2), "Males", "Fleet 1", age = bins)
 
 # Bind these together
 selex_gamma <- data.frame(rbind(selexm1, selex_m2, selexf1, selex_f2), Type = "Logistic-Gamma")
@@ -212,7 +180,8 @@ selex_all <- rbind(selex_logist, selex_gamma)
 png(here("figs", "Hypothetical_OM", "Selex_Scenario.png"), width = 650, height = 500)
 (selex_plot <- ggplot(selex_all, aes(x = as.numeric(Age), y = as.numeric(paste(Selex)), color = Fleet, lty = Fleet)) +
   geom_line(size = 1.3) + 
-  scale_color_manual(values = c("#009B77", "#335C58")) +
+  scale_color_manual(values = c("blue", "red")) +
+  scale_linetype_manual(values = c(2,1)) +
   facet_grid(Sex~Type) +
   theme_bw() +
   labs(x = "Ages", y = "Selectivity") +

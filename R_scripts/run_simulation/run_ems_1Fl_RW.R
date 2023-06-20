@@ -2,7 +2,6 @@
 # Creator: Matthew LH. Cheng
 # Date 6/12/23
 
-
 # Set up ------------------------------------------------------------------
 rm(list=ls()) # remove objects prior to running
 
@@ -26,7 +25,8 @@ compile_tmb(wd = here("src"), cpp = "EM.cpp")
 
 # Read in OM and EM Scenarios
 om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v2.xlsx"), sheet = "OM")
-em_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v2.xlsx"), sheet = "EM_1Fl_RW")
+em_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v2.xlsx"), sheet = "EM_1Fl_RW") %>% 
+  filter(str_detect(EM_Scenario, "Est"))
 
 # Read in spreadsheet for life history parameters
 lh_path <- here("input", "Sablefish_Inputs.xlsx")
@@ -44,7 +44,7 @@ for(n_om in 1:n_OM_scen) {
   load(here(om_path, paste(om_scenarios$OM_Scenarios[n_om],".RData",sep = "")))
   list2env(oms,globalenv()) # output into global environment
   
-  for(n_em in 22:n_EM_scen) {
+  for(n_em in 1:n_EM_scen) {
 
 # Pre-process EM ----------------------------------------------------------
 
@@ -69,10 +69,19 @@ for(n_om in 1:n_OM_scen) {
     
     # Run Simulations ---------------------------------------------------------
     
-    sim_models <- foreach(sim = 1:n_sims, 
-                 .packages = c("TMB", "here", "tidyverse")) %dopar% {
+    sim_models <- foreach(sim = 1:n_sims,
+                          .packages = c("TMB", "here", "tidyverse")) %dopar% {
                    
     compile_tmb(wd = here("src"), cpp = "EM.cpp")
+                            
+    # Choose which parameters to fix
+    if(fixed_sigma_re_fish == "NA") fix_pars = c( "ln_SigmaRec", "ln_q_fish", "ln_h", "ln_M")
+    
+    # If we want to estimate as penalized likelihood
+    if(fixed_sigma_re_fish != "NA") {
+      fix_pars = c( "ln_SigmaRec", "ln_q_fish", "ln_h", "ln_M", "ln_fixed_sel_re_fish")
+      random_fish_sel = NULL # also change RE to null - estimating this as fixed effects
+    }
     
     # Prepare inputs for EM
     input <- prepare_EM_input(years = years,
@@ -96,18 +105,17 @@ for(n_om in 1:n_OM_scen) {
                               S_Slx_Model_Input = c("logistic"), # logistic
                               time_selex = time_selex, 
                               n_time_selex_pars = as.numeric(time_selex_npars),
-                              fix_pars = c( "ln_SigmaRec", "ln_q_fish", "ln_h", "ln_M",
-                                            "fixed_sel_re_fish"),
+                              fix_pars = fix_pars,
                               sim = sim)
-    # Fix sigma
-    input$parameters$fixed_sel_re_fish[] <- fixed_sigma_re_fish
+    
+    # Fix sigma if sigma_fixed is not NA
+    if(fixed_sigma_re_fish != "NA") input$parameters$ln_fixed_sel_re_fish[] <- log(fixed_sigma_re_fish)
     
     # Run EM model here and get sdrep
     tryCatch(expr = model <- run_EM(data = input$data, parameters = input$parameters, 
                                     map = input$map, 
-                                    n.newton = 3,
-                                    # random = random_fish_sel, # run this as fixed effects
-                                    silent = TRUE, getsdrep = TRUE), error = function(e){e}) 
+                                    random = random_fish_sel, 
+                                    silent = FALSE, getsdrep = TRUE), error = function(e){e}) 
 
     # Check model convergence
     tryCatch(expr = convergence_status <- check_model_convergence(mle_optim = model$mle_optim,
@@ -187,3 +195,4 @@ for(n_om in 1:n_OM_scen) {
   } # end n_em loop
 } # end n_om loop
 stopCluster(cl)
+

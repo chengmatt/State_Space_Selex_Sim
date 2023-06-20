@@ -12,6 +12,9 @@ library(parallel)
 
 rm(list=ls()) # remove objects prior to running
 ncores <- detectCores() 
+# Register cluster here
+cl <- makeCluster(ncores - 2)
+registerDoSNOW(cl)
 
 # Load in all functions into the environment
 fxn_path <- here("R_scripts", "functions")
@@ -64,15 +67,11 @@ for(n_om in 1:n_OM_scen) {
                                rep(fish_selex_opt[2], length(years))),
                                 nrow = length(years), ncol = n_fleets)
     
-    # Register cluster here
-    cl <- makeCluster(ncores - 2)
-    registerDoSNOW(cl)
-    
 # Run Simulation ----------------------------------------------------------
 
     sim_models <- foreach(sim = 1:n_sims,
                           .packages = c("TMB", "here", "tidyverse")) %dopar% {
-                            
+      
       compile_tmb(wd = here("src"), cpp = "EM.cpp")
 
       # Prepare inputs for EM
@@ -106,7 +105,6 @@ for(n_om in 1:n_OM_scen) {
       # Run EM model here and get sdrep
       tryCatch(expr = model <- run_EM(data = input$data, parameters = input$parameters, 
                       map = input$map,   
-                      n.newton = 3,
                       silent = TRUE, getsdrep = TRUE), error = function(e){e}) 
       
       # Check model convergence
@@ -130,10 +128,10 @@ for(n_om in 1:n_OM_scen) {
                               F_x = 0.4), error = function(e){e}) 
       
       # Combine objects to save
-      tryCatch(expr = all_obj_list <- list(model, quants_df$Par_df,  quants_df$TS_df), error = function(e){e}) 
+      tryCatch(expr = all_obj_list <- list(model, 
+                                           quants_df$Par_df,  
+                                           quants_df$TS_df), error = function(e){e}) 
     } # end foreach loop
-    
-    stopCluster(cl) # stop cluster
     
     # After we're done running EMs, output objects to save in folder
     
@@ -186,4 +184,6 @@ for(n_om in 1:n_OM_scen) {
     
   } # end n_em loop
 } # end n_om loop
+
+stopCluster(cl) # stop cluster
 

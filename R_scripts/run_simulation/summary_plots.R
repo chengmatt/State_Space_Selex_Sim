@@ -1,5 +1,4 @@
 # Purpose: To make summary plots of simulation runs
-# Notes: For TVCont - picking sd of 1.5 for all runs since it seemed to work well
 # Creator: Matthew LH. Cheng
 # Date 3/26/23
 
@@ -42,7 +41,8 @@ unique_oms <- unique(param_df$OM_Scenario) # unique oms
 ts_pars <- unique(ts_re_df$par_name) # unique parameter names
  
 # Get plot order for EM models
-plot_order <- c("2Fl_LL", "2Fl_LGam", "2Fl_LExpL", "1Fl_L_TI", "1Fl_Gam_TI", "1Fl_ExpL_TI",
+plot_order <- c("2Fl_LL", "2Fl_LGam", "2Fl_LExpL", 
+                "1Fl_L_TI", "1Fl_Gam_TI", "1Fl_ExpL_TI",
                 "1Fl_LL_Blk", "1Fl_LGam_Blk", "1Fl_LExpL_Blk",
                 "1Fl_L_RW", "1Fl_Gam_RW", "1Fl_ExpL_RW")
 
@@ -52,7 +52,7 @@ param_df <-  param_df %>%
   EM_Scenario = str_remove(EM_Scenario, 'Term_|TrxE_|Int_'),
   time_comp = factor(time_comp, levels = c("Fleet Intersect", "Fleet Trans End",
                                            "Terminal"))) %>% 
-  filter(conv == "Converged") # only converged runs
+  filter(conv == "Converged")
 
 pdf(here(dir_out, "Param_Sum.pdf"), width = 25, height = 10)
 
@@ -60,17 +60,16 @@ for(i in 1:length(unique_oms)) {
   
   # Filter to relevant components for parameters
   om_scenario_params <- param_df %>% filter(OM_Scenario == unique_oms[i],
-                                            !str_detect(EM_Scenario, "0.5|1.0|2.0"), 
-                                            type %in% c("F_0.4", "ABC"))
+                                            !str_detect(EM_Scenario, "1.0|2.0|1.75|1.25"), 
+                                            !str_detect(EM_Scenario, "Blk_1|Blk_2|Blk_3|Blk_4|Blk_5"), 
+                                            type %in% c("F_0.4_Last5", "ABC_Last5"))
   
   # Set order for plot
-  if(length(plot_order) == length(unique(om_scenario_params$EM_Scenario))) {
     order <- vector()
     for(o in 1:length(plot_order)) {
       order[o] <- which(grepl(plot_order[o], x = unique(om_scenario_params$EM_Scenario)))
     } # end o loop
-  } # end if
-  
+
   # Now relevel factor for organizing plot
   om_scenario_params$EM_Scenario <- with(om_scenario_params,
                                          factor(EM_Scenario, 
@@ -90,7 +89,7 @@ for(i in 1:length(unique_oms)) {
       geom_pointrange(position = position_dodge2(width = 1), size = 1.5, linewidth = 1) +
       geom_hline(aes(yintercept = 0), col = "black", lty = 2, size = 0.5, alpha = 1) +
       facet_grid(type~EM_Scenario, scales = "free_x") +
-      coord_cartesian(ylim = c(-0.4,0.4)) +
+      coord_cartesian(ylim = c(-0.5,0.5)) +
       scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
       scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
       labs(x = "EM Scenarios", y = "Relative Error", fill = "Time Component",
@@ -107,6 +106,49 @@ for(i in 1:length(unique_oms)) {
 dev.off()
 
 
+# Parameter Summary (Time-block models) ------------------------------
+
+pdf(here(dir_out, "Param_Sum_BlkModels.pdf"), width = 25, height = 10)
+
+# Subset to fast OMs only
+fast_oms <- unique_oms[str_detect(unique_oms, "Fast")]
+
+for(i in 1:length(fast_oms)) {
+  
+  # Filter to relevant components for parameters
+  om_scenario_params <- param_df %>% filter(OM_Scenario == fast_oms[i],
+                                            time_comp == "Terminal",
+                                            str_detect(EM_Scenario, "Blk"), 
+                                            type %in% c("F_0.4_Last5", "ABC_Last5"))
+
+  # Point ranges for relative error and total error
+  pt_rg_re <- om_scenario_params %>% 
+    group_by(EM_Scenario, time_comp, type) %>% 
+    summarize(median = median(RE), 
+              lwr_95 = quantile(RE, 0.025),
+              upr_95 =  quantile(RE, 0.975))
+  
+  # plot now!
+  print(
+    ggplot(pt_rg_re, aes(x = factor(EM_Scenario), y = median, ymin = lwr_95, ymax = upr_95)) +
+      geom_pointrange(position = position_dodge2(width = 1), size = 1.5, linewidth = 1) +
+      geom_hline(aes(yintercept = 0), col = "black", lty = 2, size = 0.5, alpha = 1) +
+      facet_grid(~type, scales = "free_x") +
+      coord_cartesian(ylim = c(-0.5,0.5)) +
+      scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
+      scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
+      labs(x = "EM Scenarios", y = "Relative Error", fill = "Time Component",
+           color = "Time Component", title = unique_oms[i]) +
+      theme_matt() +
+      theme(legend.position = "top", title = element_text(size = 20),
+            axis.title.x = element_blank(),
+            axis.text.x = element_text(angle = 90),
+            axis.ticks.x = element_blank()) 
+  )
+  
+} #end i
+
+dev.off()
 
 # Time Series plot -----------------------------------------------------
 
@@ -141,10 +183,12 @@ for(i in 1:length(unique_oms)) {
   
     # Relative error of time series
     ts_re_om <- ts_re_df %>% filter(OM_Scenario == unique_oms[i],
-                                    !str_detect(EM_Scenario, "0.5|1.0|2.0"),
+                                    !str_detect(EM_Scenario, "0.5|1.0|2.0|1.25|1.75"),
+                                    !str_detect(EM_Scenario, "Blk_1|Blk_2|Blk_3|Blk_4|Blk_5"), 
                                     par_name %in% c("Spawning Stock Biomass",
                                                     "Total Biomass",
-                                                    "Total Recruitment"))
+                                                    "Total Recruitment",
+                                                    "Total Fishing Mortality"))
     
     # Set order for plot
       order <- vector()
@@ -166,7 +210,7 @@ for(i in 1:length(unique_oms)) {
         geom_line(linewidth = 2, alpha = 1, aes(color = time_comp)) +
         geom_hline(aes(yintercept = 0), col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
         facet_grid(par_name~EM_Scenario) +
-        coord_cartesian(ylim = c(-0.4,0.4)) +
+        coord_cartesian(ylim = c(-0.5,0.5)) +
         scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
         scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
         labs(x = "Year", y = paste("RE"), fill = "Time", color = "Time",
@@ -177,6 +221,138 @@ for(i in 1:length(unique_oms)) {
               axis.text = element_text(size = 13), strip.text = element_text(size = 13)) 
     )
 
+} # end i
+
+dev.off()
+
+
+# Time Series (Time Block Models) -----------------------------------------
+
+pdf(here(dir_out, "TS_SumBlkModels.pdf"), width = 30, height = 10)
+
+for(i in 1:length(fast_oms)) {
+  
+  # Relative error of time series
+  ts_re_om <- ts_re_df %>% filter(OM_Scenario == unique_oms[i],
+                                  time_comp == "Terminal", 
+                                  str_detect(EM_Scenario, "Blk"), 
+                                  par_name %in% c("Spawning Stock Biomass",
+                                                  "Total Biomass",
+                                                  "Total Recruitment",
+                                                  "Total Fishing Mortality"))
+  
+  # Now loop through each time series component and print the plot out
+  print(
+    ggplot(ts_re_om, aes(x = year, y = median))  +
+      geom_ribbon(aes(ymin = lwr_95, ymax = upr_95), alpha = 0.3) +
+      geom_line(linewidth = 2, alpha = 1) +
+      geom_hline(aes(yintercept = 0), col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
+      facet_grid(par_name~EM_Scenario) +
+      coord_cartesian(ylim = c(-0.5,0.5)) +
+      scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
+      scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
+      labs(x = "Year", y = paste("RE"), fill = "Time", color = "Time",
+           title = unique(ts_re_om$OM_Scenario)) +
+      theme_matt() +
+      # theme(aspect.ratio=1)
+      theme(legend.position = "top", title = element_text(size = 20),
+            axis.text = element_text(size = 13), strip.text = element_text(size = 13)) 
+  )
+  
+} # end i
+
+dev.off()
+
+# Terminal SSB and Total Biomass Plots ------------------------------------
+
+# Filter to terminal yeaer ssb and total biomass
+term_biom_ssb <- ts_re_df %>% 
+  filter(
+      (year == c(50) & str_detect(OM_Scenario, "Fast_") ) & str_detect(time_comp, "Terminal") |
+      (year == c(70) & str_detect(OM_Scenario, "Slow_") ) & str_detect(time_comp, "Terminal") |
+      (year == c(30) & str_detect(OM_Scenario, "Fast_") ) & str_detect(time_comp, "Fleet Trans End") |
+      (year == c(50) & str_detect(OM_Scenario, "Slow_") ) & str_detect(time_comp, "Fleet Trans End") |
+      (year == c(28) & str_detect(OM_Scenario, "Fast_") ) & str_detect(time_comp, "Fleet Intersect") |
+      (year == c(39) & str_detect(OM_Scenario, "Slow_") ) & str_detect(time_comp, "Fleet Intersect"),
+    par_name %in% c("Spawning Stock Biomass",
+                    "Total Biomass"),
+    !str_detect(EM_Scenario, "0.5|1.0|2.0|1.25|1.75"))
+
+pdf(here(dir_out, "Term_SSB_Biom.pdf"), width = 25, height = 10)
+
+for(i in 1:length(unique_oms)) {
+  
+  # Filter to specific OM case
+  pt_rg_re <- term_biom_ssb %>% 
+    filter(OM_Scenario == unique_oms[i],
+           !str_detect(EM_Scenario, "Blk_1|Blk_2|Blk_3|Blk_4|Blk_5"))
+  
+  # Set order for plot
+  order <- vector()
+  for(o in 1:length(plot_order)) {
+    order[o] <- which(grepl(plot_order[o], x = unique(pt_rg_re$EM_Scenario)))
+  } # end o loop
+  
+  # Set plotting order for facets
+  pt_rg_re <- pt_rg_re %>% 
+    mutate(EM_Scenario = factor(EM_Scenario, levels = unique(EM_Scenario)[order]),
+           time_comp = factor(time_comp, levels = c("Fleet Intersect", "Fleet Trans End",
+                                                    "Terminal")))
+  
+  # plot now!
+  print(
+    ggplot(pt_rg_re, aes(x = factor(EM_Scenario), y = median, ymin = lwr_95, ymax = upr_95,
+                         color = time_comp, fill = time_comp)) +
+      geom_pointrange(position = position_dodge2(width = 1), size = 1.5, linewidth = 1) +
+      geom_hline(aes(yintercept = 0), col = "black", lty = 2, size = 0.5, alpha = 1) +
+      facet_grid(par_name~EM_Scenario, scales = "free_x") +
+      coord_cartesian(ylim = c(-0.5,0.5)) +
+      scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
+      scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
+      labs(x = "EM Scenarios", y = "Relative Error", fill = "Time Component",
+           color = "Time Component", title = unique_oms[i]) +
+      theme_matt() +
+      theme(legend.position = "top", title = element_text(size = 20),
+            axis.title.x = element_blank(),
+            axis.text.x = element_blank(),
+            axis.ticks.x = element_blank()) 
+  )
+  
+} # end i
+
+dev.off()
+
+
+# Terminal SSB and Biom Block Models --------------------------------------
+
+pdf(here(dir_out, "Term_SSB_BiomBlkModels.pdf"), width = 25, height = 10)
+
+for(i in 1:length(fast_oms)) {
+  
+  # Filter to specific OM case
+  pt_rg_re <- term_biom_ssb %>% 
+    filter(OM_Scenario == fast_oms[i],
+           time_comp == "Terminal",
+           str_detect(EM_Scenario, "Blk"))
+  
+  # plot now!
+  print(
+    ggplot(pt_rg_re, aes(x = factor(EM_Scenario), y = median, ymin = lwr_95, ymax = upr_95)) +
+      geom_pointrange(position = position_dodge2(width = 1), size = 1.5, linewidth = 1) +
+      geom_hline(aes(yintercept = 0), col = "black", lty = 2, size = 0.5, alpha = 1) +
+      facet_grid(~par_name, scales = "free_x") +
+      coord_cartesian(ylim = c(-0.5,0.5)) +
+      scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
+      scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
+      labs(x = "EM Scenarios", y = "Relative Error", fill = "Time Component",
+           color = "Time Component", title = unique_oms[i]) +
+      theme_matt() +
+      theme(legend.position = "top", title = element_text(size = 20),
+            axis.title.x = element_blank(),
+            axis.text.x = element_text(angle = 90),
+            axis.ticks.x = element_blank()) 
+  )
+  
 } # end i
 
 dev.off()
@@ -197,10 +373,26 @@ for(i in 1:length(unique_oms)) {
       EM_Scenario = str_remove(EM_Scenario, 'Term_|TrxE_|Int_'),
       time_comp = factor(time_comp, levels = c("Fleet Intersect", "Fleet Trans End",
                                                     "Terminal"))) %>% 
-    filter(!str_detect(EM_Scenario, "0.5|1.0|2.0"),
+    filter(!str_detect(EM_Scenario, "1.5|2.0|1.25|1.75"),
+           !str_detect(EM_Scenario, "Blk_1|Blk_2|Blk_3|Blk_4|Blk_5"), 
            OM_Scenario == unique_oms[i]) %>% 
     group_by(EM_Scenario, time_comp) %>% 
-    summarize(converged = sum(conv == "Converged")/200)
+    summarize(converged = sum(conv == "Converged")/300)
+  
+  # Random walk convergence statistics
+  RW_convergence <- AIC_df %>% 
+    mutate(time_comp = case_when(
+      str_detect(EM_Scenario, "Term_") ~ "Terminal", # Terminal Year
+      str_detect(EM_Scenario, "TrxE") ~ "Fleet Trans End", # Fleet Transition End
+      str_detect(EM_Scenario, "Int") ~ "Fleet Intersect" # Fleet Transition Intersects
+    ),
+    EM_Scenario = str_remove(EM_Scenario, 'Term_|TrxE_|Int_'),
+    time_comp = factor(time_comp, levels = c("Fleet Intersect", "Fleet Trans End",
+                                             "Terminal"))) %>% 
+    filter(str_detect(EM_Scenario, "RW_"),
+           OM_Scenario == unique_oms[i]) %>% 
+    group_by(EM_Scenario, time_comp) %>% 
+    summarize(converged = sum(conv == "Converged")/300)
 
   # Set order for plot
     order <- vector()
@@ -232,6 +424,27 @@ for(i in 1:length(unique_oms)) {
             axis.ticks.x = element_blank())  
   )
   
+  # Random walk convergence statistics
+  print(
+    ggplot(RW_convergence,
+           mapping = aes(x = EM_Scenario, y = converged * 100,
+                         group = time_comp, fill = time_comp))  +
+      geom_col(position = "dodge", alpha = 0.85) +
+      geom_hline(aes(yintercept = 50), col = "black", lty = 2, size = 0.5, alpha = 1) +
+      facet_wrap(~EM_Scenario, nrow = 1, scales = "free_x") +
+      scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
+      theme_matt() +
+      ylim(0, 100) +
+      labs(fill = "Time Component", y = "Convg Rate", 
+           title = unique_oms[i]) +
+      # theme(aspect.ratio=1) +
+      theme(legend.position = "top", title = element_text(size = 20),
+            strip.text = element_text(size = 15), 
+            axis.title.x = element_blank(),
+            axis.text.x = element_blank(),
+            axis.ticks.x = element_blank())  
+  )
+  
 }
 
 dev.off()
@@ -240,15 +453,18 @@ dev.off()
 # AIC Plot ----------------------------------------------------------------
 
 AIC_df <- AIC_df %>% 
+  filter(conv == "Converged") %>% 
   mutate(time_comp = case_when(
     str_detect(EM_Scenario, "Term_") ~ "Terminal", # Terminal Year
     str_detect(EM_Scenario, "TrxE") ~ "Fleet Trans End", # Fleet Transition End
     str_detect(EM_Scenario, "Int") ~ "Fleet Intersect" # Fleet Transition Intersects
   ),
   EM_Scenario = str_remove(EM_Scenario, 'Term_|TrxE_|Int_'),
-  time_comp = factor(time_comp, levels = c("Fleet Intersect", "Fleet Trans End",
+  time_comp = factor(time_comp, levels = c("Fleet Intersect", 
+                                           "Fleet Trans End",
                                            "Terminal")))
 
+# Subset dataframes
 # filter to 2 fleet models (different data)
 twofleet_aic <- AIC_df %>% 
   filter(str_detect(EM_Scenario, "2Fl_")) %>% 
@@ -256,18 +472,54 @@ twofleet_aic <- AIC_df %>%
   mutate(min = min(AIC),
          min_AIC = ifelse(AIC == min, 1, 0)) %>% 
   group_by(OM_Scenario, EM_Scenario, time_comp) %>% 
-  summarize(n_minAIC = sum(min_AIC) / 200) %>% 
+  summarize(n_minAIC = sum(min_AIC) / 300) %>% 
   mutate(fleet = "2 Fleet")
 
 # filter to 1 fleet models
 onefleet_aic <- AIC_df %>% 
   filter(str_detect(EM_Scenario, "1Fl_"),
-         !str_detect(EM_Scenario, "0.5|1.0|2.0")) %>% 
+         !str_detect(EM_Scenario, "Blk_1|Blk_2|Blk_3|Blk_4|Blk_5"), 
+         !str_detect(EM_Scenario, "0.5|1.0|2.0|1.25|1.75")) %>% 
   group_by(sim, OM_Scenario, time_comp) %>% 
   mutate(min = min(AIC),
          min_AIC = ifelse(AIC == min, 1, 0)) %>% 
   group_by(OM_Scenario, EM_Scenario, time_comp) %>% 
-  summarize(n_minAIC = sum(min_AIC) / 200) %>% 
+  summarize(n_minAIC = sum(min_AIC) / 300) %>% 
+  mutate(fleet = "1 Fleet")
+
+# filter to 1 fleet random walk models
+onefleet_rw_aic <- AIC_df %>% 
+  mutate(
+    selex_form = case_when(
+      str_detect(EM_Scenario, "ExpL") ~ "Exponential Logistic",
+      str_detect(EM_Scenario, "1Fl_L_RW") ~ "Logistic",
+      str_detect(EM_Scenario, "1Fl_Gam_") ~ "Gamma",
+    )) %>% 
+  filter(str_detect(EM_Scenario, "1Fl_"),
+         str_detect(EM_Scenario, "RW_")) %>% 
+  group_by(sim, OM_Scenario, time_comp, selex_form) %>% 
+  mutate(min = min(AIC),
+         min_AIC = ifelse(AIC == min, 1, 0)) %>% 
+  group_by(OM_Scenario, EM_Scenario, time_comp, selex_form) %>% 
+  summarize(n_minAIC = sum(min_AIC) / 300) %>% 
+  mutate(fleet = "1 Fleet")
+
+# Filter to 1 fleet time block models
+onefleet_blk_aic <- AIC_df %>% 
+  filter(str_detect(EM_Scenario, "Blk|Blk_1|Blk_2|Blk_3|Blk_4|Blk_5"),
+         time_comp == "Terminal",
+         str_detect(OM_Scenario, "Fast")) %>% 
+  mutate(
+    selex_form = case_when(
+      str_detect(EM_Scenario, "LExpL") ~ "Logistic-Exponential Logistic",
+      str_detect(EM_Scenario, "LGam") ~ "Logistic-Gamma",
+      str_detect(EM_Scenario, "LL") ~ "Logistic-Logistic",
+    )) %>% 
+  group_by(sim, OM_Scenario, time_comp, selex_form) %>% 
+  mutate(min = min(AIC),
+         min_AIC = ifelse(AIC == min, 1, 0)) %>% 
+  group_by(OM_Scenario, EM_Scenario, time_comp, selex_form) %>% 
+  summarize(n_minAIC = sum(min_AIC) / 300) %>% 
   mutate(fleet = "1 Fleet")
 
 # AIC plot
@@ -280,7 +532,10 @@ pdf(file = here(dir_out, "AIC_SummaryPlot.pdf"), width = 10, height = 7)
   geom_text(size = 5) +
   facet_grid(~time_comp, scales = "free") +
   scale_fill_viridis_c() +
+  labs(x = "OM Scenario", y = "EMs", fill = "Proportion of lowest AIC") +
+  theme_test() +
   theme(legend.position = "top")) 
+  
 
 # One fleet plot
 (onefleet_plot <- ggplot(onefleet_aic, 
@@ -291,33 +546,49 @@ pdf(file = here(dir_out, "AIC_SummaryPlot.pdf"), width = 10, height = 7)
   facet_grid(~time_comp, scales = "free") +
   scale_fill_viridis_c() +
   theme_test() +
+  labs(x = "OM Scenario", y = "EMs", fill = "Proportion of lowest AIC") +
   theme(legend.position = "top")) 
+
+# one fleet RW models
+(onefleet_rw_plot <- ggplot(onefleet_rw_aic, 
+                         aes(x = OM_Scenario, y = EM_Scenario, fill = n_minAIC,
+                             label = round(n_minAIC, 2))) +
+    geom_tile(alpha = 0.85) +
+    geom_text(size = 6) +
+    facet_grid(selex_form~time_comp, scales = "free") +
+    scale_fill_viridis_c() +
+    theme_test() +
+    labs(x = "OM Scenario", y = "EMs", fill = "Proportion of lowest AIC") +
+    theme(legend.position = "top")) 
   
+# One fleet time block models
+(onefleet_blk_plot <- ggplot(onefleet_blk_aic, 
+                            aes(x = OM_Scenario, y = EM_Scenario, fill = n_minAIC,
+                                label = round(n_minAIC, 2))) +
+    geom_tile(alpha = 0.85) +
+    geom_text(size = 6) +
+    facet_grid(selex_form~time_comp, scales = "free") +
+    scale_fill_viridis_c() +
+    theme_test() +
+    labs(x = "OM Scenario", y = "EMs", fill = "Proportion of lowest AIC") +
+    theme(legend.position = "top")) 
 dev.off()
 
 
 # Min Max Solution Plot ---------------------------------------------------
 
 minmax_df <- ts_are_df %>% 
-  filter(!str_detect(EM_Scenario, "0.5|1.0|2.0"),
-         # Get terminal year of peels/EMs
-           (year %in% c(50) & str_detect(OM_Scenario, "Fast_") ) & str_detect(EM_Scenario, "Term_") |
-           (year %in% c(70) & str_detect(OM_Scenario, "Slow_") ) & str_detect(EM_Scenario, "Term_") |
-           (year %in% c(30) & str_detect(OM_Scenario, "Fast_") ) & str_detect(EM_Scenario, "TrxE_") |
-           (year %in% c(50) & str_detect(OM_Scenario, "Slow_") ) & str_detect(EM_Scenario, "TrxE_") |
-           (year %in% c(28) & str_detect(OM_Scenario, "Fast_") ) & str_detect(EM_Scenario, "Int_") |
-           (year %in% c(39) & str_detect(OM_Scenario, "Slow_") ) & str_detect(EM_Scenario, "Int_"),
-         par_name %in% c("Total Recruitment",
-                         "Spawning Stock Biomass",
-                         "Total Biomass")) %>% 
-  mutate(time_comp = case_when(
-    str_detect(EM_Scenario, "Term_") ~ "Terminal", # Terminal Year
-    str_detect(EM_Scenario, "TrxE_") ~ "Fleet Trans End", # Fleet Transition End
-    str_detect(EM_Scenario, "Int_") ~ "Fleet Intersect" # Fleet Transition Intersects
-  ),
-  time_comp = factor(time_comp, levels = c("Fleet Intersect", "Fleet Trans End",
-                                           "Terminal")),
-  EM_Scenario = str_remove(EM_Scenario, 'Term_|TrxE_|Int_')) %>% 
+  # Selective filtering down here to terminal years
+  filter(!str_detect(EM_Scenario, "ExpL_RW_1.0|ExpL_RW_1.25|ExpL_RW_1.5|ExpL_RW_1.75|Gam_RW_1.0|Gam_RW_1.25|Gam_RW_1.5|Gam_RW_1.75|Fl_L_RW_1.0|Fl_L_RW_1.25|Fl_L_RW_1.75|Fl_L_RW_2.0|Blk_1|Blk_2|Blk_3|Blk_4|Blk_5"),
+           # Get terminal year of peels/EMs
+           (year == c(50) & str_detect(OM_Scenario, "Fast_") ) & str_detect(time_comp, "Terminal") |
+           (year == c(70) & str_detect(OM_Scenario, "Slow_") ) & str_detect(time_comp, "Terminal") |
+           (year == c(30) & str_detect(OM_Scenario, "Fast_") ) & str_detect(time_comp, "Fleet Trans End") |
+           (year == c(50) & str_detect(OM_Scenario, "Slow_") ) & str_detect(time_comp, "Fleet Trans End") |
+           (year == c(28) & str_detect(OM_Scenario, "Fast_") ) & str_detect(time_comp, "Fleet Intersect") |
+           (year == c(39) & str_detect(OM_Scenario, "Slow_") ) & str_detect(time_comp, "Fleet Intersect"),
+         
+         par_name %in% c("Spawning Stock Biomass")) %>% 
   data.frame() %>%
   group_by(EM_Scenario, time_comp, par_name) %>%
   mutate(max_median = max(median)) %>% # find the maximum median MARE
@@ -335,15 +606,17 @@ minmax_df = minmax_df %>%
 # Plot!
 pdf(file = here(dir_out, "MinMax_Summary.pdf"), width = 15, height = 10)
 ggplot(minmax_df, aes(x = factor(OM_Scenario), y = factor(EM_Scenario), 
-              fill = median, label = round(median, 2))) +
+              fill = median, label = round(median, 3))) +
   geom_tile(alpha = 0.85) +
   geom_text(color = ifelse(minmax_df$median == minmax_df$max_median &
                              minmax_df$median != minmax_df$min_max_medians, "red", 
-                           ifelse(a$median == minmax_df$min_max_medians, "green", "black")),
+                           ifelse(minmax_df$median == minmax_df$min_max_medians, "green", "black")),
             size = 5.5) +
-  facet_grid(par_name~time_comp, scales = "free_y") +
+  facet_wrap(~time_comp, scales = "free_x") +
   scale_fill_viridis_c() +
-  theme_test()
+  labs(x = "OM Scenario", y = "EM Scenario", fill = "Median MARE") +
+  theme_test() +
+  theme(legend.position = "top") 
 dev.off()
 
 # Selectivity plots -------------------------------------------------------
