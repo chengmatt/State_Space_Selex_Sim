@@ -108,7 +108,7 @@ for(n_om in 1:n_OM_scen) {
                               fix_pars = fix_pars,
                               sim = sim)
     
-    # Fix sigma if sigma_fixed is not NA
+    # Fix sigma if sigma_fixed is not NA 
     if(fixed_sigma_re_fish != "NA") input$parameters$ln_fixed_sel_re_fish[] <- log(fixed_sigma_re_fish)
     
     # Run EM model here and get sdrep

@@ -84,8 +84,11 @@ for(i in 1:length(unique_oms)) {
   # plot now!
   print(
     ggplot(pt_rg_re, aes(x = factor(EM_Scenario), y = median, ymin = lwr_95, ymax = upr_95,
-                                   color = time_comp, fill = time_comp)) +
-      geom_pointrange(position = position_dodge2(width = 1), size = 1.5, linewidth = 1) +
+                                   color = time_comp, fill = time_comp, 
+                         label = round(median, 2))) +
+      geom_text(position = position_dodge2(width = 1), size = 6) +
+      geom_pointrange(position = position_dodge2(width = 1), size = 1, linewidth = 1,
+                      alpha = 0.5) +
       geom_hline(aes(yintercept = 0), col = "black", lty = 2, size = 0.5, alpha = 1) +
       facet_grid(type~EM_Scenario, scales = "free_x") +
       coord_cartesian(ylim = c(-0.4,0.4)) +
@@ -129,10 +132,14 @@ for(i in 1:length(fast_oms)) {
   
   # plot now!
   print(
-    ggplot(pt_rg_re, aes(x = factor(EM_Scenario), y = median, ymin = lwr_95, ymax = upr_95)) +
-      geom_pointrange(position = position_dodge2(width = 1), size = 1.5, linewidth = 1) +
+    ggplot(pt_rg_re, aes(x = factor(EM_Scenario), y = median, ymin = lwr_95, ymax = upr_95,
+                         color = time_comp, fill = time_comp, 
+                         label = round(median, 2))) +
+      geom_text(position = position_dodge2(width = 1), size = 6) +
+      geom_pointrange(position = position_dodge2(width = 1), size = 1, linewidth = 1,
+                      alpha = 0.5) +
       geom_hline(aes(yintercept = 0), col = "black", lty = 2, size = 0.5, alpha = 1) +
-      facet_grid(~type, scales = "free_x") +
+      facet_grid(type~EM_Scenario, scales = "free_x") +
       coord_cartesian(ylim = c(-0.4,0.4)) +
       scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
       scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
@@ -141,7 +148,7 @@ for(i in 1:length(fast_oms)) {
       theme_matt() +
       theme(legend.position = "top", title = element_text(size = 20),
             axis.title.x = element_blank(),
-            axis.text.x = element_text(angle = 90),
+            axis.text.x = element_blank(),
             axis.ticks.x = element_blank()) 
   )
   
@@ -301,8 +308,11 @@ for(i in 1:length(unique_oms)) {
   # plot now!
   print(
     ggplot(pt_rg_re, aes(x = factor(EM_Scenario), y = median, ymin = lwr_95, ymax = upr_95,
-                         color = time_comp, fill = time_comp)) +
-      geom_pointrange(position = position_dodge2(width = 1), size = 1.5, linewidth = 1) +
+                         color = time_comp, fill = time_comp, 
+                         label = round(median, 2))) +
+      geom_text(position = position_dodge2(width = 1), size = 6) +
+      geom_pointrange(position = position_dodge2(width = 1), size = 1, linewidth = 1,
+                      alpha = 0.5) +
       geom_hline(aes(yintercept = 0), col = "black", lty = 2, size = 0.5, alpha = 1) +
       facet_grid(par_name~EM_Scenario, scales = "free_x") +
       coord_cartesian(ylim = c(-0.4,0.4)) +
@@ -336,10 +346,14 @@ for(i in 1:length(fast_oms)) {
   
   # plot now!
   print(
-    ggplot(pt_rg_re, aes(x = factor(EM_Scenario), y = median, ymin = lwr_95, ymax = upr_95)) +
-      geom_pointrange(position = position_dodge2(width = 1), size = 1.5, linewidth = 1) +
+    ggplot(pt_rg_re, aes(x = factor(EM_Scenario), y = median, ymin = lwr_95, ymax = upr_95,
+                         color = time_comp, fill = time_comp, 
+                         label = round(median, 2))) +
+      geom_text(position = position_dodge2(width = 1), size = 6) +
+      geom_pointrange(position = position_dodge2(width = 1), size = 1, linewidth = 1,
+                      alpha = 0.5) +
       geom_hline(aes(yintercept = 0), col = "black", lty = 2, size = 0.5, alpha = 1) +
-      facet_grid(~par_name, scales = "free_x") +
+      facet_grid(par_name~EM_Scenario, scales = "free_x") +
       coord_cartesian(ylim = c(-0.4,0.4)) +
       scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
       scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
@@ -348,7 +362,7 @@ for(i in 1:length(fast_oms)) {
       theme_matt() +
       theme(legend.position = "top", title = element_text(size = 20),
             axis.title.x = element_blank(),
-            axis.text.x = element_text(angle = 90),
+            axis.text.x = element_blank(),
             axis.ticks.x = element_blank()) 
   )
   
