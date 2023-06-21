@@ -300,7 +300,7 @@ for(i in 1:length(unique_oms)) {
       
       # Construct our dataframe
       F_Slx_df_bind <- cbind(F_Slx_df, sim = m, 
-                             conv = convergence$conv[sim],
+                             conv = convergence$conv[m],
                              OM_Scenario = unique_oms[i],
                              EM_Scenario = files[j])
       

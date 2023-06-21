@@ -21,7 +21,6 @@ dir_out <- here("output", "Summary_Plots") # path to output folder
 dir.create(dir_out)
 
 # read in csvs
-
 # Parameter and Time Series Summaries
 param_df <- data.table::fread(here("output", "Parameter_Summary.csv")) # parameters
 ts_df <- data.table::fread(here("output", "TimeSeries_Summary.csv")) # time series values 
@@ -89,7 +88,7 @@ for(i in 1:length(unique_oms)) {
       geom_pointrange(position = position_dodge2(width = 1), size = 1.5, linewidth = 1) +
       geom_hline(aes(yintercept = 0), col = "black", lty = 2, size = 0.5, alpha = 1) +
       facet_grid(type~EM_Scenario, scales = "free_x") +
-      coord_cartesian(ylim = c(-0.5,0.5)) +
+      coord_cartesian(ylim = c(-0.4,0.4)) +
       scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
       scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
       labs(x = "EM Scenarios", y = "Relative Error", fill = "Time Component",
@@ -134,7 +133,7 @@ for(i in 1:length(fast_oms)) {
       geom_pointrange(position = position_dodge2(width = 1), size = 1.5, linewidth = 1) +
       geom_hline(aes(yintercept = 0), col = "black", lty = 2, size = 0.5, alpha = 1) +
       facet_grid(~type, scales = "free_x") +
-      coord_cartesian(ylim = c(-0.5,0.5)) +
+      coord_cartesian(ylim = c(-0.4,0.4)) +
       scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
       scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
       labs(x = "EM Scenarios", y = "Relative Error", fill = "Time Component",
@@ -210,7 +209,7 @@ for(i in 1:length(unique_oms)) {
         geom_line(linewidth = 2, alpha = 1, aes(color = time_comp)) +
         geom_hline(aes(yintercept = 0), col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
         facet_grid(par_name~EM_Scenario) +
-        coord_cartesian(ylim = c(-0.5,0.5)) +
+        coord_cartesian(ylim = c(-0.4,0.4)) +
         scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
         scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
         labs(x = "Year", y = paste("RE"), fill = "Time", color = "Time",
@@ -248,7 +247,7 @@ for(i in 1:length(fast_oms)) {
       geom_line(linewidth = 2, alpha = 1) +
       geom_hline(aes(yintercept = 0), col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
       facet_grid(par_name~EM_Scenario) +
-      coord_cartesian(ylim = c(-0.5,0.5)) +
+      coord_cartesian(ylim = c(-0.4,0.4)) +
       scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
       scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
       labs(x = "Year", y = paste("RE"), fill = "Time", color = "Time",
@@ -306,7 +305,7 @@ for(i in 1:length(unique_oms)) {
       geom_pointrange(position = position_dodge2(width = 1), size = 1.5, linewidth = 1) +
       geom_hline(aes(yintercept = 0), col = "black", lty = 2, size = 0.5, alpha = 1) +
       facet_grid(par_name~EM_Scenario, scales = "free_x") +
-      coord_cartesian(ylim = c(-0.5,0.5)) +
+      coord_cartesian(ylim = c(-0.4,0.4)) +
       scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
       scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
       labs(x = "EM Scenarios", y = "Relative Error", fill = "Time Component",
@@ -341,7 +340,7 @@ for(i in 1:length(fast_oms)) {
       geom_pointrange(position = position_dodge2(width = 1), size = 1.5, linewidth = 1) +
       geom_hline(aes(yintercept = 0), col = "black", lty = 2, size = 0.5, alpha = 1) +
       facet_grid(~par_name, scales = "free_x") +
-      coord_cartesian(ylim = c(-0.5,0.5)) +
+      coord_cartesian(ylim = c(-0.4,0.4)) +
       scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
       scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
       labs(x = "EM Scenarios", y = "Relative Error", fill = "Time Component",
@@ -523,7 +522,7 @@ onefleet_blk_aic <- AIC_df %>%
   mutate(fleet = "1 Fleet")
 
 # AIC plot
-pdf(file = here(dir_out, "AIC_SummaryPlot.pdf"), width = 10, height = 7)
+pdf(file = here(dir_out, "AIC_SummaryPlot.pdf"), width = 12, height = 7)
 # Two fleet plot
 (twofleet_plot <- ggplot(twofleet_aic, 
                         aes(x = OM_Scenario, y = EM_Scenario, fill = n_minAIC,
