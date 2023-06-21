@@ -101,10 +101,9 @@ for(n_om in 1:n_OM_scen) {
                                               "ln_h", 
                                               "ln_M"), sim = sim)
       
-
       # Run EM model here and get sdrep
       tryCatch(expr = model <- run_EM(data = input$data, parameters = input$parameters, 
-                      map = input$map,   
+                      map = input$map, n.newton = 3,
                       silent = TRUE, getsdrep = TRUE), error = function(e){e}) 
       
       # Check model convergence
@@ -145,7 +144,7 @@ for(n_om in 1:n_OM_scen) {
       params <- rbind(params, sim_models[[s]][[2]]) # save parameters
       time_series <- rbind(time_series, sim_models[[s]][[3]]) # save time series
     } # end s loop
-    
+
     # Now, save our results - create directory to store results first
     em_path_res <- here(om_path, em_scenarios$EM_Scenario[n_em])
     dir.create(em_path_res)

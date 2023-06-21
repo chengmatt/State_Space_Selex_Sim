@@ -155,7 +155,6 @@ Type objective_function<Type>::operator() ()
   // y = year, a = age, s = sex; in general, f = fishery fleet, sf = survey fleet
   
   // Selectivity ----------------------------------------------
-  
   // Selectivity random effects  ------------------------------------------------------
   for(int f = 0; f < n_fish_comps; f++) {
     for(int s = 0; s < n_sexes; s++) {
@@ -277,8 +276,8 @@ Type objective_function<Type>::operator() ()
   for(int a = 0; a < n_ages; a++) {
     if(a == 0) SBPR_N(a) = Type(1);
     if(a > 0 && a < n_ages - 1) SBPR_N(a) = SBPR_N(a - 1) * exp(-M); 
-    if(a == n_ages - 1) SBPR_N(a) = SBPR_N(a - 1) * exp(-M) * (1 / (1 - exp(-M)));
-    SBPR_SSB0(a) = SBPR_N(a) * MatAA(0, a, 0) * WAA(0, a, 0);
+    if(a == n_ages - 1) SBPR_N(a) = ((SBPR_N(a - 1) * exp(-M)) / (1 - exp(-M)));
+    SBPR_SSB0(a) = SBPR_N(a) * MatAA(0, a, 0) * WAA(0, a, 0); 
   } // a loop
   
   // Get B0 here
@@ -290,8 +289,7 @@ Type objective_function<Type>::operator() ()
       // TESTING
       // NAA(0, a, s) = exp(ln_N1Devs(a)) * Sex_Ratio(s);
       if(a < n_ages - 1) { // not plus group
-        NAA(0, a, s) = exp(ln_N1Devs(a)) * exp(ln_RecPars(0) -(SigmaRec2/Type(2))) *
-          exp(-M * Type(a)) * Sex_Ratio(s);
+        NAA(0, a, s) = exp(ln_N1Devs(a)) * exp(ln_RecPars(0)) * exp(-M * Type(a)) * Sex_Ratio(s);
       } else{
         NAA(0, a, s) = exp(ln_RecPars(0)) * exp(-M * Type(a)) /
           (1 - exp(-M)) * Sex_Ratio(s);
@@ -308,7 +306,7 @@ Type objective_function<Type>::operator() ()
          
          if(rec_model == 0) { // Mean Recruitment
            Type ln_MeanRec = ln_RecPars(0); // Mean Recruitment parameter
-           NAA(y, 0, s) = exp( ln_MeanRec + ln_RecDevs(y-1) -(SigmaRec2/Type(2)))  * Sex_Ratio(s);
+           NAA(y, 0, s) = exp( ln_MeanRec + ln_RecDevs(y-1) )  * Sex_Ratio(s);
          } // if for rec_model == 0
           
          if(rec_model == 1) { // Beverton Holt Recruitment

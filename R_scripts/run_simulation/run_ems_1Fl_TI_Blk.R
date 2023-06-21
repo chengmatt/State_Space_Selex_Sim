@@ -90,7 +90,7 @@ for(n_om in 1:n_OM_scen) {
                           .packages = c("TMB", "here", "tidyverse")) %dopar% {
       
       compile_tmb(wd = here("src"), cpp = "EM.cpp")
-      
+                            
       # Prepare inputs for EM
       input <- prepare_EM_input(years = years,
                                 n_fleets = n_fleets, 
@@ -118,7 +118,7 @@ for(n_om in 1:n_OM_scen) {
       
       # Run EM model here and get sdrep
       tryCatch(expr = model <- run_EM(data = input$data, parameters = input$parameters, 
-                      map = input$map,  
+                      map = input$map, n.newton = 3,
                       silent = TRUE, getsdrep = TRUE), error = function(e){e}) 
       
       # Check model convergence

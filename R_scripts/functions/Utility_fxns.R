@@ -661,8 +661,9 @@ get_quants <- function(
 
 # Reference Points --------------------------------------------------------
   
-  est_Selex <- model_fxn$rep$F_Slx[years[length(years)],,,1] # selectivity only for females
-
+  # Selectivity is the average of the last 5 years
+  est_Selex <- colMeans(model_fxn$rep$F_Slx[years[(length(years) - 4):length(years)],,,1]) # selectivity only for females
+  
   # Get estaimted Fx% value
   Fx_val <- get_Fx_refpt(ages = ages,
                           MortAA = Mort_at_age[length(years),,sim], 
@@ -675,7 +676,7 @@ get_quants <- function(
   # Get true f40
   true_f40 <- get_Fx_refpt(ages = ages,
                            MortAA = Mort_at_age[length(years),,sim], 
-                           SelexAA = t(Fish_selex_at_age[length(years),,,1,sim]),  # females selex
+                           SelexAA = t(colMeans(Fish_selex_at_age[(length(years) - 4):length(years),,,1,sim])),  # females selex
                            MatAA = mat_at_age[length(years),,1,sim],  # females
                            WAA = wt_at_age[length(years),,1,sim],  # females
                            Terminal_F = fish_mort[length(years),,sim],
@@ -690,7 +691,7 @@ get_quants <- function(
                            n_fleets = nmod_fish_fleets,  # Number of fishery fleets
                            mean_rec =   mean(sd_rep$value[names(sd_rep$value) == "Total_Rec"]),  # mean recruitment
                            term_NAA = model_fxn$rep$NAA[length(years),,], # terminal year NAA
-                           term_F_Slx = array(model_fxn$rep$F_Slx[length(years),,,], # # termianl yera selex
+                           term_F_Slx = array(colMeans(model_fxn$rep$F_Slx[years[(length(years) - 4):length(years)],,,]), # terminal year selex
                                               dim = c(length(ages), nmod_fish_fleets, n_sex)), 
                            term_F =  matrix(exp(sd_rep$par.fixed[names(sd_rep$par.fixed) == "ln_Fy"]), # terminal year F
                                             ncol = nmod_fish_fleets, nrow = length(years))[length(years), ], 
@@ -704,9 +705,9 @@ get_quants <- function(
                             n_ages = length(ages),  # Number of ages
                             n_sex = n_sex,  # Number of sexes
                             n_fleets = ntrue_fish_fleets,  # Number of fishery fleets
-                            mean_rec = mean(rec_total[,sim], na.rm = TRUE), # mean recruitment
+                            mean_rec = mean(rec_total[1:length(years),sim], na.rm = TRUE), # mean recruitment
                             term_NAA = N_at_age[length(years),,,sim], # terminal year NAA
-                            term_F_Slx = array(Fish_selex_at_age[length(years),,,,sim], 
+                            term_F_Slx = array(colMeans(Fish_selex_at_age[(length(years)-4):length(years),,,,sim]), 
                                                dim = c(length(ages), ntrue_fish_fleets, n_sex)), # terminal year selex
                             term_F = fish_mort[length(years),,sim], # terminal year F
                             MortAA = Mort_at_age[length(years),,sim], # natural mortality
@@ -761,13 +762,7 @@ get_quants <- function(
     dplyr::mutate(t = Total_Biom[years, sim], sim = sim, conv = conv, year = years,
                   type = "Total Biomass")
   
-  # Get Harvest Rate
-  total_harv_rate_df <- extract_ADREP_vals(sd_rep = sd_rep, par = "Total_Harvest_Rate") %>%
-    dplyr::mutate(t = rowSums(matrix(Harvest_Rate[years,,sim], ncol = ntrue_fish_fleets)),
-                  sim = sim, conv = conv, year = years,
-                  type = "Total Harvest Rate")
-
-  ts_all <- rbind(rec_df, ssb_df, f_df, depletion_df, total_biom_df, total_harv_rate_df)
+  ts_all <- rbind(rec_df, ssb_df, f_df, depletion_df, total_biom_df)
   
   return(list(TS_df = ts_all, Par_df = par_all))
 

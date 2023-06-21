@@ -108,7 +108,7 @@ for(n_om in 1:n_OM_scen) {
         
         # Run EM model here and get sdrep
         tryCatch(expr = model <- run_EM(data = input$data, parameters = input$parameters, 
-                        map = input$map,  
+                        map = input$map, n.newton = 3,
                         silent = TRUE, getsdrep = TRUE), error = function(e){e}) 
         
         # Check model convergence

@@ -262,7 +262,7 @@ simulate_data <- function(fxn_path,
                                         exp( rnorm(1, 0, sqrt(log(catch_CV[f]^2 + 1))) ) # bias correction here
               
                # Calculate harvest rate here
-               Harvest_Rate[y, f, sim] <- sum(Catch_at_age[y,,f,,sim] * wt_at_age[y,,,sim]) / # Catch / Exploitable Biomass
+               Harvest_Rate[y, f, sim] <- Catch_agg[y, f, sim] / # Catch / Exploitable Biomass
                                           sum(N_at_age[y,,s,sim] * Fish_selex_at_age[y,,f,s,sim] * wt_at_age[y,,,sim])
               } # if we are done w/ looping through sexes
               

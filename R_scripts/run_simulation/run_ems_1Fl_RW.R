@@ -26,7 +26,7 @@ compile_tmb(wd = here("src"), cpp = "EM.cpp")
 # Read in OM and EM Scenarios
 om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v2.xlsx"), sheet = "OM")
 em_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v2.xlsx"), sheet = "EM_1Fl_RW") %>% 
-  filter(str_detect(EM_Scenario, "Est"))
+  filter(str_detect(EM_Scenario, "Est")) # Only running state space random walk models here
 
 # Read in spreadsheet for life history parameters
 lh_path <- here("input", "Sablefish_Inputs.xlsx")
@@ -113,7 +113,7 @@ for(n_om in 1:n_OM_scen) {
     
     # Run EM model here and get sdrep
     tryCatch(expr = model <- run_EM(data = input$data, parameters = input$parameters, 
-                                    map = input$map, 
+                                    map = input$map, n.newton = 3,
                                     random = random_fish_sel, 
                                     silent = FALSE, getsdrep = TRUE), error = function(e){e}) 
 

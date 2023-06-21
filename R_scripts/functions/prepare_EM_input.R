@@ -219,7 +219,6 @@ prepare_EM_input <- function(years,
       if(F_Slx_Model_Input[y,i] == "gamma") F_Slx_model[y, i] <- 1
       if(F_Slx_Model_Input[y,i] == "double_logistic") F_Slx_model[y, i] <- 2
       if(F_Slx_Model_Input[y,i] == "exp_logistic") F_Slx_model[y, i] <- 3
-      if(F_Slx_Model_Input[y,i] == "normal") F_Slx_model[y, i] <- 4
     } # end i loop (fleets)
   } # end y loop (years)
   
@@ -229,7 +228,6 @@ prepare_EM_input <- function(years,
     if(S_Slx_Model_Input[i] == "gamma") S_Slx_model[i] <- 1
     if(S_Slx_Model_Input[i] == "double_logistic") S_Slx_model[i] <- 2
     if(S_Slx_Model_Input[i] == "exp_logistic") S_Slx_model[i] <- 3
-    if(S_Slx_Model_Input[i] == "normal") S_Slx_model[i] <- 4
   } # end loop for selectivity model input for survey
   
   # Specify selectivity blocks here
@@ -466,7 +464,7 @@ prepare_EM_input <- function(years,
     data$F_Slx_re_model <- matrix(0, nrow = n_fish_comps, ncol = n_sexes)
     pars$ln_fish_selpars_re <- log(array(rnorm(1, 0.3, 0),
                                          dim = c((length(years) - 1), n_time_selex_pars, n_fish_comps, n_sexes)))
-    pars$ln_fixed_sel_re_fish <- array(rnorm(1,0.3,0), dim = c(n_time_selex_pars, n_fish_comps, n_sexes))
+    pars$ln_fixed_sel_re_fish <- array(log(rnorm(1,1,0)), dim = c(n_time_selex_pars, n_fish_comps, n_sexes))
   } # random walk if statement
   
   # Parameter mapping -------------------------------------------------------

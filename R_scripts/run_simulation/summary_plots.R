@@ -189,7 +189,7 @@ for(i in 1:length(unique_oms)) {
   
     # Relative error of time series
     ts_re_om <- ts_re_df %>% filter(OM_Scenario == unique_oms[i],
-                                    !str_detect(EM_Scenario, "0.5|1.0|2.0|1.25|1.75"),
+                                    !str_detect(EM_Scenario, "0.5|1.0|2.0|1.25|1.75|Est"),
                                     !str_detect(EM_Scenario, "Blk_1|Blk_2|Blk_3|Blk_4|Blk_5"), 
                                     par_name %in% c("Spawning Stock Biomass",
                                                     "Total Biomass",
@@ -210,8 +210,7 @@ for(i in 1:length(unique_oms)) {
     
     # Now loop through each time series component and print the plot out
     print(
-      ggplot(ts_re_om %>% 
-               filter(par_name != "Depletion"), aes(x = year, y = median))  +
+      ggplot(ts_re_om, aes(x = year, y = median))  +
         geom_ribbon(aes(ymin = lwr_95, ymax = upr_95, fill = time_comp, group = time_comp), alpha = 0.3) +
         geom_line(linewidth = 2, alpha = 1, aes(color = time_comp)) +
         geom_hline(aes(yintercept = 0), col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
@@ -390,7 +389,7 @@ for(i in 1:length(unique_oms)) {
            !str_detect(EM_Scenario, "Blk_1|Blk_2|Blk_3|Blk_4|Blk_5"), 
            OM_Scenario == unique_oms[i]) %>% 
     group_by(EM_Scenario, time_comp) %>% 
-    summarize(converged = sum(conv == "Converged")/300)
+    summarize(converged = sum(conv == "Converged")/200)
   
   # Random walk convergence statistics
   RW_convergence <- AIC_df %>% 
@@ -405,7 +404,7 @@ for(i in 1:length(unique_oms)) {
     filter(str_detect(EM_Scenario, "RW_"),
            OM_Scenario == unique_oms[i]) %>% 
     group_by(EM_Scenario, time_comp) %>% 
-    summarize(converged = sum(conv == "Converged")/300)
+    summarize(converged = sum(conv == "Converged")/200)
 
   # Set order for plot
     order <- vector()

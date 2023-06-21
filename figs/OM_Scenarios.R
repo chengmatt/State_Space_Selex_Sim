@@ -132,13 +132,13 @@ bins <- 1:30
 
 # Get a50 value males
 a50m1 <- 8.5
-a50m2 <- 12.5
+a50m2 <- 13.5
 deltam1 <- 2.25
 deltam2 <- 1.25
 
 # Get a50 value females
 a50f1 <- 5.5
-a50f2 <- 9.5
+a50f2 <- 10.5
 deltaf1 <- 1.75
 deltaf2 <- 1.15
 
@@ -156,10 +156,10 @@ colnames(selex_logist) <- c("Selex", "Sex", "Fleet", "Age", "Type")
 ### Logistic-Gamma ----------------------------------------------------------
 
 # Gamma parameters
-amaxm2 <- 20
-deltam2 <- 7
-amaxf2 <- 17
-deltaf2 <- 8
+amaxm2 <- 19.5
+deltam2 <- 6
+amaxf2 <- 16
+deltaf2 <- 7
 
 # Get Selex here
 pm2 <- (0.5 * (sqrt(amaxm2^2 + 4*deltam2^2) - amaxm2))
@@ -179,7 +179,7 @@ selex_all <- rbind(selex_logist, selex_gamma)
 
 png(here("figs", "Hypothetical_OM", "Selex_Scenario.png"), width = 650, height = 500)
 (selex_plot <- ggplot(selex_all, aes(x = as.numeric(Age), y = as.numeric(paste(Selex)), color = Fleet, lty = Fleet)) +
-  geom_line(size = 1.3) + 
+  geom_line(size = 1.3, alpha = 0.75) + 
   scale_color_manual(values = c("blue", "red")) +
   scale_linetype_manual(values = c(2,1)) +
   facet_grid(Sex~Type) +
