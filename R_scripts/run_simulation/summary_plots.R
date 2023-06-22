@@ -61,7 +61,7 @@ for(i in 1:length(unique_oms)) {
   om_scenario_params <- param_df %>% filter(OM_Scenario == unique_oms[i],
                                             !str_detect(EM_Scenario, "1.0|2.0|1.75|1.25"), 
                                             !str_detect(EM_Scenario, "Blk_1|Blk_2|Blk_3|Blk_4|Blk_5"), 
-                                            type %in% c("F_0.4_Last5", "ABC_Last5"))
+                                            type %in% c("F_0.4", "ABC"))
   
   # Set order for plot
     order <- vector()
@@ -121,7 +121,7 @@ for(i in 1:length(fast_oms)) {
   om_scenario_params <- param_df %>% filter(OM_Scenario == fast_oms[i],
                                             time_comp == "Terminal",
                                             str_detect(EM_Scenario, "Blk"), 
-                                            type %in% c("F_0.4_Last5", "ABC_Last5"))
+                                            type %in% c("F_0.4", "ABC"))
 
   # Point ranges for relative error and total error
   pt_rg_re <- om_scenario_params %>% 
@@ -132,14 +132,14 @@ for(i in 1:length(fast_oms)) {
   
   # plot now!
   print(
-    ggplot(pt_rg_re, aes(x = factor(EM_Scenario), y = median, ymin = lwr_95, ymax = upr_95,
-                         color = time_comp, fill = time_comp, 
+    ggplot(pt_rg_re %>% 
+             filter(str_detect(EM_Scenario, '_LL_')), aes(x = factor(EM_Scenario), y = median, ymin = lwr_95, ymax = upr_95,
+                         color = type, fill = type, 
                          label = round(median, 2))) +
-      geom_text(position = position_dodge2(width = 1), size = 6) +
-      geom_pointrange(position = position_dodge2(width = 1), size = 1, linewidth = 1,
+      geom_text(position = position_dodge2(width = 0.5), size = 6) +
+      geom_pointrange(position = position_dodge2(width = 0.5), size = 1, linewidth = 1,
                       alpha = 0.5) +
       geom_hline(aes(yintercept = 0), col = "black", lty = 2, size = 0.5, alpha = 1) +
-      facet_grid(type~EM_Scenario, scales = "free_x") +
       coord_cartesian(ylim = c(-0.4,0.4)) +
       scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
       scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
@@ -148,7 +148,7 @@ for(i in 1:length(fast_oms)) {
       theme_matt() +
       theme(legend.position = "top", title = element_text(size = 20),
             axis.title.x = element_blank(),
-            axis.text.x = element_blank(),
+            axis.text.x = element_text(angle = 90),
             axis.ticks.x = element_blank()) 
   )
   
@@ -194,7 +194,8 @@ for(i in 1:length(unique_oms)) {
                                     par_name %in% c("Spawning Stock Biomass",
                                                     "Total Biomass",
                                                     "Total Recruitment",
-                                                    "Total Fishing Mortality"))
+                                                    "Total Fishing Mortality",
+                                                    "Depletion"))
     
     # Set order for plot
       order <- vector()
@@ -346,13 +347,12 @@ for(i in 1:length(fast_oms)) {
   # plot now!
   print(
     ggplot(pt_rg_re, aes(x = factor(EM_Scenario), y = median, ymin = lwr_95, ymax = upr_95,
-                         color = time_comp, fill = time_comp, 
+                         color = par_name, fill = par_name, 
                          label = round(median, 2))) +
-      geom_text(position = position_dodge2(width = 1), size = 6) +
-      geom_pointrange(position = position_dodge2(width = 1), size = 1, linewidth = 1,
+      geom_text(position = position_dodge2(width = 0.5), size = 6) +
+      geom_pointrange(position = position_dodge2(width = 0.5), size = 1, linewidth = 1,
                       alpha = 0.5) +
       geom_hline(aes(yintercept = 0), col = "black", lty = 2, size = 0.5, alpha = 1) +
-      facet_grid(par_name~EM_Scenario, scales = "free_x") +
       coord_cartesian(ylim = c(-0.4,0.4)) +
       scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
       scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 43)]) +
@@ -361,7 +361,7 @@ for(i in 1:length(fast_oms)) {
       theme_matt() +
       theme(legend.position = "top", title = element_text(size = 20),
             axis.title.x = element_blank(),
-            axis.text.x = element_blank(),
+            axis.text.x = element_text(angle = 90),
             axis.ticks.x = element_blank()) 
   )
   
@@ -484,7 +484,7 @@ twofleet_aic <- AIC_df %>%
   mutate(min = min(AIC),
          min_AIC = ifelse(AIC == min, 1, 0)) %>% 
   group_by(OM_Scenario, EM_Scenario, time_comp) %>% 
-  summarize(n_minAIC = sum(min_AIC) / 300) %>% 
+  summarize(n_minAIC = sum(min_AIC) / 200) %>% 
   mutate(fleet = "2 Fleet")
 
 # filter to 1 fleet models
@@ -496,7 +496,7 @@ onefleet_aic <- AIC_df %>%
   mutate(min = min(AIC),
          min_AIC = ifelse(AIC == min, 1, 0)) %>% 
   group_by(OM_Scenario, EM_Scenario, time_comp) %>% 
-  summarize(n_minAIC = sum(min_AIC) / 300) %>% 
+  summarize(n_minAIC = sum(min_AIC) / 200) %>% 
   mutate(fleet = "1 Fleet")
 
 # filter to 1 fleet random walk models
@@ -513,12 +513,12 @@ onefleet_rw_aic <- AIC_df %>%
   mutate(min = min(AIC),
          min_AIC = ifelse(AIC == min, 1, 0)) %>% 
   group_by(OM_Scenario, EM_Scenario, time_comp, selex_form) %>% 
-  summarize(n_minAIC = sum(min_AIC) / 300) %>% 
+  summarize(n_minAIC = sum(min_AIC) / 200) %>% 
   mutate(fleet = "1 Fleet")
 
 # Filter to 1 fleet time block models
 onefleet_blk_aic <- AIC_df %>% 
-  filter(str_detect(EM_Scenario, "Blk|Blk_1|Blk_2|Blk_3|Blk_4|Blk_5"),
+  filter(str_detect(EM_Scenario, "Blk"),
          time_comp == "Terminal",
          str_detect(OM_Scenario, "Fast")) %>% 
   mutate(
@@ -531,7 +531,7 @@ onefleet_blk_aic <- AIC_df %>%
   mutate(min = min(AIC),
          min_AIC = ifelse(AIC == min, 1, 0)) %>% 
   group_by(OM_Scenario, EM_Scenario, time_comp, selex_form) %>% 
-  summarize(n_minAIC = sum(min_AIC) / 300) %>% 
+  summarize(n_minAIC = sum(min_AIC) / 200) %>% 
   mutate(fleet = "1 Fleet")
 
 # AIC plot
