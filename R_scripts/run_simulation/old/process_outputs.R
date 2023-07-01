@@ -591,3 +591,162 @@ write.csv(om_fish_comps_df, here("output", "OM_Fish_Comps.csv"), row.names = FAL
 # # Bind together and write out csv
 # ts_df <- rbind(data.table::rbindlist(total_biom_df), ts_df)
 # write.csv(ts_df, here("output", "TimeSeries_Summary.csv"))
+
+
+### ABC using the last 5 years of selex ------------------------------------------------
+# # Preallocate memory for lists
+# om_ref_pt_list <- vector("list", length(unique_oms))
+# 
+# for(i in 1:length(unique_oms)) {
+#   
+#   # List files in folder
+#   files <- list.files(here(om_scenario_path, unique_oms[i]))
+#   # Load in OM data
+#   load(here(om_scenario_path, unique_oms[i], paste(unique_oms[i], ".RData", sep = "")))
+#   # Remove.RData and .pdf
+#   files <- files[str_detect(files, ".RData|.pdf") == FALSE]
+#   
+#   # Pre allocate em list
+#   em_ref_pt_list <- vector("list", length(files))
+#   
+#   for(j in 1:length(files)) {
+#     
+#     # Load in .RData from model runs
+#     load(here(om_scenario_path, unique_oms[i], files[j], paste(files[j], ".RData", sep = "")))
+#     
+#     # Pre allocate memory for list
+#     ref_pt_list <- vector("list", length = length(model_list))
+#     
+#     # Get convergence statistics here
+#     convergence <- param_df %>% 
+#       filter(OM_Scenario == unique_oms[i], EM_Scenario == files[j], type %in% c("F_0.4", "ABC"))
+#     
+#     for(sim in 1:length(model_list)) {
+#       
+#       # Define simulation model
+#       sim_model <- model_list[[sim]]
+#       
+#       # Define years based on em year lengths
+#       years <- 1:dim(sim_model$model_fxn$rep$FAA)[1]
+#       # Number of modelled fishery fleets
+#       nmod_fish_fleets <- dim(sim_model$model_fxn$rep$F_Slx)[3]
+#       # Get ages
+#       ages <- 1:dim(sim_model$model_fxn$rep$NAA)[2]
+#       # Get number of sexes
+#       n_sex <- dim(sim_model$model_fxn$rep$NAA)[3]
+#       
+#       # Pre-Processing first
+#       # Get Fs here
+#       if(nmod_fish_fleets > 1) {
+#         # Vector of fleets (define to multiply)
+#         fleet_num <- seq(1, nmod_fish_fleets)
+#         # Extract Fs here
+#         est_TermF <- exp(sim_model$sd_rep$par.fixed[names(sim_model$sd_rep$par.fixed) == "ln_Fy"])[c(length(years) * fleet_num)]
+#       } else{ # only 1 fleet
+#         # Extract Fs here
+#         est_TermF <- exp(sim_model$sd_rep$par.fixed[names(sim_model$sd_rep$par.fixed) == "ln_Fy"])[c(length(years))]
+#       } # else statement
+#       
+#       # Get true f40
+#       true_f40 <- get_Fx_refpt(ages = ages,
+#                                MortAA = oms$Mort_at_age[length(years),,sim], 
+#                                SelexAA = t(colMeans(oms$Fish_selex_at_age[(length(years) - 4):length(years),,,1,sim])),  # females selex
+#                                MatAA = oms$mat_at_age[length(years),,1,sim],  # females
+#                                WAA = oms$wt_at_age[length(years),,1,sim],  # females
+#                                Terminal_F = oms$fish_mort[length(years),,sim],
+#                                F_x = 0.4)
+#       
+#       # Get estimated selectivity here (last 5 years)
+#       est_Selex <- colMeans(sim_model$model_fxn$rep$F_Slx[years[(length(years) - 4):length(years)],,,1]) # selectivity only for females
+#       
+#       # Get estimated Fx% value
+#       Fx_val <- get_Fx_refpt(ages = ages,
+#                              MortAA = oms$Mort_at_age[length(years),,sim], 
+#                              SelexAA = t(est_Selex), 
+#                              MatAA = oms$mat_at_age[length(years),,1,sim], # females
+#                              WAA = oms$wt_at_age[length(years),,1,sim],  # females
+#                              Terminal_F = est_TermF, 
+#                              F_x = 0.4)
+#       # Get true abc
+#       true_ABC <- get_ABC_refpt(Fx_proj = true_f40, # F projection value
+#                                 terminal_yr = length(years), # Terminal year of the assessment
+#                                 sex_ratio = 0.5, # Assumed sex ratio
+#                                 n_ages = length(ages),  # Number of ages
+#                                 n_sex = n_sex,  # Number of sexes
+#                                 n_fleets = 2,  # Number of fishery fleets
+#                                 mean_rec = mean(oms$rec_total[1:length(years),sim], na.rm = TRUE), # mean recruitment
+#                                 term_NAA = oms$N_at_age[length(years),,,sim], # terminal year NAA
+#                                 term_F_Slx = array(colMeans(oms$Fish_selex_at_age[(length(years)-4):length(years),,,,sim]), 
+#                                                    dim = c(length(ages), 2, n_sex)), # last 5 years of selex averaged
+#                                 term_F = oms$fish_mort[length(years),,sim], # terminal year F
+#                                 MortAA = oms$Mort_at_age[length(years),,sim], # natural mortality
+#                                 WAA = oms$wt_at_age[length(years),,,sim]  ) # weight at age
+#       
+#       # Get estimated abc
+#       ABC_val <- get_ABC_refpt(Fx_proj = Fx_val, # F projeciton value
+#                                terminal_yr = length(years), # Terminal year of the assessment
+#                                sex_ratio = 0.5, # Assumed sex ratio
+#                                n_ages = length(ages),  # Number of ages
+#                                n_sex = n_sex,  # Number of sexes
+#                                n_fleets = nmod_fish_fleets,  # Number of fishery fleets
+#                                mean_rec = mean(sim_model$sd_rep$value[names(sim_model$sd_rep$value) == "Total_Rec"]),  # mean recruitment
+#                                term_NAA = sim_model$model_fxn$rep$NAA[length(years),,], # terminal year NAA
+#                                term_F_Slx = array(colMeans(sim_model$model_fxn$rep$F_Slx[years[(length(years) - 4):length(years)],,,]), # terminal year selex
+#                                                   dim = c(length(ages), nmod_fish_fleets, n_sex)), # last 5 years of selex averaged
+#                                term_F =  matrix(exp(sim_model$sd_rep$par.fixed[names(sim_model$sd_rep$par.fixed) == "ln_Fy"]), # terminal year F
+#                                                 ncol = nmod_fish_fleets, nrow = length(years))[length(years), ], 
+#                                MortAA = oms$Mort_at_age[length(years),,sim], # natural mortality at age
+#                                WAA = oms$wt_at_age[length(years),,,sim]  ) # weight at age
+#       
+#       # Create empty df for Fx% to rbind to par all dataframe
+#       F_df <- data.frame(matrix(ncol = length(names(param_df))))
+#       colnames(F_df) <- names(param_df) # replace colnames in empty df
+#       ABC_df <- data.frame(matrix(ncol = length(names(param_df))))
+#       colnames(ABC_df) <- names(param_df) # replace colnames in empty df
+#       
+#       # Get convergence status
+#       conv = convergence$conv[sim]
+#       
+#       # Now, input into empty dataframe
+#       F_df <- F_df %>% dplyr::mutate(mle_val = Fx_val, 
+#                                      type = paste("F", 0.4, "Last5", sep = "_"),
+#                                      t = true_f40,
+#                                      OM_Scenario = unique_oms[i],
+#                                      EM_Scenario = files[j])
+#       
+#       F_df$sim <- sim
+#       F_df$conv <- conv
+#       
+#       # Do the same for ABC estimates
+#       ABC_df <- ABC_df %>% dplyr::mutate(mle_val = ABC_val, 
+#                                          type = "ABC_Last5",
+#                                          t = true_ABC,
+#                                          OM_Scenario = unique_oms[i],
+#                                          EM_Scenario = files[j])
+#       
+#       ABC_df$sim <- sim
+#       ABC_df$conv <- conv
+#       
+#       
+#       ref_pt_list[[sim]] <- rbind(ABC_df, F_df)
+#       cat(crayon::green(sim))
+#       
+#     } # end simulation loop
+#     
+#     ref_pt_df <- data.table::rbindlist(ref_pt_list) # list to df
+#     em_ref_pt_list[[j]] <- ref_pt_df # put df into list
+#     cat(crayon::blue(j))
+#     
+#   } # end j loop (ems)
+#   
+#   # list to df
+#   om_ref_pt_df <- data.table::rbindlist(em_ref_pt_list)
+#   om_ref_pt_list[[i]] <- om_ref_pt_df
+#   cat(crayon::red(i))
+#   
+# } # end i loop (oms)
+# 
+# 
+# # Now, put this back into a regular old dataframe
+# all_ref_pt_df <- data.table::rbindlist(om_ref_pt_list)
+

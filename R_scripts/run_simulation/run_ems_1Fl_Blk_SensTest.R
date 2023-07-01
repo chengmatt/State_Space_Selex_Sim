@@ -27,8 +27,7 @@ compile_tmb(wd = here("src"), cpp = "EM.cpp")
 om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v2.xlsx"), sheet = "OM") %>% 
   filter(str_detect(OM_Scenarios, "Fast_"))
 em_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v2.xlsx"), 
-                                   sheet = "EM_Fast_Blk_SensTest") %>% 
-  filter(str_detect(EM_Scenario, "Blk_-"))
+                                   sheet = "EM_Fast_Blk_SensTest") 
 
 # Read in spreadsheet for life history parameters
 lh_path <- here("input", "Sablefish_Inputs.xlsx")
@@ -72,7 +71,6 @@ for(n_om in 1:n_OM_scen) {
                                rep(fish_selex_opt[2], length(years) - blk_time)), 
                              nrow = length(years), ncol = n_fleets)
 
-    # Register cluster here
     cl <- makeCluster(ncores - 2)
     registerDoSNOW(cl)
     
@@ -105,8 +103,7 @@ for(n_om in 1:n_OM_scen) {
                                   n_time_selex_pars = time_selex_npars,
                                   fix_pars = c( "ln_SigmaRec", 
                                                 "ln_q_fish", 
-                                                "ln_h", 
-                                                "ln_M"), sim = sim)
+                                                "ln_h", "ln_M"), sim = sim)
         
         # Run EM model here and get sdrep
         tryCatch(expr = model <- run_EM(data = input$data, parameters = input$parameters, 

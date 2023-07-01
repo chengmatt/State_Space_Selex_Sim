@@ -114,7 +114,7 @@ Type objective_function<Type>::operator() ()
   array<Type> SAA(n_years, n_ages, n_sexes); // Survival at age
   array<Type> FAA(n_years, n_ages, n_fleets, n_sexes); // Fishing Mortality
   array<Type> sum_FAA(n_years, n_ages, n_sexes); // Fishing mortality summed across fleets
-  matrix<Type> F_y(n_years, n_fleets); // Fishing Mortality by year and fleet
+  matrix<Type> Fy(n_years, n_fleets); // Fishing Mortality by year and fleet
   matrix<Type> Exploit_Biom(n_years, n_fleets); // Exploitable Biomass for a given fleet
   matrix<Type> Harvest_Rate(n_years, n_fleets); // Harvest rate calculations for a given fleet
   array<Type> CAA(n_years, n_ages, n_fleets, n_sexes); // Catch at Age
@@ -255,7 +255,7 @@ Type objective_function<Type>::operator() ()
       } // a loop
       // Increment F
       Total_Fy(y) +=  exp(ln_Fy(y, f));
-    } // f loop
+    } // f loop 
   } // y loop
   
   // Get Removals and Deaths here (Fishing and Natural Mortality)
@@ -291,8 +291,7 @@ Type objective_function<Type>::operator() ()
       if(a < n_ages - 1) { // not plus group
         NAA(0, a, s) = exp(ln_N1Devs(a)) * exp(ln_RecPars(0)) * exp(-M * Type(a)) * Sex_Ratio(s);
       } else{
-        NAA(0, a, s) = exp(ln_RecPars(0)) * exp(-M * Type(a)) /
-          (1 - exp(-M)) * Sex_Ratio(s);
+        NAA(0, a, s) = exp(ln_RecPars(0)) * exp(-M * Type(a)) / (1 - exp(-M)) * Sex_Ratio(s);
       } // plus group
     } // end s loop 
   } // end a loop

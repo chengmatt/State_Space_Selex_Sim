@@ -113,8 +113,7 @@ for(n_om in 1:n_OM_scen) {
                                 n_time_selex_pars = time_selex_npars,
                                 fix_pars = c( "ln_SigmaRec", 
                                               "ln_q_fish", 
-                                              "ln_h", 
-                                              "ln_M"), sim = sim)
+                                              "ln_h", "ln_M"), sim = sim)
       
       # Run EM model here and get sdrep
       tryCatch(expr = model <- run_EM(data = input$data, parameters = input$parameters, 

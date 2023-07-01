@@ -524,6 +524,7 @@ get_quants <- function(
   # Define parameters we want to get
   par_name <- c("ln_q_srv", 
                 "ln_RecPars", 
+                # "ln_M",
                 # "ln_srv_selpars", 
                 # "ln_fish_selpars",
                 "ln_fixed_sel_re_fish")
@@ -531,6 +532,7 @@ get_quants <- function(
   # True quantities
   t <- c(mean(q_Surv), # Catchability
          r0, # Virgin Recruitment
+         # mean(Mort_at_age), # Constant Natural Mortality
          # NA,  # Srv selex
          # NA,  # Fish selex
          NA) # Fish selex variance pars
@@ -663,6 +665,9 @@ get_quants <- function(
   
   # Selectivity is the average of the last 5 years
   est_Selex <- colMeans(model_fxn$rep$F_Slx[years[(length(years) - 4):length(years)],,,1]) # selectivity only for females
+  
+  # Get estimated natural mortality
+  # Est_NatMort <- exp(sd_rep$par.fixed[names(sd_rep$par.fixed) == "ln_M"])
   
   # Get estaimted Fx% value
   Fx_val <- get_Fx_refpt(ages = ages,

@@ -372,8 +372,12 @@ prepare_EM_input <- function(years,
   pars$ln_SigmaRec <- log(sigma_rec) # recruitment variability
   pars$ln_RecDevs <- rec_devs[years[-1],sim] * 0.3 # rec devs
   pars$ln_N1Devs <- rnorm(length(ages)-1, 0.1, 0.0) # rec devs
-  pars$ln_M <- log(mean(Mort_at_age)) # natural mortality
-  
+  if(sum(fix_pars %in% c("ln_M")) == 1) {
+    pars$ln_M <- log(mean(Mort_at_age)) # natural mortality
+  } else{
+    pars$ln_M <- log(mean(Mort_at_age)) * 0.3 # natural mortality
+  }
+
   # row sums for fish mort
   if(n_fleets == 1 & dim(Fish_Age_Comps)[3] == 1) { # 1 fleet model and truth = multiple
     pars$ln_Fy <- matrix(log(fish_mort[Fish_Start_yr[1]:length(years),,sim] * 0.3),
@@ -442,9 +446,9 @@ prepare_EM_input <- function(years,
     pars$ln_fish_selpars <- array(0, dim = c(n_fish_comps, n_sexes, 
                                              n_fish_blocks, max(n_fish_pars)))
     
-    pars$ln_fish_selpars[,,,1] <- log(0.1) # gamma parameter
-    pars$ln_fish_selpars[,,,2] <- log(0.1) # alpha parameter - doming
-    pars$ln_fish_selpars[,,,3] <- log(7) # beta parameter - rough peak area
+    pars$ln_fish_selpars[,,,1] <- log(0.3) # gamma parameter - degree of doming
+    pars$ln_fish_selpars[,,,2] <- log(7) # beta parameter - controls peak of ascending limb
+    pars$ln_fish_selpars[,,,3] <- log(0.3) # alpha parameter - moves ascending limb back (steepness of ascending limb)
   }  # if we have an exponential logistic
   
   # Time-Varying Selectivity Options (Fishery)

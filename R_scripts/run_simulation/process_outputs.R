@@ -10,13 +10,11 @@ fxn_path <- here("R_scripts", "functions")
 # Load in all functions from the functions folder
 files <- list.files(fxn_path)
 for(i in 1:length(files)) source(here(fxn_path, files[i]))
-compile_tmb(wd = here("src"), cpp = "EM.cpp")
 
 # Paths
 om_scenario_path <- here("output", "OM_Scenarios") # path to OM folder
 dir_out <- here("output", "Summary_Plots") # path to output folder
 dir.create(dir_out)
-
 
 # Collate Parameter Results -----------------------------------------------
 
@@ -27,9 +25,21 @@ ts_df <- all_results$TimeSeries_Sum # time series dataframe
 aic_df <- all_results$AIC_Sum
 unique_oms <- unique(param_df$OM_Scenario) # unique oms
 
+# Munging on AIC dataframe
+aic_df <- aic_df %>% 
+  # Changing names
+  mutate(time_comp = case_when(
+    str_detect(EM_Scenario, "Term_") ~ "Terminal", # Terminal Year
+    str_detect(EM_Scenario, "TrxE") ~ "Fleet Trans End", # Fleet Transition End
+    str_detect(EM_Scenario, "Int") ~ "Fleet Intersect" # Fleet Transition Intersects
+  ), 
+  EM_Scenario = str_remove(EM_Scenario, 'Term_|TrxE_|Int_'),
+  time_comp = factor(time_comp, levels = c("Fleet Intersect", "Fleet Trans End",
+                                           "Terminal")))
+
 # Write out time series and aic dataframe
-write.csv(ts_df, here("output", "TimeSeries_Summary.csv"))
-write.csv(aic_df, here("output", "AIC_Convergence_Summary.csv"))
+# data.table::fwrite(ts_df, here("output", "TimeSeries_Summary.csv"))
+data.table::fwrite(aic_df, here("output", "AIC_Convergence_Summary.csv"))
 
 # Parameter Results ------------------------------------------------------
 # Create relative error and CV metrics for parameters
@@ -43,13 +53,14 @@ param_df <- param_df %>%
   mutate(time_comp = case_when(
     str_detect(EM_Scenario, "Term_") ~ "Terminal", # Terminal Year
     str_detect(EM_Scenario, "TrxE") ~ "Fleet Trans End", # Fleet Transition End
-    str_detect(EM_Scenario, "Int") ~ "Fleet Intersect" # Fleet Transition Intersects
+    str_detect(EM_Scenario, "Int") ~ "Fleet Intersect", # Fleet Transition Intersects
   ),
+  EM_Scenario = str_remove(EM_Scenario, 'Term_|TrxE_|Int_'), # remove preceeding letters
   time_comp = factor(time_comp, levels = c("Terminal", "Fleet Trans End",
                                            "Fleet Intersect"))) %>% 
   data.frame()
 
-write.csv(param_df, here("output", "Parameter_Summary.csv"))
+data.table::fwrite(param_df, here("output", "Parameter_Summary.csv"))
 
 # Time Series Summary -----------------------------------------------------
 
@@ -97,16 +108,36 @@ for(i in 1:length(ts_pars)) {
   
 } # end i loop
 
-write.csv(ts_re_df, here("output", "TimeSeries_RE.csv"))
-write.csv(ts_te_df, here("output", "TimeSeries_TE.csv"))
-write.csv(ts_are_df, here("output", "TimeSeries_ARE.csv"))
+# Residual munging for time series summary plots
+ts_re_df <-  ts_re_df %>% 
+  mutate(time_comp = case_when(
+    str_detect(EM_Scenario, "Term_") ~ "Terminal", # Terminal Year
+    str_detect(EM_Scenario, "TrxE") ~ "Fleet Trans End", # Fleet Transition End
+    str_detect(EM_Scenario, "Int") ~ "Fleet Intersect" # Fleet Transition Intersects
+  ),
+  EM_Scenario = str_remove(EM_Scenario, 'Term_|TrxE_|Int_'))
 
+ts_te_df <-  ts_te_df %>% 
+  mutate(time_comp = case_when(
+    str_detect(EM_Scenario, "Term_") ~ "Terminal", # Terminal Year
+    str_detect(EM_Scenario, "TrxE") ~ "Fleet Trans End", # Fleet Transition End
+    str_detect(EM_Scenario, "Int") ~ "Fleet Intersect" # Fleet Transition Intersects
+  ),
+  EM_Scenario = str_remove(EM_Scenario, 'Term_|TrxE_|Int_'))
+
+ts_are_df <-  ts_are_df %>% 
+  mutate(time_comp = case_when(
+    str_detect(EM_Scenario, "Term_") ~ "Terminal", # Terminal Year
+    str_detect(EM_Scenario, "TrxE") ~ "Fleet Trans End", # Fleet Transition End
+    str_detect(EM_Scenario, "Int") ~ "Fleet Intersect" # Fleet Transition Intersects
+  ),
+  EM_Scenario = str_remove(EM_Scenario, 'Term_|TrxE_|Int_'))
+
+data.table::fwrite(ts_re_df, here("output", "TimeSeries_RE.csv"))
+data.table::fwrite(ts_te_df, here("output", "TimeSeries_TE.csv"))
+data.table::fwrite(ts_are_df, here("output", "TimeSeries_ARE.csv"))
 
 # Get Selectivity estimates ---------------------------------------------------------
-# Pre-allocate om list here
-om_slx_list <- list() # om selectivity estimates
-all_em_slx_list <- list() # em selectivity estimates
-
 for(i in 1:length(unique_oms)) {
   
   # List files in folder
@@ -114,7 +145,7 @@ for(i in 1:length(unique_oms)) {
   # Load in OM data
   load(here(om_scenario_path, unique_oms[i], paste(unique_oms[i], ".RData", sep = "")))
   # Remove.RData and .pdf
-  files <- files[str_detect(files, ".RData|.pdf") == FALSE]
+  files <- files[str_detect(files, ".RData|.pdf|.csv") == FALSE]
   # Pre-allocate list to store all EMs
   em_slx_list <- list()
   
@@ -127,14 +158,14 @@ for(i in 1:length(unique_oms)) {
     F_Slx_list <- list()
     
     # Get convergence statistics here
-    convergence <- param_df %>% 
-      filter(OM_Scenario == unique_oms[i], EM_Scenario == files[j], type == "F_0.4")
+    convergence <- param_df[param_df$OM_Scenario == unique_oms[i] &
+                            param_df$EM_Scenario == files[j],]
     
     # Get total biomass estimate from models here
     for(m in 1:length(model_list)) {
       
       # Get fishery selectivity from model
-      F_Slx_df <- reshape2::melt(model_list[[m]]$model_fxn$rep$F_Slx)
+      F_Slx_df <- data.table::data.table(reshape2::melt(model_list[[m]]$model_fxn$rep$F_Slx))
       names(F_Slx_df) <- c("Year", "Age", "Fleet", "Sex", "Selex")
       
       # Construct our dataframe
@@ -143,181 +174,453 @@ for(i in 1:length(unique_oms)) {
                              OM_Scenario = unique_oms[i],
                              EM_Scenario = files[j])
       
-      
       # Now bind everything together
       F_Slx_list[[m]] <- F_Slx_df_bind
-      
     } # end m 
     
     # Turn from list to dataframe
     F_Slx_mod_df <- data.table::rbindlist(F_Slx_list)
     em_slx_list[[j]] <- F_Slx_mod_df # put biomass dataframes from EMs into list
     print(j)
-    
   } # end j
   
-  # put selex dataframes from ems into all models list
-  all_em_slx_list[[i]] <- data.table::rbindlist(em_slx_list) 
-  # Get OM selectivity 
-  om_slx_df <- reshape2::melt(oms$Fish_selex_at_age[,,,,1])
-  names(om_slx_df) <- c("Year", "Age", "Fleet", "Sex", "Selex")
-  om_slx_df$OM_Scenario <- unique_oms[i]
-  om_slx_list[[i]] <- om_slx_df
-  print(i)
+  # Rbind out list
+  EM_fish_Slx <- data.table::rbindlist(em_slx_list)
   
+  # Do some residual munging and output into OM folders
+  EM_fish_Slx <- EM_fish_Slx %>% 
+    mutate(time_comp = case_when(
+      str_detect(EM_Scenario, "Term_") ~ "Terminal", # Terminal Year
+      str_detect(EM_Scenario, "TrxE") ~ "Fleet Trans End", # Fleet Transition End
+      str_detect(EM_Scenario, "Int") ~ "Fleet Intersect" # Fleet Transition Intersects
+    ),
+    time_comp = factor(time_comp, levels = c("Fleet Intersect", "Fleet Trans End", "Terminal")),
+    Sex = case_when(
+      str_detect(Sex, "1") ~ "Female",
+      str_detect(Sex, "2") ~ "Male"), 
+    EM_Scenario_Full = EM_Scenario, # Retaining full EM Scenario Name
+    EM_Scenario = str_remove(EM_Scenario, "Term_|TrxE_|Int_"))
+  
+  data.table::fwrite(EM_fish_Slx, file = here('output', "OM_Scenarios",
+                                              unique_oms[i], "EM_Fish_Selex.csv"))
+ 
+   # Get OM selectivity 
+  OM_fish_Slx <- data.table::data.table(reshape2::melt(oms$Fish_selex_at_age[,,,,1]))
+  names(OM_fish_Slx) <- c("Year", "Age", "Fleet", "Sex", "Selex")
+  OM_fish_Slx$OM_Scenario <- unique_oms[i]
+  
+  # Now parse out the numbers from this
+  OM_fish_Slx <- OM_fish_Slx %>% 
+    mutate(Year = parse_number(paste(Year)),
+           Age = parse_number(paste(Age)),
+           Fleet = parse_number(paste(Fleet)),
+           Sex = parse_number(paste(Sex)),
+           Sex = case_when( # Differentiate sexes
+             str_detect(Sex, "1") ~ "Female",
+             str_detect(Sex, "2") ~ "Male"))
+  
+  # write out csv
+  data.table::fwrite(OM_fish_Slx, file = here('output', "OM_Scenarios",
+                                              unique_oms[i], "OM_Fish_Selex.csv"))
+  
+  print(i)
 } # end i
 
-# Rbind to list all ems 
-EM_fish_Slx <- data.table::rbindlist(all_em_slx_list)
-
-# Rbind to list all oms
-OM_fish_Slx <- data.table::rbindlist(om_slx_list)
-# Now parse our the numbers rom this
-OM_fish_Slx <- OM_fish_Slx %>% 
-  mutate(Year = parse_number(paste(Year)),
-         Age = parse_number(paste(Age)),
-         Fleet = parse_number(paste(Fleet)),
-         Sex = parse_number(paste(Sex)))
-
-write.csv(EM_fish_Slx, here("output", "EM_Fish_Selex.csv"), row.names = FALSE)
-write.csv(OM_fish_Slx, here("output", "OM_Fish_Selex.csv"), row.names = FALSE)
-
-
-# Get composition fits ----------------------------------------------------
-all_em_fish_comps_list <- list() # em pred composition list
-om_fish_comps_list <- list() # om composition list
+# Now read these all back in, bind them together and output as one single file
+# Need to process huge outputs like this, or else R fucking crashes
+om_list <- list()
 
 for(i in 1:length(unique_oms)) {
-  
-  # List files in folder
-  files <- list.files(here(om_scenario_path, unique_oms[i]))
-  # Load in OM data
-  load(here(om_scenario_path, unique_oms[i], paste(unique_oms[i], ".RData", sep = "")))
-  # Remove.RData and .pdf
-  files <- files[str_detect(files, ".RData|.pdf") == FALSE]
-  # Pre-allocate list to store all EMs
-  em_fish_comps_list <- list()
-  
-  for(j in 1:length(files)) {
-    
-    # Load in .RData from model runs
-    load(here(om_scenario_path, unique_oms[i], files[j], paste(files[j], ".RData", sep = "")))
-    
-    # Pre-allocate list object here
-    Fish_comps_list <- list()
-    
-    # Get total biomass estimate from models here
-    for(m in 1:length(model_list)) {
-      
-      # Get fishery selectivity from model
-      Fish_Comps_df <- reshape2::melt(model_list[[m]]$model_fxn$rep$pred_fish_age_comps)
-      names(Fish_Comps_df) <- c("Year", "Age", "Fleet", "Sex", "Prop")
-      
-      # Check convergence here
-      convergence_status <- aic_df %>% 
-          filter(sim == m, OM_Scenario == unique_oms[i], EM_Scenario == files[j])
-        
-      # Construct our dataframe
-      F_Comps_df_bind <- cbind(Fish_Comps_df, sim = m, 
-                               conv = convergence_status$conv,
-                               OM_Scenario = unique_oms[i], EM_Scenario = files[j])
-      
-      
-      # Now bind everything together
-      Fish_comps_list[[m]] <- F_Comps_df_bind
-      
-    } # end m 
-    
-    # Turn from list to dataframe
-    Fish_Comps_mod_df <- data.table::rbindlist(Fish_comps_list)
-    em_fish_comps_list[[j]] <- Fish_Comps_mod_df # put biomass dataframes from EMs into list
-    print(j)
-    
-  } # end j
-  
-  # put selex dataframes from ems into all models list
-  all_em_fish_comps_list[[i]] <- data.table::rbindlist(em_fish_comps_list) 
-  
-  # OM Munging Comps and CAA ------------------------------------------------
-  
-  # Empty array to store stuff in for each OM 1 fleet combo
-  obs_fish_age_comps <- array(data = 0, dim = c(dim(oms$N_at_age)[1] - 1,  # years
-                                                dim(oms$N_at_age)[2], # ages
-                                                1, # fleets
-                                                dim(oms$Fish_Age_Comps)[4], # sexes
-                                                dim(oms$N_at_age)[4])) # simulations
-  
-  # Get fishery age comps for 1 fleet model
-  for(sim in 1:dim(oms$N_at_age)[4]) { # number of simulations loop 
-    # Observed catches 
-    obs_catches <- as.matrix(apply(as.matrix(oms$Catch_agg[1:50,,sim]), 1, FUN = sum), ncol = 1)
-    # Catch weighting here
-    catch_sum <- rowSums(as.matrix(oms$Catch_agg[1:50,,sim]))
-    catch_weight <- as.matrix(oms$Catch_agg[1:50,,sim]) / catch_sum 
-    
-    for(s in 1:dim(oms$Fish_Age_Comps)[4]) { # sex loop
-      for(f in 1:dim(oms$Fish_Age_Comps)[3]) { # fleet loop
-        # Filter to save as an object
-        fish_age_comps <-  oms$Fish_Age_Comps[1:(dim(oms$N_at_age)[1] - 1),,f,s,sim] * catch_weight[,f]
-        # Increment comps - fixing fleet index to 1 here
-        obs_fish_age_comps[,,1,s,sim] <- obs_fish_age_comps[,,1,s,sim] + fish_age_comps
-      } # end f loop
-    } # end s loop
-    
-    # Now, apply the proportion function over a single fleet
-    for(s in 1:dim(oms$Fish_Age_Comps)[4]) {
-      obs_fish_age_comps[,,,s, sim] <- t(apply(obs_fish_age_comps[,,,s,sim], MARGIN = 1, 
-                                               FUN=function(x) { x/sum(x) }))
-    } # s loop
-  } # end sim loop
-  
-  # one fleet comps
-  one_fleet_comps <- reshape2::melt(obs_fish_age_comps)
-  names(one_fleet_comps) <- c("Year", "Ages", "Fleets", "Sexes", "Sim", "Prop")
-  one_fleet_comps$fleet_type <- "One Fleet"
-  
-  # Empty array to store stuff in for each OM 2fleet combo
-  two_obs_fish_age_comps <- array(data = 0, dim = c(dim(oms$N_at_age)[1] - 1,  # years
-                                                    dim(oms$N_at_age)[2], # ages
-                                                    dim(oms$Fish_Age_Comps)[3], # fleets
-                                                    dim(oms$Fish_Age_Comps)[4], # sexes
-                                                    dim(oms$N_at_age)[4])) # simulations
-  
-  # Get two fleet comps
-  for(sim in 1:dim(oms$N_at_age)[4]) {
-    for(s in 1:dim(oms$Fish_Age_Comps)[4]) { # sex loop
-      for(f in 1:dim(oms$Fish_Age_Comps)[3]) { # fleet loop
-        two_obs_fish_age_comps[,,f,s, sim] <- t(
-          apply(oms$Fish_Age_Comps[1:(dim(oms$N_at_age)[1] - 1),,f,s,sim], MARGIN = 1, 
-                FUN=function(x) { x/sum(x) })
-        )
-      } # end s loop
-    } # end f loop
-  } # end sim loop
-  
-  two_fleet_comps <- reshape2::melt(two_obs_fish_age_comps)
-  names(two_fleet_comps) <- c("Year", "Ages", "Fleets", "Sexes", "Sim", "Prop")
-  two_fleet_comps$fleet_type <- "Two Fleets"
-  
-  # Now, bind the 2 fleet and one fleet dataframe together
-  fleet_comps <- rbind(one_fleet_comps, two_fleet_comps)
-  fleet_comps$OM_Scenario <- unique_oms[i] # name OM
-  om_fish_comps_list[[i]] <- fleet_comps # input into our om list
+  OM_Selex = data.table::fread(here('output', "OM_Scenarios",
+                                    unique_oms[i], "OM_Fish_Selex.csv"))
+  om_list[[i]] <- OM_Selex
   print(i)
-  
 } # end i
 
-# Rbind to list all ems 
-EM_fish_comps <- data.table::rbindlist(all_em_fish_comps_list)
-om_fish_comps_df <- data.table::rbindlist(om_fish_comps_list)
+# Write out csvs here
+data.table::fwrite(data.table::rbindlist(om_list), here("output", "OM_Fish_Selex.csv"), row.names = FALSE)
 
-write.csv(EM_fish_comps, here("output", "EM_Fish_Comps.csv"), row.names = FALSE)
-write.csv(om_fish_comps_df, here("output", "OM_Fish_Comps.csv"), row.names = FALSE)
+# Get Population Selex ----------------------------------------------------
+time_comp <- c("Fleet Intersect", "Fleet Trans End", "Terminal")
+
+### OM ----------------------------------------------------------------------
+pop_sel_om <- data.frame()
+for(i in 1:length(unique_oms)) {
+  
+  # Load in a given OM
+  load(here(om_scenario_path, unique_oms[i], paste(unique_oms[i], ".RData", sep = "")))
+  # Assessment years to filter to
+  if(str_detect(unique_oms[i], "Fast")) yr <- c(27, 30, 50)
+  if(str_detect(unique_oms[i], "Slow")) yr <- c(36, 50, 70)
+  
+  for(j in 1:length(time_comp)) {
+    
+    # Get Fratio here
+    fratio <- oms$fish_mort[yr[j],,1] / sum(oms$fish_mort[yr[j],,1])
+    
+    # Get weighted average pop selex here
+    Female <- colSums(fratio * t(oms$Fish_selex_at_age[1,,,1,1])) # female
+    Male <- colSums(fratio * t(oms$Fish_selex_at_age[1,,,2,1])) # male
+    
+    # Put this into a dataframe
+    pop_sel_df <- data.frame(cbind(Female, Male), Age = 1:30, 
+                             OM_Scenario = unique_oms[i],
+                             time_comp = time_comp[j])
+    
+    pop_sel_om <- rbind(pop_sel_df, pop_sel_om)
+    
+  } # end j loop
+} # end i loop
+
+# Residual munging here
+pop_sel_om <- pop_sel_om %>% 
+  pivot_longer(names_to = "Sex", values_to = "Selex", 
+               cols = c("Female", "Male"))
+
+data.table::fwrite(pop_sel_om, here("output", "Pop_Selex_OM.csv"))
+
+### EM ----------------------------------------------------------------------
+pop_sel_em <- data.frame()
+twofleet_pop_sel_ems <- data.frame()
+for(i in 1:length(unique_oms)) {
+  
+  # Assessment years to filter to
+  if(str_detect(unique_oms[i], "Fast")) yr <- c(27, 30, 50)
+  if(str_detect(unique_oms[i], "Slow")) yr <- c(36, 50, 70)
+  
+  # Read in EM Fishery Selex
+  EM_fish_Slx = data.table::fread(here('output', "OM_Scenarios",
+                                       unique_oms[i], "EM_Fish_Selex.csv"))
+  
+  for(j in 1:length(time_comp)) {
+    
+    # Time component filtering
+    tc_filter <- time_comp[j]
+
+    # Subset to desired dataframe
+    pop_sel_em_sub <- EM_fish_Slx %>% 
+      filter(OM_Scenario == unique_oms[i], time_comp == tc_filter,
+             Year %in% c((yr[j] - 4):yr[j]))
+    
+    # Subset to onefleet variants
+    onefleet_pop_sel_em <- pop_sel_em_sub[str_detect(pop_sel_em_sub$EM_Scenario, "1Fl")]
+    
+    # Summarize one fleet variants
+    onefleet_summary <- onefleet_pop_sel_em %>% 
+      group_by(OM_Scenario, EM_Scenario, Sex, Age, sim, time_comp) %>% 
+      summarize(Selex = mean(Selex)) %>% 
+      ungroup() %>% 
+      group_by(OM_Scenario, EM_Scenario, Sex, Age, time_comp) %>% 
+      summarize(Median_Selex = median(Selex),
+                Lwr_95 = quantile(Selex, 0),
+                Upr_95 = quantile(Selex, 1))
+    
+    # Subset to twofleet variants
+    twofleet_pop_sel_em <- pop_sel_em_sub[str_detect(pop_sel_em_sub$EM_Scenario, "2Fl")]
+    
+    # Get unique 2 fleet ems 
+    unique_models_full <- unique(twofleet_pop_sel_em$EM_Scenario_Full)
+    unique_models <- unique(twofleet_pop_sel_em$EM_Scenario)
+    
+    # Load in model_lists from unique EM models
+    for(k in 1:length(unique_models_full)) {
+      
+      # load in 2 fleet models
+      load(here(om_scenario_path, unique_oms[i], unique_models_full[k], paste(unique_models_full[k], ".RData", sep = "")))
+      
+      # Loop through simulation runs to get population selex (fratio * selexAA for both males and females)
+      for(m in 1:length(model_list)) {
+        
+        # Get Fratio - munge into matrix format
+        fratio <- matrix(exp(model_list[[m]]$sd_rep$par.fixed[names(model_list[[m]]$sd_rep$par.fixed) == "ln_Fy"]),
+                         ncol = 2, nrow = length(1:yr[j]))
+        fratio <- fratio[length(1:yr[j]),] / sum(fratio[length(1:yr[j]),])
+        
+        # Female Selectivity
+        Female <- colSums(fratio * t(colMeans(model_list[[m]]$model_fxn$rep$F_Slx[(yr[j] - 4):yr[j],,,1])))
+        # Male Selectivity
+        Male <- colSums(fratio * t(colMeans(model_list[[m]]$model_fxn$rep$F_Slx[(yr[j] - 4):yr[j],,,2])))
+        
+        # Put this into a dataframe
+        twofleet_pop_sel_df <- data.frame(cbind(Female, Male), Age = 1:30, 
+                                          OM_Scenario = unique_oms[i],
+                                          EM_Scenario = unique_models[k],
+                                          time_comp = time_comp[j],
+                                          sim = m)
+        
+        twofleet_pop_sel_ems <- rbind(twofleet_pop_sel_df, twofleet_pop_sel_ems)
+      } # end m loop
+    } # end k loop
+    
+    pop_sel_em <- rbind(pop_sel_em, onefleet_summary)
+    
+  } # end j loop
+} # end i loop
+
+# Residual munging for 2 fleet models
+twofleet_pop_sel_ems <- twofleet_pop_sel_ems %>% 
+  pivot_longer(names_to = "Sex", values_to = "Selex", cols = c("Female", "Male")) %>% 
+  group_by(OM_Scenario, EM_Scenario, Sex, Age, sim, time_comp) %>% 
+  summarize(Selex = mean(Selex)) %>% 
+  ungroup() %>% 
+  group_by(OM_Scenario, EM_Scenario, Sex, Age, time_comp) %>% 
+  summarize(Median_Selex = median(Selex),
+            Lwr_95 = quantile(Selex, 0),
+            Upr_95 = quantile(Selex, 1))
+
+pop_sel_em <- rbind(twofleet_pop_sel_ems, pop_sel_em)
+data.table::fwrite(pop_sel_em, here("output", "Pop_Selex_EM.csv"))
 
 
-### ABC using the last 5 years of selex ------------------------------------------------
-# # Preallocate memory for lists
-# om_ref_pt_list <- vector("list", length(unique_oms))
+# Get SPR from population Selex -------------------------------------------
+
+# Load in random OM to get WAA, MortAA, and MatAA
+load(here(om_scenario_path, "Fast_LL_95_Low", paste("Fast_LL_95_Low", ".RData", sep = "")))
+
+om_spr_df <- data.frame()
+em_spr_df <- data.frame()
+for(i in 1:length(unique_oms)) {
+  
+  # Filter out time-block stuff 
+  em_df <- pop_sel_em %>% filter(OM_Scenario == unique_oms[i], Sex == "Female")
+  # Get OM dataframe selex
+  om_df <- pop_sel_om %>% filter(Sex == "Female", OM_Scenario == unique_oms[i])
+  
+  for(j in 1:length(unique(om_df$time_comp))) {
+    
+    # Get true OM SPR
+    sub_om_df <- om_df %>% filter(time_comp == unique(om_df$time_comp)[j])
+    
+    # Get OM SPR Values
+    om_spr_values <- get_trialF_spr(MortAA = oms$Mort_at_age[1,,1], 
+                                    SelexAA = sub_om_df$Selex,
+                                    MatAA = oms$mat_at_age[1,,1,1], 
+                                    WAA = oms$wt_at_age[1,,1,1],
+                                    trial_F = seq(0.001, 0.5, 0.001),
+                                    F_x = 0.4) %>% 
+      mutate(OM_Scenario = unique_oms[i],
+             time_comp = unique(om_df$time_comp)[j])
+    
+    # Bind together OM SPR values
+    om_spr_df <- rbind(om_spr_df, om_spr_values)
+    
+    # Get unique EMs
+    unique_ems <- unique(em_df$EM_Scenario)
+    
+    for(e in 1:length(unique_ems)) {
+      
+      # Subset to time component
+      sub_em_df <- em_df %>% filter(time_comp == unique(om_df$time_comp)[j],
+                                    EM_Scenario == unique_ems[e])
+      
+      # Get EM SPR Values
+      em_spr_values <- get_trialF_spr(MortAA = oms$Mort_at_age[1,,1], 
+                                      SelexAA = sub_em_df$Median_Selex,
+                                      MatAA = oms$mat_at_age[1,,1,1], 
+                                      WAA = oms$wt_at_age[1,,1,1],
+                                      trial_F = seq(0.001, 0.5, 0.001),
+                                      F_x = 0.4) %>% 
+        mutate(OM_Scenario = unique_oms[i],
+               EM_Scenario = unique_ems[e],
+               time_comp = unique(om_df$time_comp)[j])
+      
+      # Bind together OM SPR values
+      em_spr_df <- rbind(em_spr_df, em_spr_values)
+      
+    } # end e loop
+  } # end j loop
+  print(i)
+} # end i loop
+
+data.table::fwrite(em_spr_df, here("output", "EM_SPR.csv"))
+data.table::fwrite(om_spr_df, here("output", "OM_SPR.csv"))
+
+
+# Sensitivity for SPR (Maturity and Selectivity Schedules) ----------------
+om_spr_mat_df <- data.frame()
+em_spr_mat_df <- data.frame()
+
+# Maturity schedules
+MatAA_OM = oms$mat_at_age[1,,1,1]
+MatAA_10 = 1 / (1 + exp(0.4 * (10 - 1:30))) # Age at 50% maturity = 10
+MatAA_4 = 1 / (1 + exp(1.25 * (4 - 1:30))) # Age at 50% maturity = 4
+
+plot(MatAA_OM, type = "l", xlab = "Age", ylab = "Maturity")
+lines(MatAA_10, type = "l", col = "blue")
+lines(MatAA_4, type = "l", col = "red")
+legend(x = 8, y = 0.5,
+       legend = c("Maturity 3 years back",  "OM Maturity", "Maturity 3 years ahead"), 
+       fill = c("red", "black", "blue"))
+
+# Maturity options
+mat_opt <- list(MatAA_OM = MatAA_OM, MatAA_10 = MatAA_10, MatAA_4 = MatAA_4)
+
+for(mat in 1:length(mat_opt)) {
+  for(i in 1:length(unique_oms)) {
+    
+    # Filter out time-block stuff 
+    em_df <- pop_sel_em %>% filter(OM_Scenario == unique_oms[i], Sex == "Female")
+    # Get OM dataframe selex
+    om_df <- pop_sel_om %>% filter(Sex == "Female", OM_Scenario == unique_oms[i])
+    
+    for(j in 1:length(unique(om_df$time_comp))) {
+      
+      # Get true OM SPR
+      sub_om_df <- om_df %>% filter(time_comp == unique(om_df$time_comp)[j])
+      
+      # Get OM SPR Values
+      om_spr_values <- get_trialF_spr(MortAA = oms$Mort_at_age[1,,1], 
+                                      SelexAA = sub_om_df$Selex,
+                                      MatAA = mat_opt[[mat]], 
+                                      WAA = oms$wt_at_age[1,,1,1],
+                                      trial_F = seq(0.001, 0.5, 0.001),
+                                      F_x = 0.4) %>% 
+        mutate(OM_Scenario = unique_oms[i],
+               time_comp = unique(om_df$time_comp)[j],
+               Mat_Opt = names(mat_opt[mat]))
+      
+      # Bind together OM SPR values
+      om_spr_mat_df <- rbind(om_spr_mat_df, om_spr_values)
+      
+      # Get unique EMs
+      unique_ems <- unique(em_df$EM_Scenario)
+      
+      for(e in 1:length(unique_ems)) {
+        
+        # Subset to time component
+        sub_em_df <- em_df %>% filter(time_comp == unique(om_df$time_comp)[j],
+                                      EM_Scenario == unique_ems[e])
+        
+        # Get EM SPR Values
+        em_spr_values <- get_trialF_spr(MortAA = oms$Mort_at_age[1,,1], 
+                                        SelexAA = sub_em_df$Median_Selex,
+                                        MatAA = mat_opt[[mat]], 
+                                        WAA = oms$wt_at_age[1,,1,1],
+                                        trial_F = seq(0.001, 0.5, 0.001),
+                                        F_x = 0.4) %>% 
+          mutate(OM_Scenario = unique_oms[i],
+                 EM_Scenario = unique_ems[e],
+                 time_comp = unique(om_df$time_comp)[j],
+                 Mat_Opt = names(mat_opt[mat]))
+        
+        # Bind together OM SPR values
+        em_spr_mat_df <- rbind(em_spr_mat_df, em_spr_values)
+        
+      } # end e loop
+    } # end j loop
+    print(i)
+  } # end i loop
+} # end maturity option loop
+
+data.table::fwrite(em_spr_mat_df, here("output", "EM_SPR_MatSens.csv"))
+data.table::fwrite(om_spr_mat_df, here("output", "OM_SPR_MatSens.csv"))
+# 
+# # Get Numbers at age ------------------------------------------------------
+# all_NAA_list <- list() # NAA estimates for both OM and EM
+# for(i in 1:length(unique_oms)) {
+#   
+#   # List files in folder
+#   files <- list.files(here(om_scenario_path, unique_oms[i]))
+#   # Load in OM data
+#   load(here(om_scenario_path, unique_oms[i], paste(unique_oms[i], ".RData", sep = "")))
+#   # Remove.RData and .pdf
+#   files <- files[str_detect(files, ".RData|.pdf|.csv") == FALSE]
+#   om_NAA_list <- list() # pre-allocate length
+#   
+#   # Get NAA for OMs
+#   om_NAA_df <- reshape2::melt(oms$N_at_age)
+#   names(om_NAA_df) <- c("Year", "Age", "Sex", "sim", "True_Numbers")
+#   
+#   # Parse numbers out
+#   om_NAA_df <- om_NAA_df %>% mutate(
+#     Year = parse_number(as.character(Year)),
+#     Age = parse_number(as.character(Age)),
+#     Sex = parse_number(as.character(Sex)),
+#     sim = parse_number(as.character(sim)))
+#   
+#   for(j in 1:length(files)) {
+#     
+#     # Load in .RData from model runs
+#     load(here(om_scenario_path, unique_oms[i], 
+#               files[j], paste(files[j], ".RData", sep = "")))
+#     
+#     # Pre-allocate list object here
+#     em_NAA_list <- list()
+#     
+#     # Get convergence statistics here
+#     convergence <- param_df[param_df$OM_Scenario == unique_oms[i] &
+#                               param_df$EM_Scenario == files[j],]
+#     
+#     # Get total biomass estimate from models here
+#     for(m in 1:length(model_list)) {
+#       
+#       # Get fishery selectivity from model
+#       em_NAA_df <- reshape2::melt(model_list[[m]]$model_fxn$rep$NAA)
+#       names(em_NAA_df) <- c("Year", "Age", "Sex", "Est_Numbers")
+#       
+#       # Subset to correct simulation
+#       om_sim_NAA = om_NAA_df[om_NAA_df$sim == m & 
+#                                om_NAA_df$Year %in% c(1:max(em_NAA_df$Year)),]$True_Numbers
+#       
+#       # Construct our dataframe
+#       em_NAA_df_bind <- cbind(em_NAA_df, sim = m, 
+#                               True_Numbers = om_sim_NAA,
+#                               conv = convergence$conv[m],
+#                               OM_Scenario = unique_oms[i],
+#                               EM_Scenario = files[j])
+#       
+#       # Now bind everything together
+#       em_NAA_list[[m]] <- em_NAA_df_bind
+#     } # end m 
+#     # Turn from list to dataframe
+#     em_NAA_df <- data.table::rbindlist(em_NAA_list)
+#     em_NAA_list[[j]] <- em_NAA_df # put dataframes from EMs into list
+#     print(j)
+#   } # end j
+#   
+#   # Rbind list and do some residual munging.
+#   em_NAA_df <- data.table::rbindlist(em_NAA_list) 
+#   
+#   # Changing some names, etc.
+#   em_NAA_df <- em_NAA_df %>% 
+#     mutate(time_comp = case_when(
+#       str_detect(EM_Scenario, "Term_") ~ "Terminal", # Terminal Year
+#       str_detect(EM_Scenario, "TrxE") ~ "Fleet Trans End", # Fleet Transition End
+#       str_detect(EM_Scenario, "Int") ~ "Fleet Intersect" # Fleet Transition Intersects
+#     ),
+#     time_comp = factor(time_comp, levels = c("Fleet Intersect", "Fleet Trans End", "Terminal")),
+#     Sex = case_when(
+#       str_detect(Sex, "1") ~ "Female",
+#       str_detect(Sex, "2") ~ "Male"), 
+#     EM_Scenario_Full = EM_Scenario, # Retaining full EM Scenario Name
+#     EM_Scenario = str_remove(EM_Scenario, "Term_|TrxE_|Int_"))
+#   
+#   # Now, output this
+#   data.table::fwrite(em_NAA_df, file = here('output', "OM_Scenarios",
+#                                               unique_oms[i], "OM_EM_NAA.csv"))
+# 
+#   print(i)
+# } # end i
+# 
+# # Now read these all back in, bind them together and output as one single file
+# NAA_om_em_list <- list()
+# 
+# for(i in 1:length(unique_oms)) {
+#   # Read in OM and EM Selex
+#   NAA_OM_EM_df = data.table::fread(here('output', "OM_Scenarios", 
+#                                     unique_oms[i], "OM_EM_NAA.csv"))
+#   # Input to list
+#   NAA_om_em_list[[i]] <- NAA_OM_EM_df
+#   print(i)
+# } # end i
+# 
+# # Write out csvs here
+# data.table::fwrite(data.table::rbindlist(NAA_om_em_list), 
+#                    here("output", "NAA_Summary.csv"), row.names = FALSE)
+# 
+# # Get composition fits ----------------------------------------------------
+# all_em_fish_comps_list <- list() # em pred composition list
+# om_fish_comps_list <- list() # om composition list
 # 
 # for(i in 1:length(unique_oms)) {
 #   
@@ -326,149 +629,123 @@ write.csv(om_fish_comps_df, here("output", "OM_Fish_Comps.csv"), row.names = FAL
 #   # Load in OM data
 #   load(here(om_scenario_path, unique_oms[i], paste(unique_oms[i], ".RData", sep = "")))
 #   # Remove.RData and .pdf
-#   files <- files[str_detect(files, ".RData|.pdf") == FALSE]
-#   
-#   # Pre allocate em list
-#   em_ref_pt_list <- vector("list", length(files))
+#   files <- files[str_detect(files, ".RData|.pdf|.csv") == FALSE]
+#   # Pre-allocate list to store all EMs
+#   em_fish_comps_list <- list()
 #   
 #   for(j in 1:length(files)) {
 #     
 #     # Load in .RData from model runs
 #     load(here(om_scenario_path, unique_oms[i], files[j], paste(files[j], ".RData", sep = "")))
 #     
-#     # Pre allocate memory for list
-#     ref_pt_list <- vector("list", length = length(model_list))
+#     # Pre-allocate list object here
+#     Fish_comps_list <- list()
 #     
-#     # Get convergence statistics here
-#     convergence <- param_df %>% 
-#       filter(OM_Scenario == unique_oms[i], EM_Scenario == files[j], type %in% c("F_0.4", "ABC"))
+#     # Get total biomass estimate from models here
+#     for(m in 1:length(model_list)) {
+#       
+#       # Get fishery selectivity from model
+#       Fish_Comps_df <- reshape2::melt(model_list[[m]]$model_fxn$rep$pred_fish_age_comps)
+#       names(Fish_Comps_df) <- c("Year", "Age", "Fleet", "Sex", "Prop")
+#       
+#       # Check convergence here
+#       convergence_status <- aic_df %>% 
+#           filter(sim == m, OM_Scenario == unique_oms[i], EM_Scenario == files[j])
+#         
+#       # Construct our dataframe
+#       F_Comps_df_bind <- cbind(Fish_Comps_df, sim = m, 
+#                                conv = convergence_status$conv,
+#                                OM_Scenario = unique_oms[i], EM_Scenario = files[j])
+#       
+#       
+#       # Now bind everything together
+#       Fish_comps_list[[m]] <- F_Comps_df_bind
+#       
+#     } # end m 
 #     
-#     for(sim in 1:length(model_list)) {
-#       
-#       # Define simulation model
-#       sim_model <- model_list[[sim]]
-#       
-#       # Define years based on em year lengths
-#       years <- 1:dim(sim_model$model_fxn$rep$FAA)[1]
-#       # Number of modelled fishery fleets
-#       nmod_fish_fleets <- dim(sim_model$model_fxn$rep$F_Slx)[3]
-#       # Get ages
-#       ages <- 1:dim(sim_model$model_fxn$rep$NAA)[2]
-#       # Get number of sexes
-#       n_sex <- dim(sim_model$model_fxn$rep$NAA)[3]
-#       
-#       # Pre-Processing first
-#       # Get Fs here
-#       if(nmod_fish_fleets > 1) {
-#         # Vector of fleets (define to multiply)
-#         fleet_num <- seq(1, nmod_fish_fleets)
-#         # Extract Fs here
-#         est_TermF <- exp(sim_model$sd_rep$par.fixed[names(sim_model$sd_rep$par.fixed) == "ln_Fy"])[c(length(years) * fleet_num)]
-#       } else{ # only 1 fleet
-#         # Extract Fs here
-#         est_TermF <- exp(sim_model$sd_rep$par.fixed[names(sim_model$sd_rep$par.fixed) == "ln_Fy"])[c(length(years))]
-#       } # else statement
-#       
-#       # Get true f40
-#       true_f40 <- get_Fx_refpt(ages = ages,
-#                                MortAA = oms$Mort_at_age[length(years),,sim], 
-#                                SelexAA = t(colMeans(oms$Fish_selex_at_age[(length(years) - 4):length(years),,,1,sim])),  # females selex
-#                                MatAA = oms$mat_at_age[length(years),,1,sim],  # females
-#                                WAA = oms$wt_at_age[length(years),,1,sim],  # females
-#                                Terminal_F = oms$fish_mort[length(years),,sim],
-#                                F_x = 0.4)
-#       
-#       # Get estimated selectivity here (last 5 years)
-#       est_Selex <- colMeans(sim_model$model_fxn$rep$F_Slx[years[(length(years) - 4):length(years)],,,1]) # selectivity only for females
-#       
-#       # Get estimated Fx% value
-#       Fx_val <- get_Fx_refpt(ages = ages,
-#                              MortAA = oms$Mort_at_age[length(years),,sim], 
-#                              SelexAA = t(est_Selex), 
-#                              MatAA = oms$mat_at_age[length(years),,1,sim], # females
-#                              WAA = oms$wt_at_age[length(years),,1,sim],  # females
-#                              Terminal_F = est_TermF, 
-#                              F_x = 0.4)
-#       # Get true abc
-#       true_ABC <- get_ABC_refpt(Fx_proj = true_f40, # F projection value
-#                                 terminal_yr = length(years), # Terminal year of the assessment
-#                                 sex_ratio = 0.5, # Assumed sex ratio
-#                                 n_ages = length(ages),  # Number of ages
-#                                 n_sex = n_sex,  # Number of sexes
-#                                 n_fleets = 2,  # Number of fishery fleets
-#                                 mean_rec = mean(oms$rec_total[1:length(years),sim], na.rm = TRUE), # mean recruitment
-#                                 term_NAA = oms$N_at_age[length(years),,,sim], # terminal year NAA
-#                                 term_F_Slx = array(colMeans(oms$Fish_selex_at_age[(length(years)-4):length(years),,,,sim]), 
-#                                                    dim = c(length(ages), 2, n_sex)), # last 5 years of selex averaged
-#                                 term_F = oms$fish_mort[length(years),,sim], # terminal year F
-#                                 MortAA = oms$Mort_at_age[length(years),,sim], # natural mortality
-#                                 WAA = oms$wt_at_age[length(years),,,sim]  ) # weight at age
-#       
-#       # Get estimated abc
-#       ABC_val <- get_ABC_refpt(Fx_proj = Fx_val, # F projeciton value
-#                                terminal_yr = length(years), # Terminal year of the assessment
-#                                sex_ratio = 0.5, # Assumed sex ratio
-#                                n_ages = length(ages),  # Number of ages
-#                                n_sex = n_sex,  # Number of sexes
-#                                n_fleets = nmod_fish_fleets,  # Number of fishery fleets
-#                                mean_rec = mean(sim_model$sd_rep$value[names(sim_model$sd_rep$value) == "Total_Rec"]),  # mean recruitment
-#                                term_NAA = sim_model$model_fxn$rep$NAA[length(years),,], # terminal year NAA
-#                                term_F_Slx = array(colMeans(sim_model$model_fxn$rep$F_Slx[years[(length(years) - 4):length(years)],,,]), # terminal year selex
-#                                                   dim = c(length(ages), nmod_fish_fleets, n_sex)), # last 5 years of selex averaged
-#                                term_F =  matrix(exp(sim_model$sd_rep$par.fixed[names(sim_model$sd_rep$par.fixed) == "ln_Fy"]), # terminal year F
-#                                                 ncol = nmod_fish_fleets, nrow = length(years))[length(years), ], 
-#                                MortAA = oms$Mort_at_age[length(years),,sim], # natural mortality at age
-#                                WAA = oms$wt_at_age[length(years),,,sim]  ) # weight at age
-#       
-#       # Create empty df for Fx% to rbind to par all dataframe
-#       F_df <- data.frame(matrix(ncol = length(names(param_df))))
-#       colnames(F_df) <- names(param_df) # replace colnames in empty df
-#       ABC_df <- data.frame(matrix(ncol = length(names(param_df))))
-#       colnames(ABC_df) <- names(param_df) # replace colnames in empty df
-#       
-#       # Get convergence status
-#       conv = convergence$conv[sim]
-#       
-#       # Now, input into empty dataframe
-#       F_df <- F_df %>% dplyr::mutate(mle_val = Fx_val, 
-#                                      type = paste("F", 0.4, "Last5", sep = "_"),
-#                                      t = true_f40,
-#                                      OM_Scenario = unique_oms[i],
-#                                      EM_Scenario = files[j])
-#       
-#       F_df$sim <- sim
-#       F_df$conv <- conv
-#       
-#       # Do the same for ABC estimates
-#       ABC_df <- ABC_df %>% dplyr::mutate(mle_val = ABC_val, 
-#                                          type = "ABC_Last5",
-#                                          t = true_ABC,
-#                                          OM_Scenario = unique_oms[i],
-#                                          EM_Scenario = files[j])
-#       
-#       ABC_df$sim <- sim
-#       ABC_df$conv <- conv
-#       
-#       
-#       ref_pt_list[[sim]] <- rbind(ABC_df, F_df)
-#       cat(crayon::green(sim))
-#       
-#     } # end simulation loop
+#     # Turn from list to dataframe
+#     Fish_Comps_mod_df <- data.table::rbindlist(Fish_comps_list)
+#     em_fish_comps_list[[j]] <- Fish_Comps_mod_df # put biomass dataframes from EMs into list
+#     print(j)
 #     
-#     ref_pt_df <- data.table::rbindlist(ref_pt_list) # list to df
-#     em_ref_pt_list[[j]] <- ref_pt_df # put df into list
-#     cat(crayon::blue(j))
-#     
-#   } # end j loop (ems)
+#   } # end j
 #   
-#   # list to df
-#   om_ref_pt_df <- data.table::rbindlist(em_ref_pt_list)
-#   om_ref_pt_list[[i]] <- om_ref_pt_df
-#   cat(crayon::red(i))
+#   # put selex dataframes from ems into all models list
+#   all_em_fish_comps_list[[i]] <- data.table::rbindlist(em_fish_comps_list) 
 #   
-# } # end i loop (oms)
+#   # OM Munging Comps and CAA ------------------------------------------------
+#   
+#   # Empty array to store stuff in for each OM 1 fleet combo
+#   obs_fish_age_comps <- array(data = 0, dim = c(dim(oms$N_at_age)[1] - 1,  # years
+#                                                 dim(oms$N_at_age)[2], # ages
+#                                                 1, # fleets
+#                                                 dim(oms$Fish_Age_Comps)[4], # sexes
+#                                                 dim(oms$N_at_age)[4])) # simulations
+#   
+#   # Get fishery age comps for 1 fleet model
+#   for(sim in 1:dim(oms$N_at_age)[4]) { # number of simulations loop 
+#     # Observed catches 
+#     obs_catches <- as.matrix(apply(as.matrix(oms$Catch_agg[1:50,,sim]), 1, FUN = sum), ncol = 1)
+#     # Catch weighting here
+#     catch_sum <- rowSums(as.matrix(oms$Catch_agg[1:50,,sim]))
+#     catch_weight <- as.matrix(oms$Catch_agg[1:50,,sim]) / catch_sum 
+#     
+#     for(s in 1:dim(oms$Fish_Age_Comps)[4]) { # sex loop
+#       for(f in 1:dim(oms$Fish_Age_Comps)[3]) { # fleet loop
+#         # Filter to save as an object
+#         fish_age_comps <-  oms$Fish_Age_Comps[1:(dim(oms$N_at_age)[1] - 1),,f,s,sim] * catch_weight[,f]
+#         # Increment comps - fixing fleet index to 1 here
+#         obs_fish_age_comps[,,1,s,sim] <- obs_fish_age_comps[,,1,s,sim] + fish_age_comps
+#       } # end f loop
+#     } # end s loop
+#     
+#     # Now, apply the proportion function over a single fleet
+#     for(s in 1:dim(oms$Fish_Age_Comps)[4]) {
+#       obs_fish_age_comps[,,,s, sim] <- t(apply(obs_fish_age_comps[,,,s,sim], MARGIN = 1, 
+#                                                FUN=function(x) { x/sum(x) }))
+#     } # s loop
+#   } # end sim loop
+#   
+#   # one fleet comps
+#   one_fleet_comps <- reshape2::melt(obs_fish_age_comps)
+#   names(one_fleet_comps) <- c("Year", "Ages", "Fleets", "Sexes", "Sim", "Prop")
+#   one_fleet_comps$fleet_type <- "One Fleet"
+#   
+#   # Empty array to store stuff in for each OM 2fleet combo
+#   two_obs_fish_age_comps <- array(data = 0, dim = c(dim(oms$N_at_age)[1] - 1,  # years
+#                                                     dim(oms$N_at_age)[2], # ages
+#                                                     dim(oms$Fish_Age_Comps)[3], # fleets
+#                                                     dim(oms$Fish_Age_Comps)[4], # sexes
+#                                                     dim(oms$N_at_age)[4])) # simulations
+#   
+#   # Get two fleet comps
+#   for(sim in 1:dim(oms$N_at_age)[4]) {
+#     for(s in 1:dim(oms$Fish_Age_Comps)[4]) { # sex loop
+#       for(f in 1:dim(oms$Fish_Age_Comps)[3]) { # fleet loop
+#         two_obs_fish_age_comps[,,f,s, sim] <- t(
+#           apply(oms$Fish_Age_Comps[1:(dim(oms$N_at_age)[1] - 1),,f,s,sim], MARGIN = 1, 
+#                 FUN=function(x) { x/sum(x) })
+#         )
+#       } # end s loop
+#     } # end f loop
+#   } # end sim loop
+#   
+#   two_fleet_comps <- reshape2::melt(two_obs_fish_age_comps)
+#   names(two_fleet_comps) <- c("Year", "Ages", "Fleets", "Sexes", "Sim", "Prop")
+#   two_fleet_comps$fleet_type <- "Two Fleets"
+#   
+#   # Now, bind the 2 fleet and one fleet dataframe together
+#   fleet_comps <- rbind(one_fleet_comps, two_fleet_comps)
+#   fleet_comps$OM_Scenario <- unique_oms[i] # name OM
+#   om_fish_comps_list[[i]] <- fleet_comps # input into our om list
+#   print(i)
+#   
+# } # end i
 # 
+# # Rbind to list all ems 
+# EM_fish_comps <- data.table::rbindlist(all_em_fish_comps_list)
+# om_fish_comps_df <- data.table::rbindlist(om_fish_comps_list)
 # 
-# # Now, put this back into a regular old dataframe
-# all_ref_pt_df <- data.table::rbindlist(om_ref_pt_list)
-
+# data.table::fwrite(EM_fish_comps, here("output", "EM_Fish_Comps.csv"), row.names = FALSE)
+# data.table::fwrite(om_fish_comps_df, here("output", "OM_Fish_Comps.csv"), row.names = FALSE)
+# 

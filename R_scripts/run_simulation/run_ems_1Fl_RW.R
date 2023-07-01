@@ -26,7 +26,7 @@ compile_tmb(wd = here("src"), cpp = "EM.cpp")
 # Read in OM and EM Scenarios
 om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v2.xlsx"), sheet = "OM")
 em_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v2.xlsx"), sheet = "EM_1Fl_RW") %>% 
-  filter(str_detect(EM_Scenario, "Est")) # Only running state space random walk models here
+  filter(!str_detect(EM_Scenario, "Est")) 
 
 # Read in spreadsheet for life history parameters
 lh_path <- here("input", "Sablefish_Inputs.xlsx")
@@ -44,7 +44,7 @@ for(n_om in 1:n_OM_scen) {
   load(here(om_path, paste(om_scenarios$OM_Scenarios[n_om],".RData",sep = "")))
   list2env(oms,globalenv()) # output into global environment
   
-  for(n_em in 1:n_EM_scen) {
+  for(n_em in 15:n_EM_scen) {
 
 # Pre-process EM ----------------------------------------------------------
 
@@ -79,7 +79,7 @@ for(n_om in 1:n_OM_scen) {
     
     # If we want to estimate as penalized likelihood
     if(fixed_sigma_re_fish != "NA") {
-      fix_pars = c( "ln_SigmaRec", "ln_q_fish", "ln_h", "ln_M", "ln_fixed_sel_re_fish")
+      fix_pars = c( "ln_SigmaRec", "ln_q_fish", "ln_h", "ln_fixed_sel_re_fish", "ln_M")
       random_fish_sel = NULL # also change RE to null - estimating this as fixed effects
     }
     
@@ -109,13 +109,13 @@ for(n_om in 1:n_OM_scen) {
                               sim = sim)
     
     # Fix sigma if sigma_fixed is not NA 
-    if(fixed_sigma_re_fish != "NA") input$parameters$ln_fixed_sel_re_fish[] <- log(fixed_sigma_re_fish)
+    if(fixed_sigma_re_fish != "NA") input$parameters$ln_fixed_sel_re_fish[] <- log(as.numeric(fixed_sigma_re_fish))
     
     # Run EM model here and get sdrep
     tryCatch(expr = model <- run_EM(data = input$data, parameters = input$parameters, 
                                     map = input$map, n.newton = 3,
                                     random = random_fish_sel, 
-                                    silent = FALSE, getsdrep = TRUE), error = function(e){e}) 
+                                    silent = TRUE, getsdrep = TRUE), error = function(e){e}) 
 
     # Check model convergence
     tryCatch(expr = convergence_status <- check_model_convergence(mle_optim = model$mle_optim,

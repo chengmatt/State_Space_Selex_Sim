@@ -51,10 +51,10 @@ Type Get_Selex(Type age,
   if(sel_model == 3) { // exponential logistic (Thompson 1994)
     
     // Extract out and exponentiate the parameters here
-    Type gamma = exp(ln_selpars(0)); 
-    Type alpha = exp(ln_selpars(1)); 
-    Type beta = exp(ln_selpars(2)); 
-    
+    Type gamma = exp(ln_selpars(0)); // Controls Doming
+    Type beta = exp(ln_selpars(1)); // Controls Peak of Ascending Limb
+    Type alpha = exp(ln_selpars(2)); // Controls Ascending Limb
+
     // Define equations to minimize mistakes
     Type first = (1 / (1 - gamma));
     Type second = pow((1 - gamma) / gamma, gamma);

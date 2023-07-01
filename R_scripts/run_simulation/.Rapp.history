@@ -1,0 +1,63 @@
+library(here)
+ls()
+library(here)
+library(here)
+library(here)
+library(here)
+# Load in all functions into the environment
+# Load in all functions into the environment#
+fxn_path <- here("R_scripts", "functions")#
+# Load in all functions from the functions folder#
+files <- list.files(fxn_path)#
+for(i in 1:length(files)) source(here(fxn_path, files[i]))#
+#
+# Paths#
+om_scenario_path <- here("output", "OM_Scenarios") # path to OM folder#
+dir_out <- here("output", "Summary_Plots") # path to output folder#
+dir.create(dir_out)#
+#
+# Collate Parameter Results -----------------------------------------------#
+#
+# Get results from self tests#
+all_results <- get_results(om_scenario_path = om_scenario_path)#
+param_df <- all_results$Parameter_Sum # parameter dataframe#
+ts_df <- all_results$TimeSeries_Sum # time series dataframe#
+aic_df <- all_results$AIC_Sum#
+unique_oms <- unique(param_df$OM_Scenario) # unique oms#
+#
+# Munging on AIC dataframe#
+aic_df <- aic_df %>% #
+  # Changing names#
+  mutate(time_comp = case_when(#
+    str_detect(EM_Scenario, "Term_") ~ "Terminal", # Terminal Year#
+    str_detect(EM_Scenario, "TrxE") ~ "Fleet Trans End", # Fleet Transition End#
+    str_detect(EM_Scenario, "Int") ~ "Fleet Intersect" # Fleet Transition Intersects#
+  ), #
+  EM_Scenario = str_remove(EM_Scenario, 'Term_|TrxE_|Int_'),#
+  time_comp = factor(time_comp, levels = c("Fleet Intersect", "Fleet Trans End",#
+                                           "Terminal")))#
+#
+# Write out time series and aic dataframe#
+write.csv(ts_df, here("output", "TimeSeries_Summary.csv"))#
+write.csv(aic_df, here("output", "AIC_Convergence_Summary.csv"))#
+#
+# Parameter Results ------------------------------------------------------#
+# Create relative error and CV metrics for parameters#
+param_df <- param_df %>% mutate(RE = (mle_val - t) / t, # Relative Error#
+                                TE = mle_val - t, # Total Error#
+                                ARE = abs(mle_val - t)/t) %>%  # Absolute Relative Error#
+  dplyr::select(-X)#
+#
+# Differentiate time components#
+param_df <- param_df %>% #
+  mutate(time_comp = case_when(#
+    str_detect(EM_Scenario, "Term_") ~ "Terminal", # Terminal Year#
+    str_detect(EM_Scenario, "TrxE") ~ "Fleet Trans End", # Fleet Transition End#
+    str_detect(EM_Scenario, "Int") ~ "Fleet Intersect", # Fleet Transition Intersects#
+  ),#
+  EM_Scenario = str_remove(EM_Scenario, 'Term_|TrxE_|Int_'), # remove preceeding letters#
+  time_comp = factor(time_comp, levels = c("Terminal", "Fleet Trans End",#
+                                           "Fleet Intersect"))) %>% #
+  data.frame()#
+#
+write.csv(param_df, here("output", "Parameter_Summary.csv"))

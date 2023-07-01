@@ -99,6 +99,56 @@ get_Fx_refpt <- function(ages,
 
 } # end function
 
+#' Title get_trialF_spr
+#'
+#' @param MortAA Vector of mortality at age
+#' @param SelexAA Vector of selectivity at age
+#' @param MatAA Vector of maturity at age
+#' @param WAA Vector of weight at age
+#' @param trial_F Vector of trial F valeus
+#' @param F_x F_x SPR rate
+#'
+#' @return
+#' @export
+#'
+#' @examples
+get_trialF_spr <- function(MortAA, 
+                           SelexAA,
+                           MatAA,
+                           WAA,
+                           trial_F,
+                           F_x = 0.4
+                           ) {
+  # Pre-Processing
+  N_Init <- 1 # Starting Numbers 
+
+  # Get Unfished SSB
+  Z <- c(0, MortAA[-length(MortAA)]) # Get Natural mortality
+  N <- N_Init * exp(-cumsum(Z)) # Calculate Numbers over the lifespan of cohort
+  SSB_Unfished <- sum(N * WAA * MatAA) # Get SSB in biomass units
+  
+  # Get SPR rates
+  spr_values <- vector()
+  spr_diff <- vector()
+  
+  # Loop through to look at SPR across Fs
+  for(i in 1:length(trial_F)) {
+    
+    # Get FAA
+    FAA = trial_F[i] * SelexAA
+    Z <- c(0, FAA[-length(FAA)] + MortAA[-length(MortAA)]) # Get Total Mortality w/o + group
+    N <- N_Init * exp(-cumsum(Z)) # Calculate Numbers over the lifespan of cohort
+    SSB_Fished <- sum(N * WAA * MatAA) # Get SSB in biomass units
+    
+    # F rate that results in x% of fished/unfished SSB
+    spr_values[i] <- abs((SSB_Fished / SSB_Unfished)) 
+    spr_diff[i] <- abs((SSB_Fished / SSB_Unfished) - F_x)  
+  } # end i loop
+
+  return(data.frame(SPR = spr_values, Diff = spr_diff, trial_F = trial_F))
+
+} # end function
+
 
 #' Title Get ABC reference points using SPR Fx%
 #'

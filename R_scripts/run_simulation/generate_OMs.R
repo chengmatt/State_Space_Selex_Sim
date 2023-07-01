@@ -99,9 +99,9 @@ for(n_om in 1:n_OM_scen) {
                                                       nrow = 2, byrow = TRUE), # Fishery Fleet 1
                                  Fish_Fleet2 = matrix(data = c(Fish_Fleet2_SelPars), 
                                                       nrow = 2, byrow = TRUE)), 
-                srv_pars = list(Srv_Fleet1 = matrix(data = c(2, 0.85, 5, 0.3), 
+                srv_pars = list(Srv_Fleet1 = matrix(data = c(2.5, 0.65, 4.5, 0.85), 
                                                     nrow = 2, byrow = TRUE))) # survey fleet 1
-  
+
   # Save as RData file
   save(oms, file = here(om_path, paste(om_scenarios$OM_Scenarios[n_om], ".RData", sep = "")))
   
