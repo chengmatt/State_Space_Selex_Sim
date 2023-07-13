@@ -50,7 +50,9 @@ param_df <- param_df %>% mutate(RE = (mle_val - t) / t, # Relative Error
 
 # Differentiate time components
 param_df <- param_df %>% 
-  mutate(time_comp = case_when(
+  mutate(
+    EM_Scenario_Full = EM_Scenario, 
+    time_comp = case_when(
     str_detect(EM_Scenario, "Term_") ~ "Terminal", # Terminal Year
     str_detect(EM_Scenario, "TrxE") ~ "Fleet Trans End", # Fleet Transition End
     str_detect(EM_Scenario, "Int") ~ "Fleet Intersect", # Fleet Transition Intersects
@@ -159,7 +161,7 @@ for(i in 1:length(unique_oms)) {
     
     # Get convergence statistics here
     convergence <- param_df[param_df$OM_Scenario == unique_oms[i] &
-                            param_df$EM_Scenario == files[j],]
+                            param_df$EM_Scenario_Full == files[j],]
     
     # Get total biomass estimate from models here
     for(m in 1:length(model_list)) {
@@ -289,8 +291,8 @@ for(i in 1:length(unique_oms)) {
   if(str_detect(unique_oms[i], "Slow")) yr <- c(36, 50, 70)
   
   # Read in EM Fishery Selex
-  EM_fish_Slx = data.table::fread(here('output', "OM_Scenarios",
-                                       unique_oms[i], "EM_Fish_Selex.csv"))
+  EM_fish_Slx = data.table::fread(here('output', "OM_Scenarios", unique_oms[i], "EM_Fish_Selex.csv"))
+  EM_fish_Slx = EM_fish_Slx[EM_fish_Slx$conv == "Converged"]
   
   for(j in 1:length(time_comp)) {
     
@@ -312,8 +314,10 @@ for(i in 1:length(unique_oms)) {
       ungroup() %>% 
       group_by(OM_Scenario, EM_Scenario, Sex, Age, time_comp) %>% 
       summarize(Median_Selex = median(Selex),
-                Lwr_95 = quantile(Selex, 0),
-                Upr_95 = quantile(Selex, 1))
+                Lwr_95 = quantile(Selex, 0.025),
+                Upr_95 = quantile(Selex, 0.975),
+                Lwr_75 = quantile(Selex, 0.125, na.rm = T),
+                Upr_75 = quantile(Selex, 0.875, na.rm = T))
     
     # Subset to twofleet variants
     twofleet_pop_sel_em <- pop_sel_em_sub[str_detect(pop_sel_em_sub$EM_Scenario, "2Fl")]
@@ -365,17 +369,18 @@ twofleet_pop_sel_ems <- twofleet_pop_sel_ems %>%
   ungroup() %>% 
   group_by(OM_Scenario, EM_Scenario, Sex, Age, time_comp) %>% 
   summarize(Median_Selex = median(Selex),
-            Lwr_95 = quantile(Selex, 0),
-            Upr_95 = quantile(Selex, 1))
+            Lwr_95 = quantile(Selex, 0.025),
+            Upr_95 = quantile(Selex, 0.975),
+            Lwr_75 = quantile(Selex, 0.125, na.rm = T),
+            Upr_75 = quantile(Selex, 0.875, na.rm = T))
 
 pop_sel_em <- rbind(twofleet_pop_sel_ems, pop_sel_em)
 data.table::fwrite(pop_sel_em, here("output", "Pop_Selex_EM.csv"))
 
-
 # Get SPR from population Selex -------------------------------------------
 
 # Load in random OM to get WAA, MortAA, and MatAA
-load(here(om_scenario_path, "Fast_LL_95_Low", paste("Fast_LL_95_Low", ".RData", sep = "")))
+load(here(om_scenario_path, "Fast_LL_High", paste("Fast_LL_High", ".RData", sep = "")))
 
 om_spr_df <- data.frame()
 em_spr_df <- data.frame()
@@ -516,108 +521,95 @@ data.table::fwrite(em_spr_mat_df, here("output", "EM_SPR_MatSens.csv"))
 data.table::fwrite(om_spr_mat_df, here("output", "OM_SPR_MatSens.csv"))
 # 
 # # Get Numbers at age ------------------------------------------------------
-# all_NAA_list <- list() # NAA estimates for both OM and EM
-# for(i in 1:length(unique_oms)) {
-#   
-#   # List files in folder
-#   files <- list.files(here(om_scenario_path, unique_oms[i]))
-#   # Load in OM data
-#   load(here(om_scenario_path, unique_oms[i], paste(unique_oms[i], ".RData", sep = "")))
-#   # Remove.RData and .pdf
-#   files <- files[str_detect(files, ".RData|.pdf|.csv") == FALSE]
-#   om_NAA_list <- list() # pre-allocate length
-#   
-#   # Get NAA for OMs
-#   om_NAA_df <- reshape2::melt(oms$N_at_age)
-#   names(om_NAA_df) <- c("Year", "Age", "Sex", "sim", "True_Numbers")
-#   
-#   # Parse numbers out
-#   om_NAA_df <- om_NAA_df %>% mutate(
-#     Year = parse_number(as.character(Year)),
-#     Age = parse_number(as.character(Age)),
-#     Sex = parse_number(as.character(Sex)),
-#     sim = parse_number(as.character(sim)))
-#   
-#   for(j in 1:length(files)) {
-#     
-#     # Load in .RData from model runs
-#     load(here(om_scenario_path, unique_oms[i], 
-#               files[j], paste(files[j], ".RData", sep = "")))
-#     
-#     # Pre-allocate list object here
-#     em_NAA_list <- list()
-#     
-#     # Get convergence statistics here
-#     convergence <- param_df[param_df$OM_Scenario == unique_oms[i] &
-#                               param_df$EM_Scenario == files[j],]
-#     
-#     # Get total biomass estimate from models here
-#     for(m in 1:length(model_list)) {
-#       
-#       # Get fishery selectivity from model
-#       em_NAA_df <- reshape2::melt(model_list[[m]]$model_fxn$rep$NAA)
-#       names(em_NAA_df) <- c("Year", "Age", "Sex", "Est_Numbers")
-#       
-#       # Subset to correct simulation
-#       om_sim_NAA = om_NAA_df[om_NAA_df$sim == m & 
-#                                om_NAA_df$Year %in% c(1:max(em_NAA_df$Year)),]$True_Numbers
-#       
-#       # Construct our dataframe
-#       em_NAA_df_bind <- cbind(em_NAA_df, sim = m, 
-#                               True_Numbers = om_sim_NAA,
-#                               conv = convergence$conv[m],
-#                               OM_Scenario = unique_oms[i],
-#                               EM_Scenario = files[j])
-#       
-#       # Now bind everything together
-#       em_NAA_list[[m]] <- em_NAA_df_bind
-#     } # end m 
-#     # Turn from list to dataframe
-#     em_NAA_df <- data.table::rbindlist(em_NAA_list)
-#     em_NAA_list[[j]] <- em_NAA_df # put dataframes from EMs into list
-#     print(j)
-#   } # end j
-#   
-#   # Rbind list and do some residual munging.
-#   em_NAA_df <- data.table::rbindlist(em_NAA_list) 
-#   
-#   # Changing some names, etc.
-#   em_NAA_df <- em_NAA_df %>% 
-#     mutate(time_comp = case_when(
-#       str_detect(EM_Scenario, "Term_") ~ "Terminal", # Terminal Year
-#       str_detect(EM_Scenario, "TrxE") ~ "Fleet Trans End", # Fleet Transition End
-#       str_detect(EM_Scenario, "Int") ~ "Fleet Intersect" # Fleet Transition Intersects
-#     ),
-#     time_comp = factor(time_comp, levels = c("Fleet Intersect", "Fleet Trans End", "Terminal")),
-#     Sex = case_when(
-#       str_detect(Sex, "1") ~ "Female",
-#       str_detect(Sex, "2") ~ "Male"), 
-#     EM_Scenario_Full = EM_Scenario, # Retaining full EM Scenario Name
-#     EM_Scenario = str_remove(EM_Scenario, "Term_|TrxE_|Int_"))
-#   
-#   # Now, output this
-#   data.table::fwrite(em_NAA_df, file = here('output', "OM_Scenarios",
-#                                               unique_oms[i], "OM_EM_NAA.csv"))
-# 
-#   print(i)
-# } # end i
-# 
-# # Now read these all back in, bind them together and output as one single file
-# NAA_om_em_list <- list()
-# 
-# for(i in 1:length(unique_oms)) {
-#   # Read in OM and EM Selex
-#   NAA_OM_EM_df = data.table::fread(here('output', "OM_Scenarios", 
-#                                     unique_oms[i], "OM_EM_NAA.csv"))
-#   # Input to list
-#   NAA_om_em_list[[i]] <- NAA_OM_EM_df
-#   print(i)
-# } # end i
-# 
-# # Write out csvs here
-# data.table::fwrite(data.table::rbindlist(NAA_om_em_list), 
-#                    here("output", "NAA_Summary.csv"), row.names = FALSE)
-# 
+all_NAA_list <- list() # NAA estimates for both OM and EM
+for(i in 1:length(unique_oms)) {
+
+  # List files in folder
+  files <- list.files(here(om_scenario_path, unique_oms[i]))
+  # Load in OM data
+  load(here(om_scenario_path, unique_oms[i], paste(unique_oms[i], ".RData", sep = "")))
+  # Remove.RData and .pdf
+  files <- files[str_detect(files, ".RData|.pdf|.csv") == FALSE]
+  om_NAA_list <- list() # pre-allocate length
+
+  # Get NAA for OMs
+  om_NAA_df <- reshape2::melt(oms$N_at_age)
+  names(om_NAA_df) <- c("Year", "Age", "Sex", "sim", "True_Numbers")
+
+  # Parse numbers out
+  om_NAA_df <- om_NAA_df %>% mutate(
+    Year = parse_number(as.character(Year)),
+    Age = parse_number(as.character(Age)),
+    Sex = parse_number(as.character(Sex)),
+    sim = parse_number(as.character(sim)))
+
+  for(j in 1:length(files)) {
+
+    # Load in .RData from model runs
+    load(here(om_scenario_path, unique_oms[i],
+              files[j], paste(files[j], ".RData", sep = "")))
+
+    # Pre-allocate list object here
+    em_NAA_list <- list()
+
+    # Get convergence statistics here
+    convergence <- param_df[param_df$OM_Scenario == unique_oms[i] &
+                              param_df$EM_Scenario_Full == files[j],]
+
+    # Get total biomass estimate from models here
+    for(m in 1:length(model_list)) {
+
+      # Get fishery selectivity from model
+      em_NAA_df <- reshape2::melt(model_list[[m]]$model_fxn$rep$NAA)
+      names(em_NAA_df) <- c("Year", "Age", "Sex", "Est_Numbers")
+
+      # Subset to correct simulation
+      om_sim_NAA = om_NAA_df[om_NAA_df$sim == m &
+                               om_NAA_df$Year %in% c(1:max(em_NAA_df$Year)),]$True_Numbers
+
+      # Construct our dataframe
+      em_NAA_df_bind <- cbind(em_NAA_df, sim = m,
+                              True_Numbers = om_sim_NAA,
+                              conv = convergence$conv[m],
+                              OM_Scenario = unique_oms[i],
+                              EM_Scenario = files[j])
+
+      # Now bind everything together
+      em_NAA_list[[m]] <- em_NAA_df_bind
+      
+    } # end m
+    
+    # Turn from list to dataframe
+    em_NAA_df <- data.table::rbindlist(em_NAA_list)
+    om_NAA_list[[j]] <- em_NAA_df # put dataframes from EMs into list
+    print(j)
+    
+  } # end j
+
+  # Rbind list and do some residual munging.
+  om_NAA_df <- data.table::rbindlist(om_NAA_list)
+
+  # Changing some names, etc.
+  om_NAA_df <- om_NAA_df %>%
+    mutate(time_comp = case_when(
+      str_detect(EM_Scenario, "Term_") ~ "Terminal", # Terminal Year
+      str_detect(EM_Scenario, "TrxE") ~ "Fleet Trans End", # Fleet Transition End
+      str_detect(EM_Scenario, "Int") ~ "Fleet Intersect" # Fleet Transition Intersects
+    ),
+    time_comp = factor(time_comp, levels = c("Fleet Intersect", "Fleet Trans End", "Terminal")),
+    Sex = case_when(
+      str_detect(Sex, "1") ~ "Female",
+      str_detect(Sex, "2") ~ "Male"),
+    EM_Scenario_Full = EM_Scenario, # Retaining full EM Scenario Name
+    EM_Scenario = str_remove(EM_Scenario, "Term_|TrxE_|Int_"))
+
+  # Now, output this
+  data.table::fwrite(om_NAA_df, file = here('output', "OM_Scenarios",
+                                              unique_oms[i], "OM_EM_NAA.csv"))
+
+  print(i)
+} # end i
+
 # # Get composition fits ----------------------------------------------------
 # all_em_fish_comps_list <- list() # em pred composition list
 # om_fish_comps_list <- list() # om composition list

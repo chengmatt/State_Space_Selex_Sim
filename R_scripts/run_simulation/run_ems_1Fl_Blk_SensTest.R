@@ -24,9 +24,9 @@ for(i in 1:length(files)) source(here(fxn_path, files[i]))
 compile_tmb(wd = here("src"), cpp = "EM.cpp")
 
 # Read in OM and EM Scenarios
-om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v2.xlsx"), sheet = "OM") %>% 
+om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "OM") %>% 
   filter(str_detect(OM_Scenarios, "Fast_"))
-em_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v2.xlsx"), 
+em_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), 
                                    sheet = "EM_Fast_Blk_SensTest") 
 
 # Read in spreadsheet for life history parameters

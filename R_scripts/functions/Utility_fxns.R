@@ -799,9 +799,8 @@ get_results <- function(om_scenario_path, exclude = NA) {
     # List out all EM Scenarios
     em_scenarios <- list.files(here(om_scenario_path, om_scenarios[i]))
     # Remove .Rdata and .pdf from em_scenarios
-    em_scenarios <- em_scenarios[str_detect(em_scenarios, ".RData") == FALSE]
-    em_scenarios <- em_scenarios[str_detect(em_scenarios, ".pdf") == FALSE]
-    
+    em_scenarios <- em_scenarios[str_detect(em_scenarios, ".RData|.pdf|.csv") == FALSE]
+
     # Pre-allocate list here
     param_em_list <- list()
     ts_em_list <- list()

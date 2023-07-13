@@ -7,3 +7,4 @@
 output/*.csv
 output/*.Rdata
 output/OM_Scenarios/
+output/Sensitivity/

@@ -24,8 +24,8 @@ for(i in 1:length(files)) source(here(fxn_path, files[i]))
 compile_tmb(wd = here("src"), cpp = "EM.cpp")
 
 # Read in OM and EM Scenarios
-om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v2.xlsx"), sheet = "OM")
-em_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v2.xlsx"), sheet = "EM_1Fl_RW") %>% 
+om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "OM") 
+em_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "EM_1Fl_RW") %>% 
   filter(!str_detect(EM_Scenario, "Est")) 
 
 # Read in spreadsheet for life history parameters
@@ -44,7 +44,7 @@ for(n_om in 1:n_OM_scen) {
   load(here(om_path, paste(om_scenarios$OM_Scenarios[n_om],".RData",sep = "")))
   list2env(oms,globalenv()) # output into global environment
   
-  for(n_em in 15:n_EM_scen) {
+  for(n_em in 1:n_EM_scen) {
 
 # Pre-process EM ----------------------------------------------------------
 

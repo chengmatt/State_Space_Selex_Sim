@@ -17,7 +17,7 @@ source(here(fxn_path, "prepare_EM_input.R"))
 dir.create(here("output", "OM_Scenarios"))
 
 # Read in OM scenarios
-om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v2.xlsx"), sheet = "OM")
+om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "OM")
 
 # Read in spreadsheet for life history parameters
 lh_path <- here("input", "Sablefish_Inputs.xlsx")
@@ -45,6 +45,7 @@ for(n_om in 1:n_OM_scen) {
   Input_N_Srv <- om_scenarios$Srv_InputN_Max[n_om] # Survey Input N
   Srv_CV <- om_scenarios$Srv_CV[n_om] # Survey Index CV
   Fish_Selex_Opt <- c(om_scenarios$Fl_1_Selex[n_om], om_scenarios$Fl_2_Selex[n_om]) # Fishery Selectivity Options
+  Input_N_Fish_Time = om_scenarios$Input_N_Fish_Time[n_om] # Whether comps are varying or constant
   
   # Selectivity parameters for Fleet 1 Females, followed by Males
   Fish_Fleet1_SelPars <- c(om_scenarios$Fl_1_Slx_Par1_F[n_om], 
@@ -80,7 +81,7 @@ for(n_om in 1:n_OM_scen) {
                 fish_likelihood = "multinomial",
                 Input_Fish_N_Max = Input_Fish_N_Max, 
                 fish_CV = c(0.1, 0.1), # not really used
-                Input_N_Fish_Time = "F_Vary", 
+                Input_N_Fish_Time = Input_N_Fish_Time, 
                 Input_N_Fish_Fixed = Input_N_Fish_Fixed, # min of Neff comps when allowed to vary
                 catch_CV = c(0.0, 0.0), 
                 q_Mean_Fish = c(0.01, 0.01),
@@ -102,11 +103,10 @@ for(n_om in 1:n_OM_scen) {
                 srv_pars = list(Srv_Fleet1 = matrix(data = c(2.5, 0.65, 4.5, 0.85), 
                                                     nrow = 2, byrow = TRUE))) # survey fleet 1
 
-  # Save as RData file
-  save(oms, file = here(om_path, paste(om_scenarios$OM_Scenarios[n_om], ".RData", sep = "")))
-  
-  # Plot OM here
-  plot_OM(path = here("output", "OM_Scenarios", om_scenarios$OM_Scenarios[n_om]), 
-          file_name = "OM_Plots.pdf")
-  
+  # Save as RData file - ifelse for sensitivity tests
+    save(oms, file = here(om_path, paste(om_scenarios$OM_Scenarios[n_om], ".RData", sep = "")))
+    
+    # Plot OM here
+    plot_OM(path = here("output", "OM_Scenarios", om_scenarios$OM_Scenarios[n_om]), 
+            file_name = "OM_Plots.pdf")
 } # end n_om loop

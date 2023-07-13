@@ -107,7 +107,8 @@ prepare_EM_input <- function(years,
     if(Fish_Comp_Like_Model %in% c("dirichlet_multionimal", "multinomial")) { # if mutlinomial or DM
       # Effective sample size
       for(s in 1:n_sexes) {
-        obs_fish_age_Input_N[,1,s] <- rowSums(floor(obs_fish_age_comps[,,,s]))
+        # obs_fish_age_Input_N[,1,s] <- floor(rowSums(obs_fish_age_comps[,,,s]))
+        obs_fish_age_Input_N[,1,s] <- round(rowSums(Input_N_Fish[Fish_Start_yr[1]:length(years),] * catch_weight))
       } # s loop
     } else{ # Dirichlet input sample sizes - weigh by the catch and input N (bc simulation sums to 1)
       # Effective sample size
@@ -439,7 +440,7 @@ prepare_EM_input <- function(years,
   # need to do slightly different starting values here, b/c exp_logistic is a lil finicky
   if(sum(reshape2::melt(F_Slx_Model_Input)$value == "exp_logistic") == 0) { 
     # if we don't have exponential logistic or double logistic
-    pars$ln_fish_selpars <- array(log(rnorm(1, 8, 0)), 
+    pars$ln_fish_selpars <- array(log(rnorm(1, 5, 0)), 
                                   dim = c(n_fish_comps, n_sexes, 
                                           n_fish_blocks, max(n_fish_pars)))
   } else{
