@@ -394,7 +394,7 @@ pdf(file = here("figs", "Manuscript_Figures", "MinMax_Summary.pdf"), width = 25,
       facet_wrap(~time_comp, scales = "free_x") +
       geom_text(color = ifelse(minmax_df$median ==  minmax_df$max_median &
                                  minmax_df$median != minmax_df$min_max_medians, "red", 
-                               ifelse(minmax_df$median ==  minmax_df$min_max_medians, "green4", "black")),
+                               ifelse(minmax_df$median ==  minmax_df$min_max_medians, "green2", "black")),
                 size = 5.5) +
       scale_fill_distiller(palette = "Spectral", direction = -1) + 
       scale_x_discrete(guide = guide_axis(angle = 90)) +
