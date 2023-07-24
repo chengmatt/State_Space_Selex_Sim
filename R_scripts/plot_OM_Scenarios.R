@@ -454,11 +454,11 @@ dev.off()
 # Combine Plots -----------------------------------------------------------
 
 
-pdf(here("figs", "OM_Scenarios", "Comb_OM_Scenarios.pdf"), width = 17, height = 13)
+pdf(here("figs", "OM_Scenarios", "Fig1_OM_Scenarios.pdf"), width = 17, height = 13)
 
 # Combine plots
-comb_plots = ggpubr::ggarrange(selex_plot, 
-                  ssb_plot, catch_plot, ncol = 3, 
+comb_plots = ggpubr::ggarrange(selex_plot, catch_plot,
+                  ssb_plot, ncol = 3, 
                   labels = c("B", "C", "D"),
                   common.legend = FALSE,  label.x = -0.005,
                   font.label=list(color="black",size = 25))
