@@ -115,6 +115,14 @@ print(
 
 dev.off()
 
+
+# d = ts_re_om %>% 
+#   filter(str_detect(EM_Scenario, "RW"),
+#          str_detect(OM_Scenario, "Slow"),
+#          par_name == "Spawning Stock Biomass",
+#          Dat_Qual == "High")
+
+
 ### Figure 3 (Fast Parameter Summary Plot) ----------------------------------------------------------------
 
 # Filter to relevant components for parameters
@@ -192,6 +200,11 @@ print(
 )
 dev.off()  
 
+# e = pt_rg_re %>% filter(Dat_Qual == "High", 
+#                         type == "ABC",
+#                         str_detect(EM_Scenario, "RW"),
+#                         str_detect(OM_Scenario, "Slow"))
+
 ### Figure 4 (Slow SSB Plot) ----------------------------------------------------------------
 
 pdf(here("figs", "Manuscript_Figures", "Fig4_SlowSSB_High.pdf"), width = 15, height = 8)
@@ -249,7 +262,7 @@ dev.off()
 # Relative error of time series
 ts_re_om <- ts_re_df %>% filter(time_comp %in% c("Terminal", "Fleet Trans End"),
                                 str_detect(OM_Scenario, "Fast"),
-                                str_detect(EM_Scenario, blk_sens_mods),
+                                str_detect(EM_Scenario, "Blk"),
                                 par_name %in% c("Spawning Stock Biomass",
                                                 "Total Fishing Mortality")) %>% 
   mutate(Dat_Qual = case_when(
@@ -275,6 +288,12 @@ ggplot(ts_re_om %>% filter(Dat_Qual == "Data Quality: High",
   theme(legend.position = "top", title = element_text(size = 20),
         axis.text = element_text(size = 13), strip.text = element_text(size = 13)) 
 dev.off()
+
+# d = ts_re_om %>%
+#   filter(str_detect(EM_Scenario, "LGam_Blk_2"),
+#          par_name == "Spawning Stock Biomass",
+#          str_detect(OM_Scenario, "Fast_LG_Y"),
+#          Dat_Qual == "Data Quality: High")
 
 ### Figure 7 (Minimax Solution) ----------------------------------------------
 
@@ -334,6 +353,15 @@ pdf(file = here("figs", "Manuscript_Figures", "Fig7_MinMax_Summary.pdf"), width 
             legend.key.width = unit(1, "cm"))
   )
 dev.off()
+
+# Figure out lowest MARE across OM scenarios
+result <- minmax_df %>%
+  group_by(OM_Scenario, Dat_Qual, time_comp) %>%
+  mutate(min = min(median)) %>% 
+  filter(median == min) %>% 
+  group_by(EM_Scenario, time_comp) %>% 
+  count()
+  
 
 # Supplemental Figures ----------------------------------------------------
 
@@ -473,7 +501,8 @@ ts_re_om <- ts_re_df %>% filter(str_detect(EM_Scenario, all_models)) %>%
     str_detect(OM_Scenario, "Low") ~ 'Data Quality: Low'
   ),  OM_Scenario = str_remove(OM_Scenario, "_High|_Low"),
   EM_Scenario = str_replace(EM_Scenario, "Gam", "G"),
-  EM_Scenario = str_remove(EM_Scenario, "_1.25|_2.0"))
+  EM_Scenario = str_remove(EM_Scenario, "_1.25|_2.0"),
+  OM_Scenario = factor(OM_Scenario, levels = c(fast_om_plot_order, slow_om_plot_order)))
 
 # Set order for plot
 order <- vector()
@@ -735,4 +764,34 @@ ggplot(ts_re_om %>% filter(Dat_Qual == "Data Quality: Low",
   theme(legend.position = "top", title = element_text(size = 20),
         axis.text = element_text(size = 13), strip.text = element_text(size = 13)) 
 dev.off()
+
+
+# Figure out time block ABC bias ------------------------------------------
+
+# Filter to relevant components for parameters
+om_scenario_params <- param_df %>% filter(str_detect(EM_Scenario, "Blk"), 
+                                          type == "ABC") %>%
+  mutate(Dat_Qual = case_when(
+    str_detect(OM_Scenario, "High") ~ 'High',
+    str_detect(OM_Scenario, "Low") ~ 'Low'
+  ), OM_Scenario = str_remove(OM_Scenario, "_High|_Low"))
+
+# Point ranges for relative error and total error
+pt_rg_re <- om_scenario_params %>% 
+  group_by(OM_Scenario, EM_Scenario, time_comp, type, Dat_Qual) %>% 
+  summarize(median = median(RE), 
+            lwr_95 = quantile(RE, 0.025),
+            upr_95 =  quantile(RE, 0.975))
+
+# Clarify names
+pt_rg_re <- pt_rg_re %>% 
+  mutate(
+  EM_Scenario = str_remove(EM_Scenario, "_1.25|_2.0"),
+  EM_Scenario = str_replace(EM_Scenario, "Gam", "G")
+  )
+
+# e = pt_rg_re %>% filter(Dat_Qual == "High",
+#                         type == "ABC",
+#                         str_detect(OM_Scenario, "Fast_LG_Y"),
+#                         str_detect(EM_Scenario, "LG_Blk_3"))
 

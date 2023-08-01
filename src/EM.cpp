@@ -471,10 +471,11 @@ Type objective_function<Type>::operator() ()
       
       // Get likelihood here
       catch_nLL(y, f) -= use_catch(y, f) * dnorm(log(obs_catches(y, f)),
-                         log(pred_catches(y, f)), catch_sd(f), true);
+                         log(pred_catches(y, f)) - pow(catch_sd(f), 2)/2, catch_sd(f), true);
       
       SIMULATE{ // Simulate catch
-        obs_catches(y, f) = exp(rnorm(log(pred_catches(y, f)), catch_sd(f) ));
+        obs_catches(y, f) = exp(rnorm(log(pred_catches(y, f)) - 
+                            pow(catch_sd(f), 2)/2, catch_sd(f) ));
       } // Simulation statement
       
     } // f loop

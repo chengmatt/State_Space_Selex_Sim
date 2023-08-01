@@ -17,7 +17,7 @@ source(here(fxn_path, "prepare_EM_input.R"))
 dir.create(here("output", "OM_Scenarios"))
 
 # Read in OM scenarios
-om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "OM")
+om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "OM") 
 
 # Read in spreadsheet for life history parameters
 lh_path <- here("input", "Sablefish_Inputs.xlsx")

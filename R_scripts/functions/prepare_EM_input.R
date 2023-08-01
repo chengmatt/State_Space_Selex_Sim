@@ -378,7 +378,7 @@ prepare_EM_input <- function(years,
   } else{
     pars$ln_M <- log(mean(Mort_at_age)) * 0.3 # natural mortality
   }
-
+  
   # row sums for fish mort
   if(n_fleets == 1 & dim(Fish_Age_Comps)[3] == 1) { # 1 fleet model and truth = multiple
     pars$ln_Fy <- matrix(log(fish_mort[Fish_Start_yr[1]:length(years),,sim] * 0.3),

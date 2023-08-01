@@ -319,6 +319,44 @@ pdf(here("figs", "OM_Scenarios", "Catch_Scenarios.pdf"), width = 28, height = 10
           strip.text = element_text(size = 11)) )
 dev.off()
 
+# Aggregated catch
+agg_catch = catch_df %>% 
+  drop_na() %>% 
+  filter(str_detect(OM_Scenario, "_High")) %>% 
+  mutate(Year = parse_number(as.character(Year)),
+         Fleet = parse_number(as.character(Fleet)),
+         OM_Scenario = str_remove(OM_Scenario, "_High"),
+         Speed = ifelse(str_detect(OM_Scenario, "Fast"), "Fast", "Slow"),
+         Selex = ifelse(str_detect(OM_Scenario, "LG_O"), "Logistic-Gamma-Old (LG_O)", 
+                        ifelse(str_detect(OM_Scenario, "LG_Y"), 'Logistic-Gamma-Young (LG_Y)', "Logistic-Logistic (LL)")),
+         Selex = factor(Selex, levels = c("Logistic-Logistic (LL)", 
+                                          "Logistic-Gamma-Old (LG_O)",
+                                          "Logistic-Gamma-Young (LG_Y)"))) %>% 
+  group_by(Year, OM_Scenario, Speed, Selex, Sim) %>% 
+  mutate(Sum_Catch = sum(Value)) %>% 
+  ungroup() %>% 
+  group_by(Year, OM_Scenario, Speed, Selex) %>% 
+  summarize(
+    Median_HR = median(Sum_Catch),
+    Lwr_95_HR = quantile(Sum_Catch, 0.025),
+    Upr_95_HR = quantile(Sum_Catch, 0.975))
+
+(ggplot(agg_catch, aes(x = Year, y = Median_HR,  
+                                        ymin = Lwr_95_HR, ymax = Upr_95_HR,
+                                        fill = Speed, color = Speed)) +
+    geom_ribbon(alpha = 0.35) +
+    geom_line(size = 1.5) +
+    facet_grid(Selex~., scales = "free_x") +
+    labs(x = "Year", y = "Catch", fill = "Fleet",
+         color = "Fleet", linetype = "Fleet") +
+    theme_bw() +
+    theme(legend.position = "top",
+          axis.title = element_text(size = 17),
+          axis.text = element_text(size = 15, color = "black"),
+          legend.title = element_text(size = 17),
+          legend.text = element_text(size = 15),
+          strip.text = element_text(size = 11)) )
+
 # Catch Ratio
 ratio_df <- catch_df %>% 
   drop_na() %>% 
@@ -455,14 +493,12 @@ dev.off()
 
 
 pdf(here("figs", "OM_Scenarios", "Fig1_OM_Scenarios.pdf"), width = 17, height = 13)
-
 # Combine plots
 comb_plots = ggpubr::ggarrange(selex_plot, catch_plot,
                   ssb_plot, ncol = 3, 
                   labels = c("B", "C", "D"),
                   common.legend = FALSE,  label.x = -0.005,
                   font.label=list(color="black",size = 25))
-
 # Now get all plots
 ggpubr::ggarrange(fmort_plot, comb_plots, 
                   labels = "A",
@@ -470,7 +506,6 @@ ggpubr::ggarrange(fmort_plot, comb_plots,
                   label.y = 0.95,
                   font.label=list(color="black",size = 25),
                   ncol = 1, heights = c(0.6, 1))
-
 dev.off()
 
 
