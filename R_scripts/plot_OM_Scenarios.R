@@ -36,7 +36,7 @@ selexf1 <- cbind(1 / (1 + exp(-1 * ((bins - a50f1)/deltaf1) )) , "Females", "Fle
 selexf2 <- cbind(1 / (1 + exp(-1 * ((bins - a50f2)/deltaf2) )) , "Females", "Fleet 2", age = bins)
 
 # Bind these together
-selex_logist <- data.frame(rbind(selexm1, selexm2, selexf1, selexf2), Type = "Logistic-Logistic (LL)")
+selex_logist <- data.frame(rbind(selexm1, selexm2, selexf1, selexf2), Type = "Logist_Logist")
 colnames(selex_logist) <- c("Selex", "Sex", "Fleet", "Age", "Type")
 
 ### Logistic-Gamma (Old) ----------------------------------------------------------
@@ -54,7 +54,7 @@ pf2 <- (0.5 * (sqrt(amaxf2^2 + 4*deltaf2^2) - amaxf2))
 selex_f2 <- cbind((bins/amaxf2) ^ (amaxf2/pf2) * exp((amaxf2 - bins) / pf2), "Females", "Fleet 2", age = bins)
 
 # Bind these together
-selex_gamma_old <- data.frame(rbind(selexm1, selex_m2, selexf1, selex_f2), Type = "Logistic-Gamma-Old (LG_O)")
+selex_gamma_old <- data.frame(rbind(selexm1, selex_m2, selexf1, selex_f2), Type = "Logist-Gamma-Old")
 colnames(selex_gamma_old) <- c("Selex", "Sex", "Fleet", "Age", "Type")
 
 
@@ -72,7 +72,7 @@ pf2 <- (0.5 * (sqrt(amaxf2^2 + 4*deltaf2^2) - amaxf2))
 selex_f2 <- cbind((bins/amaxf2) ^ (amaxf2/pf2) * exp((amaxf2 - bins) / pf2), "Females", "Fleet 2", age = bins)
 
 # Bind these together
-selex_gamma_young <- data.frame(rbind(selexm1, selex_m2, selexf1, selex_f2), Type = "Logistic-Gamma-Young (LG_Y)")
+selex_gamma_young <- data.frame(rbind(selexm1, selex_m2, selexf1, selex_f2), Type = "Logist-Gamma-Young")
 colnames(selex_gamma_young) <- c("Selex", "Sex", "Fleet", "Age", "Type")
 
 
@@ -84,9 +84,9 @@ selex_all <- rbind(selex_logist, selex_gamma_old, selex_gamma_young)
 pdf(here("figs", "OM_Scenarios", "selex_scenario.pdf"), width = 15, height = 5)
 (selex_plot <- ggplot(selex_all %>% 
                         mutate(Type = factor(Type,
-                                             levels = c("Logistic-Logistic (LL)",
-                                                        "Logistic-Gamma-Old (LG_O)",
-                                                        "Logistic-Gamma-Young (LG_Y)"))), aes(x = as.numeric(Age), 
+                                             levels = c("Logist_Logist",
+                                                        "Logist-Gamma-Old",
+                                                        "Logist-Gamma-Young"))), aes(x = as.numeric(Age), 
                                      y = as.numeric(paste(Selex)), 
                                      lty = factor(Fleet))) +
   geom_line(size = 1.5, alpha = 1) + 
@@ -98,7 +98,7 @@ pdf(here("figs", "OM_Scenarios", "selex_scenario.pdf"), width = 15, height = 5)
         axis.text = element_text(size = 15, color = "black"),
         legend.title = element_text(size = 17),
         legend.text = element_text(size = 15),
-        strip.text = element_text(size = 11)))
+        strip.text = element_text(size = 15)))
 dev.off()
 
 # Get Quantities from OMs -------------------------------------------------------
@@ -219,9 +219,9 @@ pdf(here("figs", "OM_Scenarios", "F_Scenario.pdf"), width = 20, height = 10)
         axis.title = element_text(size = 17),
         legend.key.size = unit(1.5, "cm"),
         axis.text = element_text(size = 15, color = "black"),
-        legend.title = element_text(size = 17),
-        legend.text = element_text(size = 15),
-        strip.text = element_text(size = 11)))
+        legend.title = element_text(size = 20),
+        legend.text = element_text(size = 17),
+        strip.text = element_text(size = 17)))
 
 dev.off()
 
@@ -292,11 +292,11 @@ catch_df_sum <- catch_df %>%
          Fleet = parse_number(as.character(Fleet)),
          OM_Scenario = str_remove(OM_Scenario, "_High"),
          Speed = ifelse(str_detect(OM_Scenario, "Fast"), "Fast", "Slow"),
-         Selex = ifelse(str_detect(OM_Scenario, "LG_O"), "Logistic-Gamma-Old (LG_O)", 
-                 ifelse(str_detect(OM_Scenario, "LG_Y"), 'Logistic-Gamma-Young (LG_Y)', "Logistic-Logistic (LL)")),
-         Selex = factor(Selex, levels = c("Logistic-Logistic (LL)", 
-                                          "Logistic-Gamma-Old (LG_O)",
-                                          "Logistic-Gamma-Young (LG_Y)"))) %>% 
+         Selex = ifelse(str_detect(OM_Scenario, "LG_O"), "Logist-Gamma-Old", 
+                 ifelse(str_detect(OM_Scenario, "LG_Y"), 'Logist-Gamma-Young', "Logist-Logist")),
+         Selex = factor(Selex, levels = c("Logist-Logist", 
+                                          "Logist-Gamma-Old",
+                                          "Logist-Gamma-Young"))) %>% 
   group_by(Year, OM_Scenario, Fleet, Speed, Selex) %>% 
   summarize(Median_HR = median(Value),
             Lwr_95_HR = quantile(Value, 0.025),
@@ -314,9 +314,7 @@ pdf(here("figs", "OM_Scenarios", "Catch_Scenarios.pdf"), width = 28, height = 10
     theme(legend.position = "none",
           axis.title = element_text(size = 17),
           axis.text = element_text(size = 15, color = "black"),
-          legend.title = element_text(size = 17),
-          legend.text = element_text(size = 15),
-          strip.text = element_text(size = 11)) )
+          strip.text = element_text(size = 17)) )
 dev.off()
 
 # Aggregated catch
@@ -327,11 +325,11 @@ agg_catch = catch_df %>%
          Fleet = parse_number(as.character(Fleet)),
          OM_Scenario = str_remove(OM_Scenario, "_High"),
          Speed = ifelse(str_detect(OM_Scenario, "Fast"), "Fast", "Slow"),
-         Selex = ifelse(str_detect(OM_Scenario, "LG_O"), "Logistic-Gamma-Old (LG_O)", 
-                        ifelse(str_detect(OM_Scenario, "LG_Y"), 'Logistic-Gamma-Young (LG_Y)', "Logistic-Logistic (LL)")),
-         Selex = factor(Selex, levels = c("Logistic-Logistic (LL)", 
-                                          "Logistic-Gamma-Old (LG_O)",
-                                          "Logistic-Gamma-Young (LG_Y)"))) %>% 
+         Selex = ifelse(str_detect(OM_Scenario, "LG_O"), "Logist-Gamma-Old", 
+                        ifelse(str_detect(OM_Scenario, "LG_Y"), 'Logist-Gamma-Young', "Logist-Logist")),
+         Selex = factor(Selex, levels = c("Logist-Logist", 
+                                          "Logist-Gamma-Old",
+                                          "Logist-Gamma-Young"))) %>% 
   group_by(Year, OM_Scenario, Speed, Selex, Sim) %>% 
   mutate(Sum_Catch = sum(Value)) %>% 
   ungroup() %>% 
@@ -406,12 +404,12 @@ ssb_plot_df <- ssb_df %>%
   filter(str_detect(OM_Scenario, "High")) %>% 
   mutate(OM_Scenario = str_remove(OM_Scenario, "_High"),
          Speed = ifelse(str_detect(OM_Scenario, "Fast"), "Fast", "Slow"),
-         Sel_Type = ifelse(str_detect(OM_Scenario, "LG_O"), "Logistic-Gamma-Old (LG_O)", 
+         Sel_Type = ifelse(str_detect(OM_Scenario, "LG_O"), "Logist-Gamma-Old", 
                            ifelse(str_detect(OM_Scenario, "LG_Y"),
-                                  'Logistic-Gamma-Young (LG_Y)', "Logistic-Logistic (LL)")),
-         Sel_Type = factor(Sel_Type, levels = c("Logistic-Logistic (LL)", 
-                                                "Logistic-Gamma-Old (LG_O)",
-                                                "Logistic-Gamma-Young (LG_Y)"))) %>% 
+                                  'Logist-Gamma-Young', "Logist-Logist")),
+         Sel_Type = factor(Sel_Type, levels = c("Logist-Logist", 
+                                                "Logist-Gamma-Old",
+                                                "Logist-Gamma-Young"))) %>% 
   group_by(OM_Scenario, Year, Sel_Type, Speed) %>% 
   summarize(median = median(Value),
          Lwr_95 = quantile(Value, 0.025),
@@ -431,7 +429,7 @@ pdf(here("figs", "OM_Scenarios", "SBB_Trajectory.pdf"), width = 18, height = 10)
         axis.text = element_text(size = 15, color = "black"),
         legend.title = element_text(size = 17),
         legend.text = element_text(size = 15),
-        strip.text = element_text(size = 11)) )
+        strip.text = element_text(size = 15)) )
 dev.off()
 
 # Numbers at Age ----------------------------------------------------------
