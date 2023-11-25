@@ -170,6 +170,17 @@ Type objective_function<Type>::operator() ()
         } // p loop
       } // end random walk if statement
       
+      if(F_Slx_re_model(f, s) == 1) { // Semi-parametric deviations (year x age)
+        
+        for(int a = 0; a < n_ages; a++) {
+          for(int y = 0; y < n_re_years; y++) {
+            // penalize deviations
+            fish_sel_re_nLL -= dnorm(ln_fish_selpars_re(y, a, f, s), 
+                                     Type(0.0), exp(ln_fixed_sel_re_fish(f, s)), true);
+          } // y loop
+        } // p loop
+      } // end random walk if statement
+      
     } // s loop
   } // f loop
   
@@ -179,7 +190,7 @@ Type objective_function<Type>::operator() ()
       
       // Index fishery blocks here
       int b = F_Slx_Blocks(y, f);
-      
+       
       for(int s = 0; s < n_sexes; s++) {
         
         // Define and extract selectivity parameters to feed into our 
@@ -210,8 +221,16 @@ Type objective_function<Type>::operator() ()
           Type fish_age_idx = ages(a);
           
           // Get selex value
-          F_Slx(y,a,f,s) = Get_Selex(fish_age_idx, F_Slx_model(y,f), tmp_ln_fish_selpars);
-           
+          if(F_Slx_re_model(f, s) == 1) { // if semi-parametric
+            if(y == 0) {
+              F_Slx(y,a,f,s) = Get_Selex(fish_age_idx, F_Slx_model(y,f), tmp_ln_fish_selpars); // estimate parametric form
+              F_Slx(y,a,f,s) * exp(ln_fish_selpars_re(y, a, f, s)); // then estimate deviations from the parametric form
+            } // end first year
+            if(y > 0) F_Slx(y,a,f,s) = F_Slx(y-1 ,a,f,s) * exp(ln_fish_selpars_re(y, a, f, s));
+          } else{ // not semi-parametric (either random walk or time-invariant)
+            F_Slx(y,a,f,s) = Get_Selex(fish_age_idx, F_Slx_model(y,f), tmp_ln_fish_selpars);
+          } // end if else 
+            
         } // a loop
       } // s loop
     } // f loop

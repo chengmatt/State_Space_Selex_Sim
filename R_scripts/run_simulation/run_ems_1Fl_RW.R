@@ -8,12 +8,12 @@ rm(list=ls()) # remove objects prior to running
 library(here)
 library(tidyverse)
 library(TMB)
-library(doSNOW)
+library(doParallel)
 library(parallel)
 
 ncores <- detectCores() 
-cl <- makeCluster(ncores - 2)
-registerDoSNOW(cl)
+cl <- makeCluster(ncores - 4)
+registerDoParallel(cl)
 
 # Load in all functions into the environment
 fxn_path <- here("R_scripts", "functions")
@@ -26,7 +26,7 @@ compile_tmb(wd = here("src"), cpp = "EM.cpp")
 # Read in OM and EM Scenarios
 om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "OM") 
 em_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "EM_1Fl_RW") %>% 
-  filter(!str_detect(EM_Scenario, "Est")) 
+  filter(str_detect(EM_Scenario, "SP")) 
 
 # Read in spreadsheet for life history parameters
 lh_path <- here("input", "Sablefish_Inputs.xlsx")
@@ -35,7 +35,7 @@ lh_path <- here("input", "Sablefish_Inputs.xlsx")
 n_OM_scen <- length(om_scenarios$OM_Scenarios)
 n_EM_scen <- length(em_scenarios$EM_Scenario)
 
-for(n_om in 1:n_OM_scen) {
+for(n_om in 5:n_OM_scen) {
 
 # Load OM -----------------------------------------------------------------
   
@@ -66,14 +66,18 @@ for(n_om in 1:n_OM_scen) {
     time_selex_npars <- em_scenarios$Time_Selex_Npars[n_em] # Number of time-varying selectivity parameters 
     random_fish_sel <- em_scenarios$Random_Effects[n_em] # wheter or not fishery selex is time-varying via random effects
     fixed_sigma_re_fish <- em_scenarios$Sigma_Fixed[n_em] # get sigma value to fix at
-    
+    share_ages_em <- em_scenarios$share_ages[n_em] # get ages to share for semi-parametric selex (if SP)
+
     # Run Simulations ---------------------------------------------------------
     
-    sim_models <- foreach(sim = 1:n_sims,
+    sim_models <- foreach(sim = 1:n_sims, .export = ls(globalenv()),
                           .packages = c("TMB", "here", "tidyverse")) %dopar% {
-                   
+    
+    # for(sim in 1:n_sims) {
     compile_tmb(wd = here("src"), cpp = "EM.cpp")
-                            
+    # dyn.unload(dynlib("EM"))
+    dyn.load(dynlib("EM"))
+    
     # Choose which parameters to fix
     if(fixed_sigma_re_fish == "NA") fix_pars = c( "ln_SigmaRec", "ln_q_fish", "ln_h", "ln_M")
     
@@ -103,27 +107,38 @@ for(n_om in 1:n_OM_scen) {
                               rec_model = "BH", 
                               F_Slx_Model_Input = fish_selex_opt,
                               S_Slx_Model_Input = c("logistic"), # logistic
-                              time_selex = time_selex, 
+                              time_selex = time_selex,  
+                              share_ages = as.numeric(share_ages_em),
                               n_time_selex_pars = as.numeric(time_selex_npars),
                               fix_pars = fix_pars,
                               sim = sim)
     
+
     # Fix sigma if sigma_fixed is not NA 
     if(fixed_sigma_re_fish != "NA") input$parameters$ln_fixed_sel_re_fish[] <- log(as.numeric(fixed_sigma_re_fish))
     
     # Run EM model here and get sdrep
+    model = list() # to ensure foreach loop doesnt break b/c of not detecting exported obj
     tryCatch(expr = model <- run_EM(data = input$data, parameters = input$parameters, 
                                     map = input$map, n.newton = 3,
                                     random = random_fish_sel, 
-                                    silent = TRUE, getsdrep = TRUE), error = function(e){e}) 
+                                    silent = T, getsdrep = TRUE), error = function(e){e}) 
+
+    # image(model$model_fxn$rep$F_Slx[,,1,1])
+    # for(i in 1:49) {
+    #   if(i==1) plot(model$model_fxn$rep$F_Slx[i,,1,1], type = "l", ylim = c(0,3))
+    #   else lines(model$model_fxn$rep$F_Slx[i,,1,1], type = "l")
+    # }
 
     # Check model convergence
+    convergence_status = list() # to ensure foreach loop doesnt break b/c of not detecting exported obj
     tryCatch(expr = convergence_status <- check_model_convergence(mle_optim = model$mle_optim,
                                                   mod_rep = model$model_fxn,
                                                   sd_rep = model$sd_rep,
                                                   min_grad = 0.001), error = function(e){e}) 
     
     # Get quantities
+    quants_df = list() # to ensure foreach loop doesnt break b/c of not detecting exported obj
     tryCatch(expr = quants_df <- get_quants(sd_rep = model$sd_rep,
                                             model_fxn = model$model_fxn, 
                                             sim = sim,  
@@ -138,9 +153,8 @@ for(n_om in 1:n_OM_scen) {
                                             F_x = 0.4), error = function(e){e}) 
     
     # Combine objects to save
-    tryCatch(expr = all_obj_list <- list(model, 
-                                         quants_df$Par_df,
-                                         quants_df$TS_df), error = function(e){e}) 
+    list(model, quants_df$Par_df, quants_df$TS_df)
+    
   } # end foreach loop
     
     # After we're done running EMs, output objects to save in folder
@@ -173,12 +187,21 @@ for(n_om in 1:n_OM_scen) {
     Convergence = params %>% group_by(sim) %>% summarize(conv = unique(conv))
     
     for(s in 1:n_sims) {
+      # To deal with empty lists - foreach loop issue with objects not exporting
+      if(length(model_list[[s]]) != 0) {
+        TMB_AIC_val = TMB_AIC(model_list[[s]]$mle_optim)
+        conv_val = Convergence$conv[Convergence$sim == s]
+      }
+      if(length(model_list[[s]]) == 0) {
+        TMB_AIC_val = NA
+        conv_val = "Not Converged"
+      }
       # Get AIC here
       AIC_df_tmp <- data.frame(
-        AIC = TMB_AIC(model_list[[s]]$mle_optim),
+        AIC = TMB_AIC_val,
         OM_Scenario = om_scenarios$OM_Scenarios[n_om],
         EM_Scenario = em_scenarios$EM_Scenario[n_em],
-        sim = s, conv = Convergence$conv[s]
+        sim = s, conv = conv_val
       )
       AIC_df <- rbind(AIC_df, AIC_df_tmp)
     } # end s sim AIC loop

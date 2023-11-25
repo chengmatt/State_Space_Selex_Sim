@@ -42,6 +42,9 @@ em_spr_df <- data.table::fread(here("output", "EM_SPR.csv")) # SPR from Pop Sele
 om_spr_mat_df <- data.table::fread(here("output", "OM_SPR_MatSens.csv")) # SPR from Pop Selex OM
 em_spr_mat_df <- data.table::fread(here("output", "EM_SPR_MatSens.csv")) # SPR from Pop Selex EM
 
+# Likelihoods for fishery ages
+fishlikes_df = data.table::fread(here("output", "FishComp_Likes.csv"))
+
 # Unique oms and other components
 unique_oms <- unique(param_df$OM_Scenario) # unique oms
 ts_pars <- unique(ts_re_df$par_name) # unique parameter names
@@ -72,8 +75,9 @@ blk_sens_labels <- c("1Fl_Logist_Logist_TimeBlk_-5", "1Fl_Logist_Logist_TimeBlk_
                      "1Fl_Logist_Gamma_TimeBlk_-5", "1Fl_Logist_Gamma_TimeBlk_-3", "1Fl_Logist_Gamma_TimeBlk_-1", "1Fl_Logist_Gamma_TimeBlk",
                      "1Fl_Logist_Gamma_TimeBlk_1", "1Fl_Logist_Gamma_TimeBlk_3", "1Fl_Logist_Gamma_TimeBlk_5")
 
+presentation_ems <- c("2Fleet_Logist_Logist", "2Fleet_Logist_Gamma", "1Fleet_Logist_Logist_TimeBlk",
+                         "1Fleet_Logist_Gamma_TimeBlk", "1Fleet_Logist_RandomWalk", "1Fleet_Gamma_RandomWalk")
 # Main Figures ------------------------------------------------------------
-
 ### Figure 2 (Fast SSB Plot) ----------------------------------------------------------------
 
 # Relative error of time series
@@ -84,7 +88,7 @@ ts_re_om <- ts_re_df %>% filter(str_detect(EM_Scenario, all_models)) %>%
   ),  OM_Scenario = str_remove(OM_Scenario, "_High|_Low"),
   EM_Scenario = str_replace(EM_Scenario, "Gam", "G"),
   EM_Scenario = str_remove(EM_Scenario, "_1.25|_2.0"),
-  OM_Scenario = factor(OM_Scenario, 
+  OM_Scenario = factor(OM_Scenario,
                        labels = c("Fast_Logist_Gamma_Old",
                                   "Fast_Logist_Gamma_Young",
                                   "Fast_Logist_Logist",
@@ -92,18 +96,18 @@ ts_re_om <- ts_re_df %>% filter(str_detect(EM_Scenario, all_models)) %>%
                                   "Slow_Logist_Gamma_Young",
                                   "Slow_Logist_Logist")),
   EM_Scenario = factor(EM_Scenario,
-                       labels = c("1Fleet_Gamma_RandomWalk", 
+                       labels = c("1Fleet_Gamma_RandomWalk",
                                   "1Fleet_Gamma_TimeInvar",
-                                  "1Fleet_Logist_Gamma_TimeBlk", 
-                                  "1Fleet_Logist_Logist_TimeBlk",
-                                  "1Fleet_Logist_RandomWalk", 
+                                  "1Fleet_Logist_RandomWalk",
                                   "1Fleet_Logist_TimeInvar",
+                                  "1Fleet_Logist_Gamma_TimeBlk",
+                                  "1Fleet_Logist_Logist_TimeBlk",
                                   "2Fleet_Logist_Gamma",
                                   "2Fleet_Logist_Logist")),
   Matched_OM_EM = case_when(
-    EM_Scenario == "2Fleet_Logist_Logist" & 
+    EM_Scenario == "2Fleet_Logist_Logist" &
     OM_Scenario %in% c("Fast_Logist_Logist", "Slow_Logist_Logist") ~ "*",
-    EM_Scenario == "2Fleet_Logist_Gamma" & 
+    EM_Scenario == "2Fleet_Logist_Gamma" &
     OM_Scenario %in% c("Fast_Logist_Gamma_Old", "Slow_Logist_Gamma_Old",
                        "Fast_Logist_Gamma_Young", "Slow_Logist_Gamma_Young") ~ "*"
   ))
@@ -147,6 +151,50 @@ print(
 
 dev.off()
 
+# Presentation Figure (SSB - Fast)
+pdf(here("figs", "Presentation_Figures", "SSB_RE_Fast.pdf"), width = 25, height = 13)
+print(
+  ggplot(ts_re_om %>% 
+           mutate(
+             EM_Scenario = ifelse(EM_Scenario %in% c("2Fleet_Logist_Logist", "2Fleet_Logist_Gamma") & 
+                                    Matched_OM_EM == "*", "Matched OM", as.character(EM_Scenario))) %>% 
+           filter(Dat_Qual == "High", par_name == "Spawning Stock Biomass",
+                             str_detect(OM_Scenario, "Fast"),
+                             EM_Scenario %in% c("Matched OM",
+                                                "1Fleet_Logist_Logist_TimeBlk",
+                                                "1Fleet_Logist_Gamma_TimeBlk",
+                                                "1Fleet_Logist_RandomWalk",
+                                                "1Fleet_Gamma_RandomWalk"),
+                  time_comp == "Terminal") %>% 
+           mutate(OM_Scenario = factor(OM_Scenario, levels = fast_om_plot_order),
+                  EM_Scenario = factor(EM_Scenario, levels = c(
+                    "Matched OM",
+                    "1Fleet_Logist_Logist_TimeBlk",
+                    "1Fleet_Logist_Gamma_TimeBlk",
+                    "1Fleet_Logist_RandomWalk",
+                    "1Fleet_Gamma_RandomWalk"
+                  ))) %>% 
+           filter(EM_Scenario == "1Fleet_Logist_Logist_TimeBlk",
+                  OM_Scenario == "Fast_Logist_Gamma_Young"),
+         aes(x = year, y = median))  +
+    geom_ribbon(aes(ymin = lwr_95, ymax = upr_95), alpha = 0.35) +
+    geom_line(linewidth = 2, alpha = 1) +
+    geom_hline(aes(yintercept = 0), col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
+    # facet_grid(OM_Scenario~EM_Scenario) +
+    coord_cartesian(ylim = c(-0.5,0.5)) +
+    scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 40)]) +
+    scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 40)]) +
+    labs(x = "Year", y = "Relative Error in SSB") +
+    theme_matt() +
+    theme(legend.position = "top",
+          axis.text = element_text(size = 20), 
+          strip.text = element_text(size = 20),
+          legend.text = element_text(size = 20),
+          legend.title = element_text(size = 25),
+          axis.title = element_text(size = 25)) 
+)
+
+dev.off()
 
 # d = ts_re_om %>%
 #   filter(str_detect(EM_Scenario, "RW"),
@@ -171,12 +219,12 @@ om_scenario_params <- param_df %>% filter(str_detect(EM_Scenario, all_models),
                                                "Slow_Logist_Gamma_Young",
                                                "Slow_Logist_Logist")),
   EM_Scenario = factor(EM_Scenario,
-                       labels = c("1Fleet_Gamma_RandomWalk", 
+                       labels = c("1Fleet_Gamma_RandomWalk",
                                   "1Fleet_Gamma_TimeInvar",
-                                  "1Fleet_Logist_Gamma_TimeBlk", 
-                                  "1Fleet_Logist_Logist_TimeBlk",
-                                  "1Fleet_Logist_RandomWalk", 
+                                  "1Fleet_Logist_RandomWalk",
                                   "1Fleet_Logist_TimeInvar",
+                                  "1Fleet_Logist_Gamma_TimeBlk",
+                                  "1Fleet_Logist_Logist_TimeBlk",
                                   "2Fleet_Logist_Gamma",
                                   "2Fleet_Logist_Logist")),
   Matched_OM_EM = case_when(
@@ -262,6 +310,49 @@ print(
           legend.title = element_text(size = 25),
           axis.title = element_text(size = 25))
 )
+dev.off()
+
+# Presentation Figure (SSB - Slow)
+pdf(here("figs", "Presentation_Figures", "SSB_RE_Slow.pdf"), width = 25, height = 13)
+print(
+  ggplot(ts_re_om %>% 
+           mutate(
+             EM_Scenario = ifelse(EM_Scenario %in% c("2Fleet_Logist_Logist", "2Fleet_Logist_Gamma") & 
+                                    Matched_OM_EM == "*", "Matched OM", as.character(EM_Scenario))) %>% 
+           filter(Dat_Qual == "High", par_name == "Spawning Stock Biomass",
+                  str_detect(OM_Scenario, "Slow"),
+                  EM_Scenario %in% c("Matched OM",
+                                     "1Fleet_Logist_Logist_TimeBlk",
+                                     "1Fleet_Logist_Gamma_TimeBlk",
+                                     "1Fleet_Logist_RandomWalk",
+                                     "1Fleet_Gamma_RandomWalk"),
+                  time_comp == "Terminal") %>% 
+           mutate(OM_Scenario = factor(OM_Scenario, levels = slow_om_plot_order),
+                  EM_Scenario = factor(EM_Scenario, levels = c(
+                    "Matched OM",
+                    "1Fleet_Logist_Logist_TimeBlk",
+                    "1Fleet_Logist_Gamma_TimeBlk",
+                    "1Fleet_Logist_RandomWalk",
+                    "1Fleet_Gamma_RandomWalk"
+                  ))),
+         aes(x = year, y = median))  +
+    geom_ribbon(aes(ymin = lwr_95, ymax = upr_95), alpha = 0.35) +
+    geom_line(linewidth = 2, alpha = 1) +
+    geom_hline(aes(yintercept = 0), col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
+    facet_grid(OM_Scenario~EM_Scenario) +
+    coord_cartesian(ylim = c(-0.5,0.5)) +
+    scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 40)]) +
+    scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 40)]) +
+    labs(x = "Year", y = "Relative Error in SSB") +
+    theme_matt() +
+    theme(legend.position = "top",
+          axis.text = element_text(size = 20), 
+          strip.text = element_text(size = 20),
+          legend.text = element_text(size = 20),
+          legend.title = element_text(size = 25),
+          axis.title = element_text(size = 25)) 
+)
+
 dev.off()
 
 
@@ -389,7 +480,7 @@ minmax_df <- ts_are_df %>%
   # Selective filtering down here to terminal years
   filter(str_detect(EM_Scenario, all_models),
          # Get terminal year of peels/EMs
-         (year == c(50) & str_detect(OM_Scenario, "Fast_") ) & str_detect(time_comp, "Terminal") |
+          (year == c(50) & str_detect(OM_Scenario, "Fast_") ) & str_detect(time_comp, "Terminal") |
            (year == c(70) & str_detect(OM_Scenario, "Slow_") ) & str_detect(time_comp, "Terminal") |
            (year == c(30) & str_detect(OM_Scenario, "Fast_") ) & str_detect(time_comp, "Fleet Trans End") |
            (year == c(50) & str_detect(OM_Scenario, "Slow_") ) & str_detect(time_comp, "Fleet Trans End") |
@@ -410,7 +501,7 @@ minmax_df <- ts_are_df %>%
                                          "1Fleet_Logist_Gamma_TimeBlk",
                                          "1Fleet_Logist_Logist_TimeBlk",
                                          "2Fleet_Logist_Gamma",
-                                         "2Fleet_Logist_Logist")), 
+                                         "2Fleet_Logist_Logist")),
          EM_Scenario = factor(EM_Scenario, levels = rev(plot_order))) %>%
   mutate(Dat_Qual = case_when(
     str_detect(OM_Scenario, "High") ~ 'Data Quality: High',
@@ -440,6 +531,7 @@ min_max_medians <- minmax_df %>%
 minmax_df = minmax_df %>% 
   left_join(min_max_medians, by = c("par_name", "time_comp"))
 
+
 # Plot!
 pdf(file = here("figs", "Manuscript_Figures", "Fig7_MinMax_Summary.pdf"), width = 25, height = 15)
   print(
@@ -448,7 +540,7 @@ pdf(file = here("figs", "Manuscript_Figures", "Fig7_MinMax_Summary.pdf"), width 
       geom_tile(alpha = 0.35) +
       facet_grid(Dat_Qual~time_comp, scales = "free_x") +
       geom_text(color = ifelse(minmax_df$median ==  minmax_df$max_median &
-                                 minmax_df$median != minmax_df$min_max_medians, "red", 
+                                 minmax_df$median != minmax_df$min_max_medians, "red",
                                ifelse(minmax_df$median ==  minmax_df$min_max_medians, "green2", "black")),
                 size = 8) +
       scale_fill_distiller(palette = "Spectral", direction = -1) + 
@@ -665,12 +757,12 @@ ts_re_om <- ts_re_df %>% filter(str_detect(EM_Scenario, all_models)) %>%
                                   "Slow_Logist_Gamma_Young",
                                   "Slow_Logist_Logist")),
   EM_Scenario = factor(EM_Scenario,
-                       labels = c("1Fleet_Gamma_RandomWalk", 
+                       labels = c("1Fleet_Gamma_RandomWalk",
                                   "1Fleet_Gamma_TimeInvar",
-                                  "1Fleet_Logist_Gamma_TimeBlk", 
-                                  "1Fleet_Logist_Logist_TimeBlk",
-                                  "1Fleet_Logist_RandomWalk", 
+                                  "1Fleet_Logist_RandomWalk",
                                   "1Fleet_Logist_TimeInvar",
+                                  "1Fleet_Logist_Gamma_TimeBlk",
+                                  "1Fleet_Logist_Logist_TimeBlk",
                                   "2Fleet_Logist_Gamma",
                                   "2Fleet_Logist_Logist")),
   Matched_OM_EM = case_when(
@@ -1087,12 +1179,12 @@ plot_df = pop_sel_em %>%
                                                "Slow_Logist_Gamma_Young",
                                                "Slow_Logist_Logist")),
   EM_Scenario = factor(EM_Scenario,
-                       labels = c("1Fleet_Gamma_RandomWalk", 
+                       labels = c("1Fleet_Gamma_RandomWalk",
                                   "1Fleet_Gamma_TimeInvar",
-                                  "1Fleet_Logist_Gamma_TimeBlk", 
-                                  "1Fleet_Logist_Logist_TimeBlk",
-                                  "1Fleet_Logist_RandomWalk", 
+                                  "1Fleet_Logist_RandomWalk",
                                   "1Fleet_Logist_TimeInvar",
+                                  "1Fleet_Logist_Gamma_TimeBlk",
+                                  "1Fleet_Logist_Logist_TimeBlk",
                                   "2Fleet_Logist_Gamma",
                                   "2Fleet_Logist_Logist")),
   OM_Scenario = factor(OM_Scenario, levels = c(fast_om_plot_order, slow_om_plot_order)),
@@ -1263,8 +1355,68 @@ pt_rg_re <- pt_rg_re %>%
   EM_Scenario = str_replace(EM_Scenario, "Gam", "G")
   )
 
-# e = pt_rg_re %>% filter(Dat_Qual == "High",
-#                         type == "ABC",
-#                         str_detect(OM_Scenario, "Fast_LG_Y"),
-#                         str_detect(EM_Scenario, "LG_Blk_3"))
 
+# Likelihood Plots CumSum -------------------------------------------------
+
+# fishlikes_sum = fishlikes_df %>% 
+#   drop_na() %>% 
+#   mutate(
+#     # Changing names
+#     time_comp = case_when(
+#       str_detect(EM, "Term_") ~ "Terminal", # Terminal Year
+#       str_detect(EM, "TrxE") ~ "Fleet Trans End", # Fleet Transition End
+#       str_detect(EM, "Int") ~ "Fleet Intersect" # Fleet Transition Intersects
+#     ), 
+#     EM = str_remove(EM, 'Term_|TrxE_|Int_'),
+#     time_comp = factor(time_comp, levels = c("Fleet Intersect", "Fleet Trans End",
+#                                              "Terminal"))) %>% 
+#   filter(str_detect(EM, all_models)) %>% 
+#   mutate(Dat_Qual = case_when(
+#     str_detect(OM, "High") ~ 'High',
+#     str_detect(OM, "Low") ~ 'Low'
+#   ),  OM = str_remove(OM, "_High|_Low"),
+#   EM = str_replace(EM, "Gam", "G"),
+#   EM = str_remove(EM, "_1.25|_2.0"),
+#   OM = factor(OM, labels = c("Fast_Logist_Gamma_Old",
+#                                   "Fast_Logist_Gamma_Young",
+#                                   "Fast_Logist_Logist",
+#                                   "Slow_Logist_Gamma_Old",
+#                                   "Slow_Logist_Gamma_Young",
+#                                   "Slow_Logist_Logist"))) %>% 
+#   # EM = factor(EM, labels = c("1Fleet_Gamma_RandomWalk",
+#   #                                 "1Fleet_Gamma_TimeInvar",
+#   #                                 "1Fleet_Logist_RandomWalk",
+#   #                                 "1Fleet_Logist_TimeInvar",
+#   #                                 "1Fleet_Logist_Gamma_TimeBlk",
+#   #                                 "1Fleet_Logist_Logist_TimeBlk",
+#   #                                 "2Fleet_Logist_Gamma",
+#   #                                 "2Fleet_Logist_Logist"))) %>% 
+#   group_by(OM, EM, Year, Dat_Qual, time_comp, Fleet) %>% 
+#   summarize(median_F = median(Females),
+#             median_M = median(Males),
+#             lwr_95_F = quantile(Females, 0.025),
+#             upr_95_F = quantile(Females, 0.975),
+#             lwr_95_M = quantile(Males, 0.025),
+#             upr_95_M = quantile(Males, 0.975))
+# 
+# 
+# ggplot(fishlikes_sum %>% filter(Dat_Qual == "High",
+#                                 time_comp == "Fleet Trans End",
+#                                 str_detect(EM, "1Fl"),
+#                                 !str_detect(EM, "TI"),
+#                                 str_detect(OM, "Fast")),
+#        aes(x = Year, y = median_F,  fill = EM)) +
+#   geom_line(aes(color = EM), size = 1.5, alpha = 0.4) +
+#   geom_point(aes(color = EM), size = 3) +
+#   geom_ribbon(alpha = 0.25) +
+#   facet_wrap(~OM) +
+#   theme_matt() +
+#   xlim(25, NA) +
+#   ylim(900, NA) +
+#   theme(legend.position = "top", 
+#         title = element_text(size = 20),
+#         axis.title = element_text(size = 17),
+#         axis.text= element_text(size = 15),
+#         strip.text = element_text(size = 15),
+#         axis.text.y = element_text(angle = 90),
+#         legend.text = element_text(size = 15)) 

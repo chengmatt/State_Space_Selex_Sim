@@ -45,7 +45,7 @@ data.table::fwrite(aic_df, here("output", "AIC_Convergence_Summary.csv"))
 # Create relative error and CV metrics for parameters
 param_df <- param_df %>% mutate(RE = (mle_val - t) / t, # Relative Error
                                 TE = mle_val - t, # Total Error
-                                ARE = abs(mle_val - t)/t) %>%  # Absolute Relative Error
+                                ARE = abs(mle_val - t/t)) %>%  # Absolute Relative Error
   dplyr::select(-X)
 
 # Differentiate time components
@@ -741,3 +741,48 @@ for(i in 1:length(unique_oms)) {
 # data.table::fwrite(EM_fish_comps, here("output", "EM_Fish_Comps.csv"), row.names = FALSE)
 # data.table::fwrite(om_fish_comps_df, here("output", "OM_Fish_Comps.csv"), row.names = FALSE)
 # 
+
+# Get likelihood components (fishery comps) -----------------------------------------------
+all_om_list = list()
+for(i in 1:length(unique_oms)) {
+  
+  # List out EMs within each OM here
+  ems = list.files(here(om_scenario_path, unique_oms[i]))
+  ems <- ems[str_detect(ems, ".RData|.pdf|.csv") == FALSE]
+  em_list = list()
+  
+  # Now load in unique EMs and extract values
+  for(k in 1:length(unique(ems))) {
+    
+    # load in rdata
+    load(here(om_scenario_path, unique_oms[i], ems[k], paste(ems[k], ".RData", sep = ""))) 
+    # figure out number of fleets
+    n_fleets = dim(model_list[[1]]$model_fxn$rep$fish_comp_nLL)[2]
+    sim_list = list()
+    
+    for(sim in 1:length(model_list)) {
+      fleet_df = data.frame() # to store fleet specific stuff
+      for(f in 1:n_fleets) {
+        females_cumsum = cumsum(model_list[[sim]]$model_fxn$rep$fish_comp_nLL[,f,1]) # females
+        males_cumsum = cumsum(model_list[[sim]]$model_fxn$rep$fish_comp_nLL[,f,2]) # males
+        store_df = data.frame(Females = females_cumsum, Males = males_cumsum, OM = unique_oms[i],
+                   EM = ems[k], Year = 1:length(females_cumsum), sim = sim, Fleet = paste("Fleet", f))
+        fleet_df = rbind(fleet_df, store_df)
+      } # end f fleet loop
+      sim_list[[sim]] = fleet_df # input into simulation list
+    } # sim loop
+    
+    # Rbind list into dataframe for simulations of a given EM
+    sim_df <- data.table::rbindlist(sim_list)
+    em_list[[k]] = sim_df # input simulation for a given EM into em list
+    print(k)
+  } # end k
+  
+  # rbind list into om list
+  em_df <- data.table::rbindlist(em_list)
+  all_om_list[[i]] = em_df
+} # end i
+
+# rbind list into df and write it out
+fish_comps_likes_om_df = data.table::rbindlist(all_om_list)
+data.table::fwrite(fish_comps_likes_om_df, here("output", "FishComp_Likes.csv"))

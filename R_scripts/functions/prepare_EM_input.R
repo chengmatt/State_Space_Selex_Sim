@@ -50,6 +50,7 @@ prepare_EM_input <- function(years,
                              time_selex = "None",
                              n_time_selex_pars = 1,
                              fix_pars = NA,
+                             share_ages = 1,
                              sim) {
   
   # Make data into a list 
@@ -471,6 +472,33 @@ prepare_EM_input <- function(years,
                                          dim = c((length(years) - 1), n_time_selex_pars, n_fish_comps, n_sexes)))
     pars$ln_fixed_sel_re_fish <- array(log(rnorm(1,1,0)), dim = c(n_time_selex_pars, n_fish_comps, n_sexes))
   } # random walk if statement
+  
+  if(time_selex == "Semi-Parametric") {
+    data$F_Slx_re_model = matrix(1, nrow = n_fish_comps, ncol = n_sexes)
+    pars$ln_fish_selpars_re = array(log(0.18), dim = c(length(years), length(ages), n_fish_comps, n_sexes))
+    pars$ln_fixed_sel_re_fish = array(log(rnorm(1,1,0)), dim = c(n_fish_comps, n_sexes))
+
+    # Share random effects for adjacent ages
+    map_ln_fish_selpars_re = pars$ln_fish_selpars_re # create mapping variable here
+    unique_idx = (prod(dim(pars$ln_fish_selpars_re)) / share_ages) # get number of unique elements to mape
+    idx = rep(seq(1:unique_idx), each = share_ages) # create index variable to loop through
+    counter = 1 # counter for looping
+    # loop through indexing now
+    for(y in 1:(length(years)-1)) {
+      for(f in 1:n_fish_comps) {
+        for(s in 1:n_sexes) {
+          for(a in 1:length(ages)) {
+            map_ln_fish_selpars_re[y,a,f,s] = idx[counter]
+            counter = counter + 1 # update counter
+          } # end a loop
+        } # end s loop
+      } # end f loop
+    } # end y loop
+    
+    # update mapping
+    map_ln_fish_selpars_re = factor(as.numeric(map_ln_fish_selpars_re))
+    map$ln_fish_selpars_re = map_ln_fish_selpars_re
+  } # end if semi-parametric
   
   # Parameter mapping -------------------------------------------------------
   if(sum(fix_pars %in% c("ln_h")) == 1) {

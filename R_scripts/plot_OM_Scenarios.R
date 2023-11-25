@@ -101,6 +101,26 @@ pdf(here("figs", "OM_Scenarios", "selex_scenario.pdf"), width = 15, height = 5)
         strip.text = element_text(size = 15)))
 dev.off()
 
+# Presentation Figure
+pdf(here("figs", "Presentation_Figures", "selex_scenario.pdf"), width = 15, height = 5)
+(selex_plot <- ggplot(selex_all %>% filter(Sex == "Females") %>% 
+                        mutate(Type = factor(Type,
+                                             levels = c("Logist_Logist",
+                                                        "Logist-Gamma-Old",
+                                                        "Logist-Gamma-Young"))), 
+                      aes(x = as.numeric(Age),  y = as.numeric(paste(Selex)), lty = factor(Fleet))) +
+    geom_line(size = 1.5, alpha = 1) + 
+    facet_grid(Sex~Type) +
+    theme_bw() +
+    labs(x = "Ages", y = "Selectivity", lty = "Fleet") +
+    theme(legend.position = "none",
+          axis.title = element_text(size = 17),
+          axis.text = element_text(size = 15, color = "black"),
+          legend.title = element_text(size = 17),
+          legend.text = element_text(size = 15),
+          strip.text = element_text(size = 15)))
+dev.off()
+
 # Get Quantities from OMs -------------------------------------------------------
 # Get OM files
 OMs <- list.files(here("output", "OM_Scenarios"))
@@ -223,6 +243,23 @@ pdf(here("figs", "OM_Scenarios", "F_Scenario.pdf"), width = 20, height = 10)
         legend.text = element_text(size = 17),
         strip.text = element_text(size = 17)))
 
+dev.off()
+
+# Presentation Figure
+pdf(here("figs", "Presentation_Figures", "F_Scenario.pdf"), width = 8, height = 10)
+(fmort_plot <- ggplot(fmort_plot_df, aes(x = Year, y = Value,  lty = factor(Fleet))) +
+    geom_line(size = 0.9) +
+    coord_cartesian(ylim = c(0, 0.13)) + 
+    facet_wrap(~OM_Scenario, nrow = 2, scales = "free_x") +
+    theme_bw() +
+    labs(x = "Year", y =  "Fishing Mortality Multiplier", linetype = "Fleet") +
+    theme(legend.position = "left",
+          axis.title = element_text(size = 17),
+          legend.key.size = unit(1.5, "cm"),
+          axis.text = element_text(size = 15, color = "black"),
+          legend.title = element_text(size = 20),
+          legend.text = element_text(size = 17),
+          strip.text = element_text(size = 17)))
 dev.off()
 
 # Harvest Rate Plot -------------------------------------------------------

@@ -411,7 +411,7 @@ get_TE_precentiles <- function(df, est_val_col = 1, true_val_col = 5, par_name =
                                group_vars) {
   
   # Get relative error based on indexed columns
-  TE <- (df[,est_val_col] - df[,true_val_col]) 
+  TE <- abs((df[,est_val_col] - df[,true_val_col]) / df[,true_val_col])
   df <- cbind(df, TE) # Cbind TE
   names(df)[ncol(df)] <- "TE" # Rename variable
   
@@ -456,7 +456,7 @@ get_ARE_precentiles <- function(df, est_val_col = 1, true_val_col = 5, par_name 
                                group_vars) {
   
   # Get relative error based on indexed columns
-  ARE <- abs(df[,est_val_col] - df[,true_val_col]) / df[,true_val_col]
+  ARE <- abs((df[,est_val_col] - df[,true_val_col])/ df[,true_val_col]) 
   df <- cbind(df, ARE) # Cbind TE
   names(df)[ncol(df)] <- "ARE" # Rename variable
   

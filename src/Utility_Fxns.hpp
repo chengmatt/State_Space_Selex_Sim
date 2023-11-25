@@ -208,3 +208,7 @@ Type get_Neff(Type Ntotal,
   return Neff; 
 } // end function
 
+// Transformation to ensure correlation is between 0 and 1
+template <class Type>
+Type rho_trans(Type x){return Type(1) / (Type(1) + exp(-x));
+}
