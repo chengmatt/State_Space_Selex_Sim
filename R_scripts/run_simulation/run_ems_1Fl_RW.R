@@ -11,10 +11,6 @@ library(TMB)
 library(doParallel)
 library(parallel)
 
-ncores <- detectCores() 
-cl <- makeCluster(ncores - 4)
-registerDoParallel(cl)
-
 # Load in all functions into the environment
 fxn_path <- here("R_scripts", "functions")
 # Load in all functions from the functions folder
@@ -35,7 +31,7 @@ lh_path <- here("input", "Sablefish_Inputs.xlsx")
 n_OM_scen <- length(om_scenarios$OM_Scenarios)
 n_EM_scen <- length(em_scenarios$EM_Scenario)
 
-for(n_om in 5:n_OM_scen) {
+for(n_om in 12:n_OM_scen) {
 
 # Load OM -----------------------------------------------------------------
   
@@ -44,7 +40,12 @@ for(n_om in 5:n_OM_scen) {
   load(here(om_path, paste(om_scenarios$OM_Scenarios[n_om],".RData",sep = "")))
   list2env(oms,globalenv()) # output into global environment
   
-  for(n_em in 1:n_EM_scen) {
+  for(n_em in 24:n_EM_scen) {
+    
+    # register cores here
+    ncores <- detectCores() 
+    cl <- makeCluster(ncores - 4)
+    registerDoParallel(cl)
 
 # Pre-process EM ----------------------------------------------------------
 
@@ -214,8 +215,8 @@ for(n_om in 5:n_OM_scen) {
     # Progress
     cat(crayon::green("OM", n_om, "out of", n_OM_scen))
     cat(crayon::yellow("EM", n_em, "out of", n_EM_scen))
+    stopCluster(cl)
     
   } # end n_em loop
 } # end n_om loop
-stopCluster(cl)
 

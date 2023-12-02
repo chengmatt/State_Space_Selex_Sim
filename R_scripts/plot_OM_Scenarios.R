@@ -103,7 +103,7 @@ dev.off()
 
 # Presentation Figure
 pdf(here("figs", "Presentation_Figures", "selex_scenario.pdf"), width = 15, height = 5)
-(selex_plot <- ggplot(selex_all %>% filter(Sex == "Females") %>% 
+(selex_plot_1 <- ggplot(selex_all %>% filter(Sex == "Females") %>% 
                         mutate(Type = factor(Type,
                                              levels = c("Logist_Logist",
                                                         "Logist-Gamma-Old",
@@ -247,7 +247,7 @@ dev.off()
 
 # Presentation Figure
 pdf(here("figs", "Presentation_Figures", "F_Scenario.pdf"), width = 8, height = 10)
-(fmort_plot <- ggplot(fmort_plot_df, aes(x = Year, y = Value,  lty = factor(Fleet))) +
+(fmort_plot_1 <- ggplot(fmort_plot_df, aes(x = Year, y = Value,  lty = factor(Fleet))) +
     geom_line(size = 0.9) +
     coord_cartesian(ylim = c(0, 0.13)) + 
     facet_wrap(~OM_Scenario, nrow = 2, scales = "free_x") +
@@ -342,7 +342,7 @@ catch_df_sum <- catch_df %>%
 pdf(here("figs", "OM_Scenarios", "Catch_Scenarios.pdf"), width = 28, height = 10)
 (catch_plot <- ggplot(catch_df_sum, aes(x = Year, y = Median_HR,  lty = factor(Fleet),
                       ymin = Lwr_95_HR, ymax = Upr_95_HR)) +
-    geom_ribbon(alpha = 0.35, color = "black") +
+    geom_ribbon(alpha = 0.35, color = NA) +
     geom_line(size = 1.5) +
     facet_grid(Selex~Speed, scales = "free_x") +
     labs(x = "Year", y = "Catch", fill = "Fleet",
@@ -379,7 +379,7 @@ agg_catch = catch_df %>%
 (ggplot(agg_catch, aes(x = Year, y = Median_HR,  
                                         ymin = Lwr_95_HR, ymax = Upr_95_HR,
                                         fill = Speed, color = Speed)) +
-    geom_ribbon(alpha = 0.35) +
+    geom_ribbon(alpha = 0.35, color = NA) +
     geom_line(size = 1.5) +
     facet_grid(Selex~., scales = "free_x") +
     labs(x = "Year", y = "Catch", fill = "Fleet",
@@ -456,7 +456,7 @@ pdf(here("figs", "OM_Scenarios", "SBB_Trajectory.pdf"), width = 18, height = 10)
 (ssb_plot <- ssb_plot_df %>% 
   ggplot(aes(x = Year, y = median, ymin = Lwr_95, ymax = Upr_95)) +
   geom_line(lwd = 1.5) +
-  geom_ribbon(alpha = 0.35, color = "black") +
+  geom_ribbon(alpha = 0.35) +
   theme_bw() +
   facet_grid(Sel_Type~Speed, scales = "free_x") +
   labs(x = 'Year', y = "Spawning Stock Biomass",

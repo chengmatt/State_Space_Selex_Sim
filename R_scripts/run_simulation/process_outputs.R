@@ -140,7 +140,7 @@ data.table::fwrite(ts_te_df, here("output", "TimeSeries_TE.csv"))
 data.table::fwrite(ts_are_df, here("output", "TimeSeries_ARE.csv"))
 
 # Get Selectivity estimates ---------------------------------------------------------
-for(i in 1:length(unique_oms)) {
+for(i in 8:length(unique_oms)) {
   
   # List files in folder
   files <- list.files(here(om_scenario_path, unique_oms[i]))
@@ -166,18 +166,20 @@ for(i in 1:length(unique_oms)) {
     # Get total biomass estimate from models here
     for(m in 1:length(model_list)) {
       
-      # Get fishery selectivity from model
-      F_Slx_df <- data.table::data.table(reshape2::melt(model_list[[m]]$model_fxn$rep$F_Slx))
-      names(F_Slx_df) <- c("Year", "Age", "Fleet", "Sex", "Selex")
-      
-      # Construct our dataframe
-      F_Slx_df_bind <- cbind(F_Slx_df, sim = m, 
-                             conv = convergence$conv[m],
-                             OM_Scenario = unique_oms[i],
-                             EM_Scenario = files[j])
-      
-      # Now bind everything together
-      F_Slx_list[[m]] <- F_Slx_df_bind
+      if(length(model_list[[m]])!=0) {
+        # Get fishery selectivity from model
+        F_Slx_df <- data.table::data.table(reshape2::melt(model_list[[m]]$model_fxn$rep$F_Slx))
+        names(F_Slx_df) <- c("Year", "Age", "Fleet", "Sex", "Selex")
+        
+        # Construct our dataframe
+        F_Slx_df_bind <- cbind(F_Slx_df, sim = m, 
+                               conv = convergence$conv[m],
+                               OM_Scenario = unique_oms[i],
+                               EM_Scenario = files[j])
+        
+        # Now bind everything together
+        F_Slx_list[[m]] <- F_Slx_df_bind
+      }
     } # end m 
     
     # Turn from list to dataframe
@@ -559,24 +561,25 @@ for(i in 1:length(unique_oms)) {
     # Get total biomass estimate from models here
     for(m in 1:length(model_list)) {
 
-      # Get fishery selectivity from model
-      em_NAA_df <- reshape2::melt(model_list[[m]]$model_fxn$rep$NAA)
-      names(em_NAA_df) <- c("Year", "Age", "Sex", "Est_Numbers")
-
-      # Subset to correct simulation
-      om_sim_NAA = om_NAA_df[om_NAA_df$sim == m &
-                               om_NAA_df$Year %in% c(1:max(em_NAA_df$Year)),]$True_Numbers
-
-      # Construct our dataframe
-      em_NAA_df_bind <- cbind(em_NAA_df, sim = m,
-                              True_Numbers = om_sim_NAA,
-                              conv = convergence$conv[m],
-                              OM_Scenario = unique_oms[i],
-                              EM_Scenario = files[j])
-
-      # Now bind everything together
-      em_NAA_list[[m]] <- em_NAA_df_bind
-      
+      if(length(model_list[[m]]) != 0) {
+        # Get fishery selectivity from model
+        em_NAA_df <- reshape2::melt(model_list[[m]]$model_fxn$rep$NAA)
+        names(em_NAA_df) <- c("Year", "Age", "Sex", "Est_Numbers")
+        
+        # Subset to correct simulation
+        om_sim_NAA = om_NAA_df[om_NAA_df$sim == m &
+                                 om_NAA_df$Year %in% c(1:max(em_NAA_df$Year)),]$True_Numbers
+        
+        # Construct our dataframe
+        em_NAA_df_bind <- cbind(em_NAA_df, sim = m,
+                                True_Numbers = om_sim_NAA,
+                                conv = convergence$conv[m],
+                                OM_Scenario = unique_oms[i],
+                                EM_Scenario = files[j])
+        
+        # Now bind everything together
+        em_NAA_list[[m]] <- em_NAA_df_bind
+      } # end if
     } # end m
     
     # Turn from list to dataframe
@@ -786,3 +789,4 @@ for(i in 1:length(unique_oms)) {
 # rbind list into df and write it out
 fish_comps_likes_om_df = data.table::rbindlist(all_om_list)
 data.table::fwrite(fish_comps_likes_om_df, here("output", "FishComp_Likes.csv"))
+

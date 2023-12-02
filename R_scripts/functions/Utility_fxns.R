@@ -841,11 +841,12 @@ get_results <- function(om_scenario_path, exclude = NA) {
 theme_matt <- function() {
   theme_bw() +
     theme(legend.position = "top",
-          strip.text = element_text(size = 15),
-          axis.title = element_text(size = 15),
-          axis.text= element_text(size = 13, color = "black"),
-          legend.text = element_text(size = 13),
-          legend.title = element_text(size = 15)) 
+          strip.text = element_text(size = 18),
+          axis.title = element_text(size = 23),
+          axis.text= element_text(size = 18, color = "black"),
+          legend.text = element_text(size = 23),
+          legend.title = element_text(size = 25),
+          title = element_text(size = 25)) 
 }
 
 # Get AIC values here
