@@ -572,7 +572,7 @@ print(
 dev.off()
 
 # Figure S1 (Convergence) -------------------------------------------------
-pdf(here("figs", "Manuscript_Figures_v2", "FigS1_Convergence.pdf"), width = 22, height = 13)
+pdf(here("figs", "Manuscript_Figures_v2", "FigS1_Convergence.pdf"), width = 25, height = 13)
 ggplot(conv_stat %>% 
          mutate(OM_Scenario = factor(OM_Scenario, levels = c(fast_om_plot_order, slow_om_plot_order)),
                 EM_Scenario = forcats::fct_rev(EM_Scenario)) %>% 
