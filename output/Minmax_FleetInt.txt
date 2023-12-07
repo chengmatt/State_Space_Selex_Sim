@@ -1,0 +1,11 @@
+"EM_Scenario","Fast_Logist_Logist","Fast_Logist_Gamma_Old","Fast_Logist_Gamma_Young","Slow_Logist_Logist","Slow_Logist_Gamma_Old","Slow_Logist_Gamma_Young"
+"2Fleet_Logist_Logist",0.0249,0.0347,0.1358,0.0212,0.0303,0.1286
+"2Fleet_Logist_Gamma",0.0269,0.0283,0.0296,0.026,0.0209,0.024
+"1Fleet_Logist_TimeInvar",0.0315,0.0304,0.0292,0.0358,0.0274,0.0263
+"1Fleet_Gamma_TimeInvar",0.0316,0.0346,0.0417,0.024,0.0254,0.0356
+"1Fleet_Logist_Logist_TimeBlk",0.029,0.0306,0.0294,0.0333,0.0266,0.0245
+"1Fleet_Logist_Gamma_TimeBlk",0.0263,0.0313,0.0298,0.0259,0.0259,0.0267
+"1Fleet_Logist_RandomWalk",0.0343,0.0358,0.038,0.0279,0.0316,0.0319
+"1Fleet_Gamma_RandomWalk",0.0368,0.0395,0.0368,0.028,0.0317,0.0306
+"1Fleet_Logist_SemiPar",0.028,0.0313,0.0289,0.0261,0.023,0.025
+"1Fleet_Gamma_SemiPar",0.031,0.0329,0.0367,0.0262,0.0271,0.0386

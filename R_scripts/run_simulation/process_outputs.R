@@ -38,7 +38,7 @@ aic_df <- aic_df %>%
                                            "Terminal")))
 
 # Write out time series and aic dataframe
-# data.table::fwrite(ts_df, here("output", "TimeSeries_Summary.csv"))
+data.table::fwrite(ts_df, here("output", "TimeSeries_Summary.csv"))
 data.table::fwrite(aic_df, here("output", "AIC_Convergence_Summary.csv"))
 
 # Parameter Results ------------------------------------------------------
@@ -140,7 +140,7 @@ data.table::fwrite(ts_te_df, here("output", "TimeSeries_TE.csv"))
 data.table::fwrite(ts_are_df, here("output", "TimeSeries_ARE.csv"))
 
 # Get Selectivity estimates ---------------------------------------------------------
-for(i in 8:length(unique_oms)) {
+for(i in 1:length(unique_oms)) {
   
   # List files in folder
   files <- list.files(here(om_scenario_path, unique_oms[i]))

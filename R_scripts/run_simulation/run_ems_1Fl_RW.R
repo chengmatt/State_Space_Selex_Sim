@@ -22,7 +22,7 @@ compile_tmb(wd = here("src"), cpp = "EM.cpp")
 # Read in OM and EM Scenarios
 om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "OM") 
 em_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "EM_1Fl_RW") %>% 
-  filter(str_detect(EM_Scenario, "SP")) 
+  filter(str_detect(EM_Scenario, "SP"))
 
 # Read in spreadsheet for life history parameters
 lh_path <- here("input", "Sablefish_Inputs.xlsx")
@@ -31,8 +31,8 @@ lh_path <- here("input", "Sablefish_Inputs.xlsx")
 n_OM_scen <- length(om_scenarios$OM_Scenarios)
 n_EM_scen <- length(em_scenarios$EM_Scenario)
 
-for(n_om in 12:n_OM_scen) {
-
+for(n_om in 1:n_OM_scen) {
+  
 # Load OM -----------------------------------------------------------------
   
   # Load in OM data
@@ -40,13 +40,15 @@ for(n_om in 12:n_OM_scen) {
   load(here(om_path, paste(om_scenarios$OM_Scenarios[n_om],".RData",sep = "")))
   list2env(oms,globalenv()) # output into global environment
   
-  for(n_em in 24:n_EM_scen) {
+  for(n_em in 1:n_EM_scen) {
+    
+    rm(sim_models)
     
     # register cores here
     ncores <- detectCores() 
-    cl <- makeCluster(ncores - 4)
+    cl <- makeCluster(ncores - 2)
     registerDoParallel(cl)
-
+    
 # Pre-process EM ----------------------------------------------------------
 
     # Pre-processing to specify EM here
@@ -71,12 +73,11 @@ for(n_om in 12:n_OM_scen) {
 
     # Run Simulations ---------------------------------------------------------
     
-    sim_models <- foreach(sim = 1:n_sims, .export = ls(globalenv()),
-                          .packages = c("TMB", "here", "tidyverse")) %dopar% {
+    sim_models <- foreach(sim = 1:n_sims, .packages = c("TMB", "here", "tidyverse")) %dopar% {
     
     # for(sim in 1:n_sims) {
     compile_tmb(wd = here("src"), cpp = "EM.cpp")
-    # dyn.unload(dynlib("EM"))
+    dyn.unload(dynlib("EM"))
     dyn.load(dynlib("EM"))
     
     # Choose which parameters to fix
@@ -117,14 +118,18 @@ for(n_om in 12:n_OM_scen) {
 
     # Fix sigma if sigma_fixed is not NA 
     if(fixed_sigma_re_fish != "NA") input$parameters$ln_fixed_sel_re_fish[] <- log(as.numeric(fixed_sigma_re_fish))
-    
+
     # Run EM model here and get sdrep
     model = list() # to ensure foreach loop doesnt break b/c of not detecting exported obj
     tryCatch(expr = model <- run_EM(data = input$data, parameters = input$parameters, 
                                     map = input$map, n.newton = 3,
                                     random = random_fish_sel, 
                                     silent = T, getsdrep = TRUE), error = function(e){e}) 
-
+    
+    # plot(model$model_fxn$rep$F_Slx[1,,,1])
+    # model$model_fxn$rep$ln_fish_selpars_re[]
+    # model$sd_rep
+    # #
     # image(model$model_fxn$rep$F_Slx[,,1,1])
     # for(i in 1:49) {
     #   if(i==1) plot(model$model_fxn$rep$F_Slx[i,,1,1], type = "l", ylim = c(0,3))
@@ -219,4 +224,5 @@ for(n_om in 12:n_OM_scen) {
     
   } # end n_em loop
 } # end n_om loop
+
 

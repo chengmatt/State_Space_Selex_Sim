@@ -224,14 +224,31 @@ Type objective_function<Type>::operator() ()
           if(F_Slx_re_model(f, s) == 1) { // if semi-parametric
             if(y == 0) {
               F_Slx(y,a,f,s) = Get_Selex(fish_age_idx, F_Slx_model(y,f), tmp_ln_fish_selpars); // estimate parametric form
-              F_Slx(y,a,f,s) * exp(ln_fish_selpars_re(y, a, f, s)); // then estimate deviations from the parametric form
             } // end first year
-            if(y > 0) F_Slx(y,a,f,s) = F_Slx(y-1 ,a,f,s) * exp(ln_fish_selpars_re(y, a, f, s));
+            if(y > 0) {
+              F_Slx(y,a,f,s) = F_Slx(y-1 ,a,f,s) * exp(ln_fish_selpars_re(y-1, a, f, s));
+            }
           } else{ // not semi-parametric (either random walk or time-invariant)
             F_Slx(y,a,f,s) = Get_Selex(fish_age_idx, F_Slx_model(y,f), tmp_ln_fish_selpars);
           } // end if else 
-            
+             
         } // a loop
+        if(F_Slx_re_model(f, s) == 1) { // semi-parametric curvature penalty
+          // Extract out fishery selectivity
+          if(y > 0) {
+            vector<Type> selex_vec = F_Slx.col(s).col(f).transpose().col(y);
+            // Set up curvature pentalty - squared second differences
+            // Get first difference
+            int n = selex_vec.size();
+            vector<Type> ans(n - 1);
+            for (int i = 0; i < n - 1; i++) ans(i) = selex_vec(i+1) - selex_vec(i);
+            // Get second difference
+            int n1 = ans.size();
+            vector<Type> ans1(n1 - 1);
+            for (int i1 = 0; i1 < n1 - 1; i1++) ans1(i1) = ans(i1+1) - ans(i1);
+            fish_sel_re_nLL += pow(sum(ans1),2); // add into likelihood penalty
+          } // end if y > 0
+        } // end curvature penalty
       } // s loop
     } // f loop
   } // y loop

@@ -81,7 +81,7 @@ colnames(selex_gamma_young) <- c("Selex", "Sex", "Fleet", "Age", "Type")
 # Coerce into dataframe
 selex_all <- rbind(selex_logist, selex_gamma_old, selex_gamma_young)
 
-pdf(here("figs", "OM_Scenarios", "selex_scenario.pdf"), width = 15, height = 5)
+pdf(here("figs", "OM_Scenarios", "selex_scenario.pdf"), width = 15, height = 10)
 (selex_plot <- ggplot(selex_all %>% 
                         mutate(Type = factor(Type,
                                              levels = c("Logist_Logist",
@@ -527,7 +527,7 @@ dev.off()
 # Combine Plots -----------------------------------------------------------
 
 
-pdf(here("figs", "OM_Scenarios", "Fig1_OM_Scenarios.pdf"), width = 17, height = 13)
+pdf(here("figs", "OM_Scenarios", "Fig1_OM_Scenarios.pdf"), width = 17, height = 15)
 # Combine plots
 comb_plots = ggpubr::ggarrange(selex_plot, catch_plot,
                   ssb_plot, ncol = 3, 

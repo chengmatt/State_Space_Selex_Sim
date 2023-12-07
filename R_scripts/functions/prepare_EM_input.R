@@ -441,7 +441,7 @@ prepare_EM_input <- function(years,
   # need to do slightly different starting values here, b/c exp_logistic is a lil finicky
   if(sum(reshape2::melt(F_Slx_Model_Input)$value == "exp_logistic") == 0) { 
     # if we don't have exponential logistic or double logistic
-    pars$ln_fish_selpars <- array(log(rnorm(1, 5, 0)), 
+    pars$ln_fish_selpars <- array(log(rnorm(1, 3.5, 0)), 
                                   dim = c(n_fish_comps, n_sexes, 
                                           n_fish_blocks, max(n_fish_pars)))
   } else{
@@ -468,14 +468,14 @@ prepare_EM_input <- function(years,
   
   if(time_selex == "RW") { # Random Walk
     data$F_Slx_re_model <- matrix(0, nrow = n_fish_comps, ncol = n_sexes)
-    pars$ln_fish_selpars_re <- log(array(rnorm(1, 0.3, 0),
-                                         dim = c((length(years) - 1), n_time_selex_pars, n_fish_comps, n_sexes)))
+    pars$ln_fish_selpars_re <- array(0,
+                                     dim = c((length(years)-1), n_time_selex_pars, n_fish_comps, n_sexes))
     pars$ln_fixed_sel_re_fish <- array(log(rnorm(1,1,0)), dim = c(n_time_selex_pars, n_fish_comps, n_sexes))
   } # random walk if statement
   
   if(time_selex == "Semi-Parametric") {
     data$F_Slx_re_model = matrix(1, nrow = n_fish_comps, ncol = n_sexes)
-    pars$ln_fish_selpars_re = array(log(0.18), dim = c(length(years), length(ages), n_fish_comps, n_sexes))
+    pars$ln_fish_selpars_re = array(0, dim = c(length(years)-1, length(ages), n_fish_comps, n_sexes))
     pars$ln_fixed_sel_re_fish = array(log(rnorm(1,1,0)), dim = c(n_fish_comps, n_sexes))
 
     # Share random effects for adjacent ages

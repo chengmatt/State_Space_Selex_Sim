@@ -25,6 +25,7 @@ for(i in 1:length(files)) source(here(fxn_path, files[i]))
 # Parameter and Time Series Summaries
 AIC_df <- data.table::fread(here("output", "AIC_Convergence_Summary.csv")) # time series total error (converged runs only)
 param_df <- read.csv(here("output", "Parameter_Summary.csv")) # parameters
+ts_all_df <- data.table::fread(here("output", "TimeSeries_Summary.csv")) # all time series data
 ts_re_df <- read.csv(here("output", "TimeSeries_RE.csv")) # time series relative error (converged runs only)
 ts_te_df <- read.csv(here("output", "TimeSeries_TE.csv")) # time series total error (converged runs only)
 ts_are_df <- read.csv(here("output", "TimeSeries_ARE.csv")) # time series abs relative error (converged runs only)
@@ -40,7 +41,7 @@ ts_pars <- unique(ts_re_df$par_name) # unique parameter names
 
 # Timeblock sensitivity models
 blk_sens_mods <- "Blk\\b|Blk_1|Blk_3|Blk_5|Blk_-1|Blk_-3|Blk_-5"
-all_models <- "2Fl_LL|2Fl_LGam|1Fl_L_TI|1Fl_Gam_TI|1Fl_LL_Blk\\b|1Fl_LGam_Blk\\b|1Fl_L_RW_1.25|1Fl_Gam_RW_2.0|1Fl_L_SP_0.75|1Fl_Gam_SP_0.75"
+all_models <- "2Fl_LL|2Fl_LGam|1Fl_L_TI|1Fl_Gam_TI|1Fl_LL_Blk\\b|1Fl_LGam_Blk\\b|1Fl_L_RW_1.25|1Fl_Gam_RW_2.0|1Fl_L_SP_0.20|1Fl_Gam_SP_0.20"
 gen_om <- c("Fast", "Slow") # general OMs
 
 # Get plot order for EM models
@@ -279,7 +280,7 @@ plot_df = pop_sel_em %>%
     str_detect(OM_Scenario, "Low") ~ 'Low'
   ), 
   OM_Scenario = str_remove(OM_Scenario, "_High|_Low"),
-  EM_Scenario = str_remove(EM_Scenario, "_1.25|_2.0"),
+  EM_Scenario = str_remove(EM_Scenario, "_1.25|_2.0|_0.75"),
   EM_Scenario = str_replace(EM_Scenario, "Gam", "G"),
   OM_Scenario = factor(OM_Scenario, labels = c("Fast_Logist_Gamma_Old",
                                                "Fast_Logist_Gamma_Young",
@@ -356,7 +357,6 @@ ts_re_om <- ts_re_om %>%
 
 
 ### Time Block Time Series --------------------------------------------------
-
 # Relative error of time series
 tb_ts_re_om <- ts_re_df %>% filter(time_comp %in% c("Terminal", "Fleet Trans End"),
                                    str_detect(OM_Scenario, "Fast"),
@@ -389,6 +389,88 @@ tb_ts_re_om = tb_ts_re_om %>% left_join(best_fleetblk_models,
                                         by = c("OM_Scenario", "EM_Scenario", "time_comp", "Dat_Qual")) %>% 
   mutate(Model = ifelse(is.na(Model), "Not Best", Model ))
 
+
+### Minimax Solution --------------------------------------------------------
+
+# Do some munging and compute maximum ARE and minimum ARE
+minmax_df = ts_all_df %>% 
+  filter(conv == "Converged") %>% 
+  mutate(
+    are = abs((mle_val - t) / t),
+    time_comp = case_when(
+      str_detect(EM_Scenario, "Term_") ~ "Terminal", # Terminal Year
+      str_detect(EM_Scenario, "TrxE") ~ "Fleet Trans End", # Fleet Transition End
+      str_detect(EM_Scenario, "Int") ~ "Fleet Intersect", # Fleet Transition Intersects
+    ),
+    EM_Scenario = str_remove(EM_Scenario, 'Term_|TrxE_|Int_'), # remove preceeding letters
+    time_comp = factor(time_comp, levels = c("Terminal", "Fleet Trans End",
+                                             "Fleet Intersect")),
+    Dat_Qual = case_when(
+      str_detect(OM_Scenario, "High") ~ 'High',
+      str_detect(OM_Scenario, "Low") ~ 'Low'),
+    OM_Scenario = str_remove(OM_Scenario, "_High|_Low")) %>% 
+  data.frame() %>% 
+  filter(str_detect(EM_Scenario, all_models), type == "Spawning Stock Biomass") %>% 
+  data.frame() %>% 
+  group_by(OM_Scenario, EM_Scenario, Dat_Qual, time_comp) %>% 
+  summarize(MARE = median(are)) %>% 
+  ungroup() %>% 
+  group_by(EM_Scenario, Dat_Qual, time_comp) %>% 
+  mutate(max_median = max(MARE))
+
+  
+# Do some residual munging with names
+minmax_df = minmax_df %>% 
+  mutate(
+  EM_Scenario = str_replace(EM_Scenario, "Gam", "G"),
+  EM_Scenario = str_remove(EM_Scenario, "_1.25|_2.0|_0.75"),
+  OM_Scenario = factor(OM_Scenario, 
+                       levels = c("Fast_LL", "Fast_LG_O", "Fast_LG_Y",
+                                  "Slow_LL", "Slow_LG_O", "Slow_LG_Y"),
+                       labels = c("Fast_Logist_Logist",
+                                  "Fast_Logist_Gamma_Old",
+                                  "Fast_Logist_Gamma_Young",
+                                  "Slow_Logist_Logist",
+                                  "Slow_Logist_Gamma_Old",
+                                  "Slow_Logist_Gamma_Young")),
+  EM_Scenario = factor(EM_Scenario,
+                       levels = c( "1Fl_G_SP" , "1Fl_L_SP" , 
+                                   "1Fl_G_RW" , "1Fl_L_RW" ,
+                                  "1Fl_LG_Blk" , "1Fl_LL_Blk" ,
+                                  "1Fl_G_TI", "1Fl_L_TI" , 
+                                  "2Fl_LG" , "2Fl_LL"), # relevel
+                       labels = c("1Fleet_Gamma_RandomWalk",
+                                  "1Fleet_Logist_RandomWalk",
+                                  "1Fleet_Gamma_SemiPar",
+                                  "1Fleet_Logist_SemiPar",
+                                  "1Fleet_Logist_Gamma_TimeBlk",
+                                  "1Fleet_Logist_Logist_TimeBlk",
+                                  "1Fleet_Gamma_TimeInvar",
+                                  "1Fleet_Logist_TimeInvar",
+                                  "2Fleet_Logist_Gamma",
+                                  "2Fleet_Logist_Logist")),
+  time_comp = factor(time_comp, levels = c("Fleet Intersect", "Fleet Trans End", "Terminal"))) %>% 
+  ungroup()
+
+# Find the minimum maximum median value for each time period
+time_minmax_medians <- minmax_df %>%
+  group_by(time_comp, Dat_Qual) %>%
+  summarize(time_minmax_medians = min(max_median),
+            time_maxmax_medians = max(max_median)) %>% 
+  ungroup()
+
+# Find the global minimuim maximum median value
+global_minmax_medians <- minmax_df %>%
+  group_by(Dat_Qual) %>% 
+  summarize(global_minmax_medians = min(max_median),
+            global_maxmax_medians = max(max_median)) 
+
+# Now left join this
+minmax_df = minmax_df %>% 
+  left_join(time_minmax_medians, by = c("time_comp", "Dat_Qual")) %>% 
+  left_join(global_minmax_medians, by = c("Dat_Qual"))
+
+  
 # Plots -------------------------------------------------------------------
 # Figure 2 (RE SSB Fast) --------------------------------------------------
 
@@ -1074,5 +1156,184 @@ dev.off()
 pdf(here("figs", "Manuscript_Figures_v2", "FigS12_SlowSelex_M.pdf"), width = 20, height = 25)
 ggpubr::ggarrange(a,b,c, common.legend = TRUE, ncol = 1, labels = c("A", "B", "C"), widths = c(0.975,1,1),
                   label.x = 0.01, label.y = 1.01,font.label = list(size = 34, color = "black"))
+dev.off()
+
+
+# Table (Minimax Solution) -------------------------------------------------
+plot_minmax_df = minmax_df %>% filter(Dat_Qual == "High") # filter to high data quality
+pdf(here("figs", "Manuscript_Figures_v2", "Fig_Minimax.pdf"), width = 20, height = 25)
+print(
+  ggplot(plot_minmax_df %>% filter(Dat_Qual == "High"), 
+         aes(x = factor(OM_Scenario), y = factor(EM_Scenario), fill = MARE, label = round(MARE, 4))) +
+    geom_tile(alpha = 0.25) +
+    geom_text(color = ifelse(plot_minmax_df$MARE ==  plot_minmax_df$time_minmax_medians, "green", "black"), size = 5) +    
+                facet_wrap(~time_comp, scales = "free_x") +
+    scale_fill_distiller(palette = "Spectral", direction = -1) + 
+    scale_x_discrete(guide = guide_axis(angle = 90)) +
+    labs(x = "OM Scenario", y = "Estimation Models", fill = "MARE") +
+    theme_test() +
+    theme(legend.position = "top",
+          strip.text = element_text(size = 20),
+          axis.title = element_text(size = 20),
+          axis.text = element_text(size = 17, color = "black"),
+          legend.text = element_text(size = 17),
+          legend.title = element_text(size = 20),
+          legend.key.width = unit(1, "cm"))
+)
+dev.off()
+
+# Output tables
+# terminal year
+terminal_minmax_df = minmax_df %>% 
+  mutate(MARE = round(MARE, 4)) %>% 
+  filter(Dat_Qual == "High", time_comp == "Terminal") %>% 
+  select(OM_Scenario, EM_Scenario, MARE) %>% 
+  pivot_wider(names_from = "OM_Scenario", values_from = "MARE")
+
+# fleet transition end
+fleettrans_minmax_df = minmax_df %>% 
+  mutate(MARE = round(MARE, 4)) %>% 
+  filter(Dat_Qual == "High", time_comp == "Fleet Trans End") %>% 
+  select(OM_Scenario, EM_Scenario, MARE) %>% 
+  pivot_wider(names_from = "OM_Scenario", values_from = "MARE")
+
+# fleet intersection
+fleetint_minmax_df = minmax_df %>% 
+  mutate(MARE = round(MARE, 4)) %>% 
+  filter(Dat_Qual == "High", time_comp == "Fleet Intersect") %>% 
+  select(OM_Scenario, EM_Scenario, MARE) %>% 
+  pivot_wider(names_from = "OM_Scenario", values_from = "MARE")
+
+terminal_minmax_df = terminal_minmax_df[,c("EM_Scenario", fast_om_plot_order, slow_om_plot_order)] %>% 
+  mutate(EM_Scenario = fct_relevel(EM_Scenario, plot_order)) %>% arrange(EM_Scenario)
+fleettrans_minmax_df = fleettrans_minmax_df[,c("EM_Scenario", fast_om_plot_order, slow_om_plot_order)] %>% 
+  mutate(EM_Scenario = fct_relevel(EM_Scenario, plot_order)) %>% arrange(EM_Scenario)
+fleetint_minmax_df = fleetint_minmax_df[,c("EM_Scenario", fast_om_plot_order, slow_om_plot_order)] %>% 
+  mutate(EM_Scenario = fct_relevel(EM_Scenario, plot_order)) %>% arrange(EM_Scenario)
+
+write.table(terminal_minmax_df, here("output", "Minmax_Terminal.txt"), sep = ",", row.names = FALSE)
+write.table(fleettrans_minmax_df, here("output", "Minmax_FleetTrans.txt"), sep = ",", row.names = FALSE)
+write.table(fleetint_minmax_df, here("output", "Minmax_FleetInt.txt"), sep = ",", row.names = FALSE)
+
+
+# Selectivity EM Plot -----------------------------------------------------
+
+selex_path = here("output", "OM_Scenarios", "Fast_LG_O_High") # selectivity plot path
+selex_em_df = data.table::fread(here(selex_path, "EM_Fish_Selex.csv")) %>% 
+  filter(Sex == "Female", time_comp == "Terminal",
+         sim == 1, str_detect(EM_Scenario, all_models)) # filter to terminal year and other stuff for plotting
+
+selex_em_df = selex_em_df %>% 
+  mutate(EM_Scenario = str_remove(EM_Scenario, "_1.25|_2.0|_0.05"),
+         EM_Scenario = str_replace(EM_Scenario, "Gam", "G"), # filter out stuff and cleaning up stuff
+         EM_Scenario = factor(EM_Scenario,
+                                labels = c("1Fleet_Gamma_RandomWalk",
+                                           "1Fleet_Gamma_SemiPar",
+                                           "1Fleet_Gamma_TimeInvar",
+                                           "1Fleet_Logist_RandomWalk",
+                                           "1Fleet_Logist_SemiPar",
+                                           "1Fleet_Logist_TimeInvar",
+                                           "1Fleet_Logist_Gamma_TimeBlk",
+                                           "1Fleet_Logist_Logist_TimeBlk",
+                                           "2Fleet_Logist_Gamma",
+                                           "2Fleet_Logist_Logist")))
+
+
+
+(pa = ggplot(selex_em_df %>% filter(str_detect(EM_Scenario, "2Fl"), Year == 50), 
+       aes(x = Age, y = Selex, color = factor(Fleet))) +
+  geom_line(size = 1.3) +
+  facet_wrap(~EM_Scenario) +
+  theme_bw() +
+  labs(x = "Age", y = "Proportion Selected", color = "Fleet") +
+  theme(legend.position = c(0.85, 0.15),
+        strip.text = element_text(size = 13),
+        axis.title = element_text(size = 15),
+        axis.text= element_text(size = 13, color = "black"),
+        legend.text = element_text(size = 11),
+        legend.title = element_text(size = 13),
+        title = element_text(size = 25),
+        legend.key.width = unit(1.5, "cm")))
+
+(pb = ggplot(selex_em_df %>% filter(str_detect(EM_Scenario, "Invar"), Year == 50), 
+       aes(x = Age, y = Selex, color = factor(Fleet))) +
+  geom_line(size = 1.3) +
+  facet_wrap(~EM_Scenario) +
+  theme_bw() +
+  labs(x = "Age", y = "Proportion Selected", color = "Fleet") +
+  theme(legend.position = c(0.85, 0.15),
+          strip.text = element_text(size = 13),
+          axis.title = element_text(size = 15),
+          axis.text= element_text(size = 13, color = "black"),
+          legend.text = element_text(size = 11),
+          legend.title = element_text(size = 13),
+          title = element_text(size = 25),
+          legend.key.width = unit(1.5, "cm")))
+
+(pc = ggplot(selex_em_df %>% filter(str_detect(EM_Scenario, "Blk"), Year %in% c(1, 50)) %>% 
+               mutate(Time_Block = ifelse(Year == 1, "Year 1 - 24",
+                                          "Year 25 - 50")), 
+       aes(x = Age, y = Selex, color = factor(Time_Block))) +
+    geom_line(size = 1.3) +
+    facet_wrap(~EM_Scenario) +
+    theme_bw() +
+    labs(x = "Age", y = "Proportion Selected", color = "Time Block") +
+    theme(legend.position = c(0.83, 0.15),
+          strip.text = element_text(size = 13),
+          axis.title = element_text(size = 15),
+          axis.text= element_text(size = 13, color = "black"),
+          legend.text = element_text(size = 11),
+          legend.title = element_text(size = 13),
+          title = element_text(size = 25),
+          legend.key.width = unit(1.5, "cm")))
+  
+age_year_levels <- as.factor(rev(seq(1, 50, 1))) 
+
+(pd = ggplot(selex_em_df %>% filter(str_detect(EM_Scenario, "Semi|Random")),
+       aes(Age, Year, height = Selex, group = Year, fill = Year)) + 
+  ggridges::geom_density_ridges(stat = "identity", scale = 2, alpha = 0.3) +
+  scale_fill_viridis_c() +
+  facet_wrap(~EM_Scenario, nrow = 1) +
+  scale_y_continuous(trans = "reverse") +
+  theme_bw() +
+  theme(legend.position = "bottom",
+        strip.text = element_text(size = 13),
+        axis.title = element_text(size = 15),
+        axis.text= element_text(size = 13, color = "black"),
+        legend.text = element_text(size = 13),
+        legend.title = element_text(size = 15),
+        title = element_text(size = 25),
+        legend.key.width = unit(1.5, "cm")))
+
+(pd = ggplot(selex_em_df %>% filter(str_detect(EM_Scenario, "Semi|Random")),
+             aes(Age, Selex, group = Year, color = Year)) + 
+    # ggridges::geom_density_ridges(stat = "identity", scale = 2, alpha = 0.3) +
+    geom_line() + 
+    scale_color_viridis_c() +
+    facet_wrap(~EM_Scenario, nrow = 1) +
+    # scale_y_continuous(trans = "reverse") +
+    theme_bw() +
+    theme(legend.position = "bottom",
+          strip.text = element_text(size = 13),
+          axis.title = element_text(size = 15),
+          axis.text= element_text(size = 13, color = "black"),
+          legend.text = element_text(size = 13),
+          legend.title = element_text(size = 15),
+          title = element_text(size = 25),
+          legend.key.width = unit(1.5, "cm")))
+
+a_b_c = ggpubr::ggarrange(pa, pb, pc, nrow = 1)
+
+pdf(here("figs", "Manuscript_Figures_v2", "Fig_EM_Selex_A.pdf"), width = 20, height = 5)
+a_b_c
+dev.off()
+
+pdf(here("figs", "Manuscript_Figures_v2", "Fig_EM_Selex_B.pdf"), width = 13, height = 15)
+pd
+dev.off()
+
+pdf(here("figs", "Manuscript_Figures_v2", "Fig_EM_Selex.pdf"), width = 20, height = 20)
+ggpubr::ggarrange(a_b_c, pd, nrow = 2, heights = c(0.4, 1), labels = c("A", "B"),
+                  label.x = -0.003, label.y = 1.01,font.label = list(size = 28, color = "black"))
 dev.off()
 

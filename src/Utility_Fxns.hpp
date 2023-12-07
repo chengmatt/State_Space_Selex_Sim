@@ -65,6 +65,12 @@ Type Get_Selex(Type age,
     selex = first * second * (third/fourth);
   }
   
+  if(sel_model == 4) {
+    int idx = CppAD::Integer(age-1);
+    Type sel_par = exp(ln_selpars(idx));
+    selex = sel_par;
+  }
+  
   return selex;
 } // end function
 
