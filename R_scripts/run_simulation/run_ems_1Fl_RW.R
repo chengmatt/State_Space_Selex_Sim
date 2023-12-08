@@ -31,7 +31,7 @@ lh_path <- here("input", "Sablefish_Inputs.xlsx")
 n_OM_scen <- length(om_scenarios$OM_Scenarios)
 n_EM_scen <- length(em_scenarios$EM_Scenario)
 
-for(n_om in 1:n_OM_scen) {
+for(n_om in 2:n_OM_scen) {
   
 # Load OM -----------------------------------------------------------------
   

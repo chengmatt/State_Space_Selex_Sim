@@ -41,7 +41,7 @@ ts_pars <- unique(ts_re_df$par_name) # unique parameter names
 
 # Timeblock sensitivity models
 blk_sens_mods <- "Blk\\b|Blk_1|Blk_3|Blk_5|Blk_-1|Blk_-3|Blk_-5"
-all_models <- "2Fl_LL|2Fl_LGam|1Fl_L_TI|1Fl_Gam_TI|1Fl_LL_Blk\\b|1Fl_LGam_Blk\\b|1Fl_L_RW_1.25|1Fl_Gam_RW_2.0|1Fl_L_SP_0.20|1Fl_Gam_SP_0.20"
+all_models <- "2Fl_LL|2Fl_LGam|1Fl_L_TI|1Fl_Gam_TI|1Fl_LL_Blk\\b|1Fl_LGam_Blk\\b|1Fl_L_RW_1.25|1Fl_Gam_RW_2.0|1Fl_L_SP_0.75|1Fl_Gam_SP_0.75"
 gen_om <- c("Fast", "Slow") # general OMs
 
 # Get plot order for EM models
@@ -258,6 +258,7 @@ om_scenario_params <- param_df %>% filter(str_detect(EM_Scenario, all_models),
 pt_rg_re <- om_scenario_params %>% 
   group_by(OM_Scenario, EM_Scenario, time_comp, type, Dat_Qual) %>% 
   summarize(median = median(RE), 
+            sd = sd(RE),
             lwr_95 = quantile(RE, 0.025),
             upr_95 =  quantile(RE, 0.975))
 
@@ -439,10 +440,10 @@ minmax_df = minmax_df %>%
                                   "1Fl_LG_Blk" , "1Fl_LL_Blk" ,
                                   "1Fl_G_TI", "1Fl_L_TI" , 
                                   "2Fl_LG" , "2Fl_LL"), # relevel
-                       labels = c("1Fleet_Gamma_RandomWalk",
-                                  "1Fleet_Logist_RandomWalk",
-                                  "1Fleet_Gamma_SemiPar",
+                       labels = c("1Fleet_Gamma_SemiPar",
                                   "1Fleet_Logist_SemiPar",
+                                  "1Fleet_Gamma_RandomWalk",
+                                  "1Fleet_Logist_RandomWalk",
                                   "1Fleet_Logist_Gamma_TimeBlk",
                                   "1Fleet_Logist_Logist_TimeBlk",
                                   "1Fleet_Gamma_TimeInvar",
@@ -563,6 +564,31 @@ print(
 )
 dev.off()
 
+pdf(here("figs", "Manuscript_Figures_v2", "Fig_Fast_SDRE_ABC.pdf"), width = 17, height = 10)
+print(
+  ggplot(pt_rg_re %>% filter(Dat_Qual == "High", str_detect(OM_Scenario, "Fast_"),
+                             type == "ABC"),
+         aes(x = factor(EM_Scenario), y = sd, group = time_comp, 
+             color = time_comp, fill = time_comp)) +
+    geom_point(size = 5) +
+    geom_line(size = 1.2, alpha = 0.5) +
+    facet_grid(~OM_Scenario, scales = "free_x") +
+    scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 40)]) +
+    scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 40)]) +
+    scale_x_discrete(guide = guide_axis(angle = 90)) +
+    labs(x = "Estimation Models", y = "Standard Deviation of Relative Error in ABC",
+         fill = "Assessment Period", color = "Assessment Period") +
+    theme_matt() +
+    theme(legend.position = "top", 
+          title = element_text(size = 20),
+          axis.title = element_text(size = 17),
+          axis.text= element_text(size = 15),
+          strip.text = element_text(size = 17),
+          axis.text.y = element_text(angle = 90),
+          legend.text = element_text(size = 15),
+          legend.title = element_text(size = 17)) )
+dev.off()
+
 
 # Figure 4 (RE SSB Slow) --------------------------------------------------
 
@@ -651,6 +677,31 @@ print(
           legend.title = element_text(size = 17)) +
     coord_flip(ylim = c(-0.4, 0.4))
 )
+dev.off()
+
+pdf(here("figs", "Manuscript_Figures_v2", "Fig_Slow_SDRE_ABC.pdf"), width = 17, height = 10)
+print(
+  ggplot(pt_rg_re %>% filter(Dat_Qual == "High", str_detect(OM_Scenario, "Slow_"),
+                             type == "ABC"),
+         aes(x = factor(EM_Scenario), y = sd, group = time_comp, 
+             color = time_comp, fill = time_comp)) +
+    geom_point(size = 5) +
+    geom_line(size = 1.2, alpha = 0.5) +
+    facet_grid(~OM_Scenario, scales = "free_x") +
+    scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 40)]) +
+    scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 40)]) +
+    scale_x_discrete(guide = guide_axis(angle = 90)) +
+    labs(x = "Estimation Models", y = "Standard Deviation of Relative Error in ABC",
+         fill = "Assessment Period", color = "Assessment Period") +
+    theme_matt() +
+    theme(legend.position = "top", 
+          title = element_text(size = 20),
+          axis.title = element_text(size = 17),
+          axis.text= element_text(size = 15),
+          strip.text = element_text(size = 17),
+          axis.text.y = element_text(angle = 90),
+          legend.text = element_text(size = 15),
+          legend.title = element_text(size = 17)) )
 dev.off()
 
 # Figure S1 (Convergence) -------------------------------------------------
@@ -1161,7 +1212,7 @@ dev.off()
 
 # Table (Minimax Solution) -------------------------------------------------
 plot_minmax_df = minmax_df %>% filter(Dat_Qual == "High") # filter to high data quality
-pdf(here("figs", "Manuscript_Figures_v2", "Fig_Minimax.pdf"), width = 20, height = 25)
+pdf(here("figs", "Manuscript_Figures_v2", "Fig_Minimax.pdf"), width = 20, height = 15)
 print(
   ggplot(plot_minmax_df %>% filter(Dat_Qual == "High"), 
          aes(x = factor(OM_Scenario), y = factor(EM_Scenario), fill = MARE, label = round(MARE, 4))) +
@@ -1170,7 +1221,7 @@ print(
                 facet_wrap(~time_comp, scales = "free_x") +
     scale_fill_distiller(palette = "Spectral", direction = -1) + 
     scale_x_discrete(guide = guide_axis(angle = 90)) +
-    labs(x = "OM Scenario", y = "Estimation Models", fill = "MARE") +
+    labs(x = "OM Scenario", y = "Estimation Models", fill = "SSB MARE") +
     theme_test() +
     theme(legend.position = "top",
           strip.text = element_text(size = 20),
@@ -1218,12 +1269,11 @@ write.table(fleetint_minmax_df, here("output", "Minmax_FleetInt.txt"), sep = ","
 
 # Selectivity EM Plot -----------------------------------------------------
 
-selex_path = here("output", "OM_Scenarios", "Fast_LG_O_High") # selectivity plot path
-selex_em_df = data.table::fread(here(selex_path, "EM_Fish_Selex.csv")) %>% 
-  filter(Sex == "Female", time_comp == "Terminal",
-         sim == 1, str_detect(EM_Scenario, all_models)) # filter to terminal year and other stuff for plotting
+selex_path = here("output", "OM_Scenarios", "Fast_LL_High") # selectivity plot path
+selex_em_df = data.table::fread(here(selex_path, "EM_Fish_Selex.csv")) 
 
-selex_em_df = selex_em_df %>% 
+plt_selex_em_df = selex_em_df %>% 
+  filter(Sex == "Female", time_comp == "Terminal", str_detect(EM_Scenario, all_models)) %>%  # filter to terminal year and other stuff for plotting
   mutate(EM_Scenario = str_remove(EM_Scenario, "_1.25|_2.0|_0.05"),
          EM_Scenario = str_replace(EM_Scenario, "Gam", "G"), # filter out stuff and cleaning up stuff
          EM_Scenario = factor(EM_Scenario,
@@ -1236,11 +1286,12 @@ selex_em_df = selex_em_df %>%
                                            "1Fleet_Logist_Gamma_TimeBlk",
                                            "1Fleet_Logist_Logist_TimeBlk",
                                            "2Fleet_Logist_Gamma",
-                                           "2Fleet_Logist_Logist")))
+                                           "2Fleet_Logist_Logist"))) %>% 
+  group_by(Year, Age, EM_Scenario, Fleet) %>% 
+  summarize(Selex = mean(Selex))
 
 
-
-(pa = ggplot(selex_em_df %>% filter(str_detect(EM_Scenario, "2Fl"), Year == 50), 
+(pa = ggplot(plt_selex_em_df %>% filter(str_detect(EM_Scenario, "2Fl"), Year == 50), 
        aes(x = Age, y = Selex, color = factor(Fleet))) +
   geom_line(size = 1.3) +
   facet_wrap(~EM_Scenario) +
@@ -1255,7 +1306,7 @@ selex_em_df = selex_em_df %>%
         title = element_text(size = 25),
         legend.key.width = unit(1.5, "cm")))
 
-(pb = ggplot(selex_em_df %>% filter(str_detect(EM_Scenario, "Invar"), Year == 50), 
+(pb = ggplot(plt_selex_em_df %>% filter(str_detect(EM_Scenario, "Invar"), Year == 50), 
        aes(x = Age, y = Selex, color = factor(Fleet))) +
   geom_line(size = 1.3) +
   facet_wrap(~EM_Scenario) +
@@ -1270,7 +1321,7 @@ selex_em_df = selex_em_df %>%
           title = element_text(size = 25),
           legend.key.width = unit(1.5, "cm")))
 
-(pc = ggplot(selex_em_df %>% filter(str_detect(EM_Scenario, "Blk"), Year %in% c(1, 50)) %>% 
+(pc = ggplot(plt_selex_em_df %>% filter(str_detect(EM_Scenario, "Blk"), Year %in% c(1, 50)) %>% 
                mutate(Time_Block = ifelse(Year == 1, "Year 1 - 24",
                                           "Year 25 - 50")), 
        aes(x = Age, y = Selex, color = factor(Time_Block))) +
@@ -1289,29 +1340,12 @@ selex_em_df = selex_em_df %>%
   
 age_year_levels <- as.factor(rev(seq(1, 50, 1))) 
 
-(pd = ggplot(selex_em_df %>% filter(str_detect(EM_Scenario, "Semi|Random")),
-       aes(Age, Year, height = Selex, group = Year, fill = Year)) + 
-  ggridges::geom_density_ridges(stat = "identity", scale = 2, alpha = 0.3) +
-  scale_fill_viridis_c() +
-  facet_wrap(~EM_Scenario, nrow = 1) +
-  scale_y_continuous(trans = "reverse") +
-  theme_bw() +
-  theme(legend.position = "bottom",
-        strip.text = element_text(size = 13),
-        axis.title = element_text(size = 15),
-        axis.text= element_text(size = 13, color = "black"),
-        legend.text = element_text(size = 13),
-        legend.title = element_text(size = 15),
-        title = element_text(size = 25),
-        legend.key.width = unit(1.5, "cm")))
-
-(pd = ggplot(selex_em_df %>% filter(str_detect(EM_Scenario, "Semi|Random")),
-             aes(Age, Selex, group = Year, color = Year)) + 
-    # ggridges::geom_density_ridges(stat = "identity", scale = 2, alpha = 0.3) +
-    geom_line() + 
-    scale_color_viridis_c() +
+(pd = ggplot(plt_selex_em_df %>% filter(str_detect(EM_Scenario, "Semi|Random")),
+             aes(Age, Year, height = Selex, group = Year, fill = Year)) + 
+    ggridges::geom_density_ridges(stat = "identity", scale = 2, alpha = 0.3) +
+    scale_fill_viridis_c() +
     facet_wrap(~EM_Scenario, nrow = 1) +
-    # scale_y_continuous(trans = "reverse") +
+    scale_y_continuous(trans = "reverse") +
     theme_bw() +
     theme(legend.position = "bottom",
           strip.text = element_text(size = 13),
