@@ -329,12 +329,13 @@ catch_df_sum <- catch_df %>%
          Fleet = parse_number(as.character(Fleet)),
          OM_Scenario = str_remove(OM_Scenario, "_High"),
          Speed = ifelse(str_detect(OM_Scenario, "Fast"), "Fast", "Slow"),
-         Selex = ifelse(str_detect(OM_Scenario, "LG_O"), "Logist-Gamma-Old", 
+         Selex = ifelse(str_detect(OM_Scenario, "LG_O"), "Logist-Gamma-Old",
                  ifelse(str_detect(OM_Scenario, "LG_Y"), 'Logist-Gamma-Young', "Logist-Logist")),
-         Selex = factor(Selex, levels = c("Logist-Logist", 
+         Selex = factor(Selex, levels = c("Logist-Logist",
                                           "Logist-Gamma-Old",
-                                          "Logist-Gamma-Young"))) %>% 
-  group_by(Year, OM_Scenario, Fleet, Speed, Selex) %>% 
+                                          "Logist-Gamma-Young"))
+         ) %>% 
+  group_by(Year, OM_Scenario, Fleet, Speed) %>% 
   summarize(Median_HR = median(Value),
             Lwr_95_HR = quantile(Value, 0.025),
             Upr_95_HR = quantile(Value, 0.975)) 
@@ -344,7 +345,7 @@ pdf(here("figs", "OM_Scenarios", "Catch_Scenarios.pdf"), width = 28, height = 10
                       ymin = Lwr_95_HR, ymax = Upr_95_HR)) +
     geom_ribbon(alpha = 0.35, color = NA) +
     geom_line(size = 1.5) +
-    facet_grid(Selex~Speed, scales = "free_x") +
+    facet_grid(OM_Scenario~Speed, scales = "free_x") +
     labs(x = "Year", y = "Catch", fill = "Fleet",
          color = "Fleet", linetype = "Fleet") +
     theme_bw() +
@@ -474,29 +475,47 @@ dev.off()
 med_naa_df <- naa_df %>% 
   filter(str_detect(OM_Scenario, "High")) %>% 
   mutate(Sex = ifelse(Sex == 1, "Female", "Male"),
-         OM_Scenario = str_remove(OM_Scenario, "_High"),
-         OM_Scenario = factor(OM_Scenario,
-                              levels = c("Fast_LG_O", "Fast_LG_Y",
-                                         "Slow_LG_O", "Slow_LG_Y",
-                                         "Fast_LL", "Slow_LL"))) %>% 
+         OM_Scenario = str_remove(OM_Scenario, "_High")
+         # OM_Scenario = factor(OM_Scenario,
+         #                      levels = c("Fast_LG_O", "Fast_LG_Y",
+         #                                 "Slow_LG_O", "Slow_LG_Y",
+         #                                 "Fast_LL", "Slow_LL"))
+         ) %>% 
   group_by(Age, Year, Sex, OM_Scenario) %>% 
   summarize(median = median(Value))
 
-pdf(here("figs", "OM_Scenarios", "NAA_plot.pdf"), width = 28, height = 10)
+pdf(here("figs", "OM_Scenarios", "NAA_plot.pdf"), width = 15, height = 10)
 
-(naa_plot = ggplot(med_naa_df %>% filter(Age %in% c(seq(2,30, 2))), 
+(naa_plot = ggplot(med_naa_df %>% filter(Age %in% c(seq(2,30, 3), 30),
+                                         # str_detect(OM_Scenario, "LL"),
+                                         Sex == "Female") %>% 
+                     mutate(OM_Scenario = factor(OM_Scenario,
+                                                 levels = c(
+                                                   "Fast_LL",
+                                                   "Fast_LL_Rev",
+                                                   "Fast_LG_O",
+                                                   "Fast_LG_O_Rev",
+                                                   "Fast_LG_Y",
+                                                   "Fast_LG_Y_Rev",
+                                                   "Slow_LL",
+                                                   "Slow_LL_Rev",
+                                                   "Slow_LG_O",
+                                                   "Slow_LG_O_Rev",
+                                                   "Slow_LG_Y",
+                                                   "Slow_LG_Y_Rev"
+                                                 ))), 
        aes(x = Year, y = median, fill = factor(Age))) +
-  geom_col(color = "black", alpha = 0.55) +
-  facet_grid(Sex~OM_Scenario, scales = "free") +
+  geom_col(color = "black", alpha = 0.85) +
+  facet_wrap(~OM_Scenario, scales = "free") +
   labs(x = "Year", y = "Median Numbers-at-age", fill = "Age") +
   scale_fill_viridis_d() +
   theme_bw() +
   theme(legend.position = "top",
-        axis.title = element_text(size = 17),
-        axis.text = element_text(size = 15, color = "black"),
-        legend.title = element_text(size = 17),
-        legend.text = element_text(size = 15),
-        strip.text = element_text(size = 11)) )
+        axis.title = element_text(size = 25),
+        axis.text = element_text(size = 18, color = "black"),
+        legend.title = element_text(size = 25),
+        legend.text = element_text(size = 23),
+        strip.text = element_text(size = 18)) )
 
 dev.off()
 

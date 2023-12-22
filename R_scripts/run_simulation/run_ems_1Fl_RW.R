@@ -20,9 +20,10 @@ for(i in 1:length(files)) source(here(fxn_path, files[i]))
 compile_tmb(wd = here("src"), cpp = "EM.cpp")
 
 # Read in OM and EM Scenarios
-om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "OM") 
+om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "OM") %>% 
+  filter(str_detect(OM_Scenarios, "Rev"))
 em_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "EM_1Fl_RW") %>% 
-  filter(str_detect(EM_Scenario, "SP"))
+  filter(str_detect(EM_Scenario, "SP_0.75|L_RW_1.25|Gam_RW_2.0"))
 
 # Read in spreadsheet for life history parameters
 lh_path <- here("input", "Sablefish_Inputs.xlsx")
@@ -31,7 +32,7 @@ lh_path <- here("input", "Sablefish_Inputs.xlsx")
 n_OM_scen <- length(om_scenarios$OM_Scenarios)
 n_EM_scen <- length(em_scenarios$EM_Scenario)
 
-for(n_om in 2:n_OM_scen) {
+for(n_om in 1:n_OM_scen) {
   
 # Load OM -----------------------------------------------------------------
   
@@ -114,11 +115,11 @@ for(n_om in 2:n_OM_scen) {
                               n_time_selex_pars = as.numeric(time_selex_npars),
                               fix_pars = fix_pars,
                               sim = sim)
-    
+  
 
     # Fix sigma if sigma_fixed is not NA 
     if(fixed_sigma_re_fish != "NA") input$parameters$ln_fixed_sel_re_fish[] <- log(as.numeric(fixed_sigma_re_fish))
-
+    
     # Run EM model here and get sdrep
     model = list() # to ensure foreach loop doesnt break b/c of not detecting exported obj
     tryCatch(expr = model <- run_EM(data = input$data, parameters = input$parameters, 
@@ -126,15 +127,6 @@ for(n_om in 2:n_OM_scen) {
                                     random = random_fish_sel, 
                                     silent = T, getsdrep = TRUE), error = function(e){e}) 
     
-    # plot(model$model_fxn$rep$F_Slx[1,,,1])
-    # model$model_fxn$rep$ln_fish_selpars_re[]
-    # model$sd_rep
-    # #
-    # image(model$model_fxn$rep$F_Slx[,,1,1])
-    # for(i in 1:49) {
-    #   if(i==1) plot(model$model_fxn$rep$F_Slx[i,,1,1], type = "l", ylim = c(0,3))
-    #   else lines(model$model_fxn$rep$F_Slx[i,,1,1], type = "l")
-    # }
 
     # Check model convergence
     convergence_status = list() # to ensure foreach loop doesnt break b/c of not detecting exported obj
@@ -226,3 +218,30 @@ for(n_om in 2:n_OM_scen) {
 } # end n_om loop
 
 
+# MCMC Runs for selectivity > 1
+# Make AD Function here
+# model_fxn <- TMB::MakeADFun(input$data, input$parameters, input$map,
+#                             random = NULL,
+#                             DLL="EM", silent = T,
+#                             checkParameterOrder = TRUE, tracepar = TRUE)
+# 
+# 
+# # Optimize model here w/ nlminb
+# mle_optim <- stats::nlminb(model_fxn$par, model_fxn$fn, model_fxn$gr, 
+#                            control = list(iter.max = 1e5, eval.max = 1e5))
+# 
+# # Take additional newton steps
+# add_newton(n.newton = 3, ad_model = model_fxn, mle_optim = mle_optim)
+# # Get report with mle optimized parameters
+# model_fxn$rep <- model_fxn$report(model_fxn$env$last.par.best) # Need to pass both fixed and random effects!!!
+# # Get sd report here from TMB
+# sd_rep <- TMB::sdreport(model_fxn)
+# # Look at correlations
+# cor_f_re = reshape2::melt(cov2cor(sd_rep$cov.fixed)) %>% 
+#   filter(Var1 == "ln_fish_selpars_re", Var2 == "ln_Fy")
+# 
+# # Run MCMC on this
+# cores <- parallel::detectCores()-7
+# options(mc.cores = cores)
+# mcmc_runs = tmbstan::tmbstan(model_fxn,init ="last.par.best", chains = cores)
+# shinystan::launch_shinystan(mcmc_runs)
