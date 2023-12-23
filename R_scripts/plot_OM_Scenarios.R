@@ -494,15 +494,15 @@ pdf(here("figs", "OM_Scenarios", "NAA_plot.pdf"), width = 15, height = 10)
                                                    "Fast_LL",
                                                    "Fast_LL_Rev",
                                                    "Fast_LG_O",
-                                                   "Fast_LG_O_Rev",
+                                                   "Fast_GL_O_Rev",
                                                    "Fast_LG_Y",
-                                                   "Fast_LG_Y_Rev",
+                                                   "Fast_GL_Y_Rev",
                                                    "Slow_LL",
                                                    "Slow_LL_Rev",
                                                    "Slow_LG_O",
-                                                   "Slow_LG_O_Rev",
+                                                   "Slow_GL_O_Rev",
                                                    "Slow_LG_Y",
-                                                   "Slow_LG_Y_Rev"
+                                                   "Slow_GL_Y_Rev"
                                                  ))), 
        aes(x = Year, y = median, fill = factor(Age))) +
   geom_col(color = "black", alpha = 0.85) +

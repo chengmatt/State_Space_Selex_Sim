@@ -23,17 +23,29 @@ for(i in 1:length(files)) source(here(fxn_path, files[i]))
 
 # read in csvs
 # Parameter and Time Series Summaries
-AIC_df <- data.table::fread(here("output", "AIC_Convergence_Summary.csv")) # time series total error (converged runs only)
-param_df <- read.csv(here("output", "Parameter_Summary.csv")) # parameters
-ts_all_df <- data.table::fread(here("output", "TimeSeries_Summary.csv")) # all time series data
-ts_re_df <- read.csv(here("output", "TimeSeries_RE.csv")) # time series relative error (converged runs only)
-ts_te_df <- read.csv(here("output", "TimeSeries_TE.csv")) # time series total error (converged runs only)
-ts_are_df <- read.csv(here("output", "TimeSeries_ARE.csv")) # time series abs relative error (converged runs only)
+AIC_df <- data.table::fread(here("output", "AIC_Convergence_Summary.csv")) %>%   # time series total error (converged runs only)
+  filter(!str_detect(OM_Scenario, "Rev"))
+  # time series total error (converged runs only)
+param_df <- read.csv(here("output", "Parameter_Summary.csv")) %>% # parameters
+  filter(str_detect(OM_Scenario, "Rev"))
+ts_all_df <- data.table::fread(here("output", "TimeSeries_Summary.csv")) %>%  # all time series data
+  filter(!str_detect(OM_Scenario, "Rev"))
+ts_re_df <- read.csv(here("output", "TimeSeries_RE.csv")) %>% # time series relative error (converged runs only)
+  filter(!str_detect(OM_Scenario, "Rev"))
+ts_te_df <- read.csv(here("output", "TimeSeries_TE.csv")) %>%  # time series total error (converged runs only)
+  filter(!str_detect(OM_Scenario, "Rev"))
+ts_are_df <- read.csv(here("output", "TimeSeries_ARE.csv")) %>%  # time series abs relative error (converged runs only)
+  filter(!str_detect(OM_Scenario, "Rev"))
+
 
 # Selectivity and Comps
-om_slx_df <- data.table::fread(here("output", "OM_Fish_Selex.csv")) # OM Selectivity Values
-pop_sel_om <- data.table::fread(here("output", "Pop_Selex_OM.csv")) # OM Pop'n Selectivity Values
-pop_sel_em <- data.table::fread(here("output", "Pop_Selex_EM.csv")) # EM Pop'n Selectivity Values
+om_slx_df <- data.table::fread(here("output", "OM_Fish_Selex.csv")) %>% # OM Selectivity Values
+  filter(!str_detect(OM_Scenario, "Rev"))
+pop_sel_om <- data.table::fread(here("output", "Pop_Selex_OM.csv")) %>%  # OM Pop'n Selectivity Values
+  filter(!str_detect(OM_Scenario, "Rev"))
+pop_sel_em <- data.table::fread(here("output", "Pop_Selex_EM.csv")) %>%  # EM Pop'n Selectivity Values\
+  filter(!str_detect(OM_Scenario, "Rev"))
+
 
 # Unique oms and other components
 unique_oms <- unique(param_df$OM_Scenario) # unique oms
@@ -153,7 +165,7 @@ AIC_df <- AIC_df %>%
 
 # Two fleet AIC df
 twofleet_aic <- AIC_df %>% 
-  filter(str_detect(EM_Scenario, "2Fl_")) %>% 
+  filter(str_detect(EM_Scenario, "2Fl_LL|2Fl_LGam")) %>% 
   group_by(sim, OM_Scenario, time_comp, Dat_Qual) %>% 
   mutate(min = min(AIC), min_AIC = ifelse(AIC == min, 1, 0)) %>% 
   group_by(OM_Scenario, EM_Scenario, time_comp, Dat_Qual) %>% 
@@ -231,7 +243,7 @@ onefleet_aic <- AIC_df %>%
 
 # Filter to 1 fleet time block models
 onefleet_blk_aic <- AIC_df %>% 
-  filter(str_detect(EM_Scenario, "Blk"),
+  filter(str_detect(EM_Scenario, "LL_Blk|LGam_Blk"),
          str_detect(OM_Scenario, "Fast")) %>% 
   mutate(
     selex_form = case_when(
@@ -583,37 +595,38 @@ ssb_fast_re_om = ts_re_om %>%
               ),
           abbrev = factor(abbrev, levels = c("2Fleet", "1Fleet TimeInvar",
                                              "1Fleet Block", "1Fleet RandWlkPar",
-                                             "1Fleet SemiPar"))) # functional form
+                                             "1Fleet SemiPar"))) %>%  # functional form
+  filter(Dat_Qual == "High")
 
 
-pdf(here("figs", "Manuscript_Figures_v2", "Fig2_SSB.pdf"), width = 17, height = 19)
-ggplot(ssb_fast_re_om %>% filter(time_comp %in% c("Fleet Trans End", "Terminal"), Dat_Qual == "High"),
-       aes(x = year, y = median, color = func, group = interaction(func, time_comp), alpha = time_comp)) +
-  geom_ribbon(aes(ymin = lwr_95, ymax = upr_95, fill = func, alpha = time_comp), color = NA) +
-  geom_line(aes(color = func, linetype = time_comp, size = time_comp), alpha = 1) +
+pdf(here("figs", "Manuscript_Figures_v2", "Fig2_SSB.pdf"), width = 19, height = 21)
+ggplot() + 
+  geom_hline(yintercept = 0, col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
+  geom_ribbon(ssb_fast_re_om %>% filter(time_comp == "Terminal"),
+              mapping = aes(x = year, y = median, ymin = lwr_95, ymax = upr_95, fill = func), 
+              color = NA, alpha = 0.3) +
+  geom_line(ssb_fast_re_om, mapping = aes(x = year, y = median, size = time_comp,
+                                          color = func, linetype = time_comp), alpha = 1) +
   facet_grid(abbrev ~ OM_Scenario) +
   coord_cartesian(ylim = c(-0.5, 0.5)) +
-  geom_hline(aes(yintercept = 0), col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
-  scale_linetype_manual(values = c("Fleet Trans End" = 2, "Terminal" = 1)) +
-  scale_alpha_manual(values = c("Fleet Trans End" = 0.25, "Terminal" = 0.35)) +
-  scale_size_manual(values = c("Fleet Trans End" = 1.25, "Terminal" = 1.5)) +
+  scale_linetype_manual(values = c("Fleet Intersect" = 3, "Fleet Trans End" = 2, "Terminal" = 1)) +
+  scale_size_manual(values = c("Fleet Intersect" = 2.8, "Fleet Trans End" = 1.35, "Terminal" = 1.5)) +
   scale_color_manual(values = c("#E69F00", "#0072B2")) +
   scale_fill_manual(values = c("#E69F00", "#0072B2")) +
   theme_matt() +
-  theme(legend.key.width = unit(1,"cm")) +
+  theme(legend.key.width = unit(1.3,"cm")) +
   theme(legend.position = "top") +
   labs(x = "Year", y = "Relative Error in Spawning Stock Biomass", fill = "Functional Form",
-       color = "Functional Form", lty = "Time Component", alpha = "Time Component",
-       size = "Time Component")
+       color = "Functional Form", lty = "Assessment Period", alpha = "Assessment Period",
+       size = "Assessment Period")
 dev.off()
 
 
 # Figure 3 (RE ABC Fast) --------------------------------------------------
 
-pdf(here("figs", "Manuscript_Figures_v2", "Fig3_ABC.pdf"), width = 25, height = 13)
+pdf(here("figs", "Manuscript_Figures_v2", "Fig3_ABC.pdf"), width = 15, height = 15)
 print(
-  ggplot(pt_rg_re %>% filter(Dat_Qual == "High", str_detect(OM_Scenario, "Fast_"),
-                             type == "ABC", time_comp != "Fleet Intersect"),
+  ggplot(pt_rg_re %>% filter(Dat_Qual == "High", str_detect(OM_Scenario, "Fast_"), type == "ABC"),
          aes(x = factor(abbrev), y = median, color = func, fill = func,
              ymin = lwr_95, ymax = upr_95)) +
     geom_pointrange(position = position_dodge2(width = 0.65), size = 1, linewidth = 1) +
@@ -621,18 +634,17 @@ print(
     facet_grid(time_comp~OM_Scenario, scales = "free_x") +
     scale_color_manual(values = c("#E69F00", "#0072B2")) +
     scale_fill_manual(values = c("#E69F00", "#0072B2")) +
-    scale_x_discrete(guide = guide_axis(angle = 0)) +
+    scale_x_discrete(guide = guide_axis(angle = 45)) +
     labs(x = "Estimation Models", y = "Relative Error in ABC", 
          fill = "Functional Form", color = "Functional Form") +
     theme_matt() +
     theme(legend.position = "top", 
           title = element_text(size = 20),
-          axis.title = element_text(size = 17),
-          axis.text= element_text(size = 15),
+          axis.title = element_text(size = 20),
+          axis.text= element_text(size = 18),
           strip.text = element_text(size = 17),
-          axis.text.y = element_text(angle = 90),
-          legend.text = element_text(size = 15),
-          legend.title = element_text(size = 17)) +
+          legend.text = element_text(size = 18),
+          legend.title = element_text(size = 20)) +
     coord_cartesian(ylim = c(-0.5, 0.5)))
 dev.off()
 
@@ -659,34 +671,35 @@ ssb_slow_re_om = ts_re_om %>%
           ),
           abbrev = factor(abbrev, levels = c("2Fleet", "1Fleet TimeInvar",
                                              "1Fleet Block", "1Fleet RandWlkPar",
-                                             "1Fleet SemiPar"))) # functional form
+                                             "1Fleet SemiPar"))) %>%  # functional form
+  filter(Dat_Qual == "High")
 
-pdf(here("figs", "Manuscript_Figures_v2", "Fig4_SSB.pdf"), width = 17, height = 19)
-ggplot(ssb_slow_re_om %>% filter(time_comp %in% c("Fleet Trans End", "Terminal"), Dat_Qual == "High"),
-       aes(x = year, y = median, color = func, group = interaction(func, time_comp), alpha = time_comp)) +
-  geom_ribbon(aes(ymin = lwr_95, ymax = upr_95, fill = func, alpha = time_comp), color = NA) +
-  geom_line(aes(color = func, linetype = time_comp, size = time_comp), alpha = 1) +
+pdf(here("figs", "Manuscript_Figures_v2", "Fig4_SSB.pdf"), width = 19, height = 21)
+ggplot() + 
+  geom_hline(yintercept = 0, col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
+  geom_ribbon(ssb_slow_re_om %>% filter(time_comp == "Terminal"),
+              mapping = aes(x = year, y = median, ymin = lwr_95, ymax = upr_95, fill = func), 
+              color = NA, alpha = 0.3) +
+  geom_line(ssb_slow_re_om, mapping = aes(x = year, y = median, size = time_comp,
+                                          color = func, linetype = time_comp), alpha = 1) +
   facet_grid(abbrev ~ OM_Scenario) +
   coord_cartesian(ylim = c(-0.5, 0.5)) +
-  geom_hline(aes(yintercept = 0), col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
-  scale_linetype_manual(values = c("Fleet Trans End" = 2, "Terminal" = 1)) +
-  scale_alpha_manual(values = c("Fleet Trans End" = 0.25, "Terminal" = 0.35)) +
-  scale_size_manual(values = c("Fleet Trans End" = 1.25, "Terminal" = 1.5)) +
+  scale_linetype_manual(values = c("Fleet Intersect" = 3, "Fleet Trans End" = 2, "Terminal" = 1)) +
+  scale_size_manual(values = c("Fleet Intersect" = 2.8, "Fleet Trans End" = 1.35, "Terminal" = 1.5)) +
   scale_color_manual(values = c("#E69F00", "#0072B2")) +
   scale_fill_manual(values = c("#E69F00", "#0072B2")) +
   theme_matt() +
-  theme(legend.key.width = unit(1,"cm")) +
+  theme(legend.key.width = unit(1.3,"cm")) +
   theme(legend.position = "top") +
   labs(x = "Year", y = "Relative Error in Spawning Stock Biomass", fill = "Functional Form",
-       color = "Functional Form", lty = "Time Component", alpha = "Time Component",
-       size = "Time Component")
+       color = "Functional Form", lty = "Assessment Period", alpha = "Assessment Period",
+       size = "Assessment Period")
 dev.off()
 
 # Figure 5 (RE ABC Slow) --------------------------------------------------
-pdf(here("figs", "Manuscript_Figures_v2", "Fig5_ABC.pdf"), width = 25, height = 13)
+pdf(here("figs", "Manuscript_Figures_v2", "Fig5_ABC.pdf"), width = 15, height = 15)
 print(
-  ggplot(pt_rg_re %>% filter(Dat_Qual == "High", str_detect(OM_Scenario, "Slow_"),
-                             type == "ABC", time_comp != "Fleet Intersect"),
+  ggplot(pt_rg_re %>% filter(Dat_Qual == "High", str_detect(OM_Scenario, "Slow_"), type == "ABC"),
          aes(x = factor(abbrev), y = median, color = func, fill = func,
              ymin = lwr_95, ymax = upr_95)) +
     geom_pointrange(position = position_dodge2(width = 0.65), size = 1, linewidth = 1) +
@@ -694,18 +707,17 @@ print(
     facet_grid(time_comp~OM_Scenario, scales = "free_x") +
     scale_color_manual(values = c("#E69F00", "#0072B2")) +
     scale_fill_manual(values = c("#E69F00", "#0072B2")) +
-    scale_x_discrete(guide = guide_axis(angle = 0)) +
+    scale_x_discrete(guide = guide_axis(angle = 45)) +
     labs(x = "Estimation Models", y = "Relative Error in ABC", 
          fill = "Functional Form", color = "Functional Form") +
     theme_matt() +
     theme(legend.position = "top", 
           title = element_text(size = 20),
-          axis.title = element_text(size = 17),
-          axis.text= element_text(size = 15),
+          axis.title = element_text(size = 20),
+          axis.text= element_text(size = 18),
           strip.text = element_text(size = 17),
-          axis.text.y = element_text(angle = 90),
-          legend.text = element_text(size = 15),
-          legend.title = element_text(size = 17)) +
+          legend.text = element_text(size = 18),
+          legend.title = element_text(size = 20)) +
     coord_cartesian(ylim = c(-0.5, 0.5)))
 dev.off()
 
@@ -800,69 +812,30 @@ f_fast_re_om = ts_re_om %>%
           ),
           abbrev = factor(abbrev, levels = c("2Fleet", "1Fleet TimeInvar",
                                              "1Fleet Block", "1Fleet RandWlkPar",
-                                             "1Fleet SemiPar"))) # functional form
+                                             "1Fleet SemiPar"))) %>%  # functional form
+  filter(Dat_Qual == "High")
 
-# (a = ggplot(f_fast_re_om %>% filter(Dat_Qual == "High", OM_Scenario == "Fast_Logist_Logist"),
-#             aes(x = year, y = median, color=time_comp)) +
-#     geom_ribbon(aes(ymin = lwr_95, ymax = upr_95, fill=time_comp),
-#                 alpha = 0.35, color = NA) +
-#     geom_line(show.legend = F, size = 2, alpha = 1) +
-#     facet_wrap(~EM_Scenario, nrow = 2) +
-#     scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 40)]) +
-#     scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 40)]) +
-#     coord_cartesian(ylim = c(-0.5, 0.5)) +
-#     geom_hline(aes(yintercept = 0), col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
-#     theme_matt() +
-#     labs(x = "Year", y = "", fill = "Time", color = "Time", title = "Fast_Logist_Logist"))
-# 
-# (b = ggplot(f_fast_re_om %>% filter(Dat_Qual == "High", OM_Scenario == "Fast_Logist_Gamma_Old"),
-#             aes(x = year, y = median, color=time_comp)) +
-#     geom_ribbon(aes(ymin = lwr_95, ymax = upr_95, fill=time_comp),
-#                 alpha = 0.35, color = NA) +
-#     geom_line(show.legend = F, size = 2, alpha = 1) +
-#     facet_wrap(~EM_Scenario, nrow = 2) +
-#     scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 40)]) +
-#     scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 40)]) +
-#     coord_cartesian(ylim = c(-0.5, 0.5)) +
-#     geom_hline(aes(yintercept = 0), col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
-#     theme_matt() +
-#     labs(x = "Year", y = "", fill = "Time", color = "Time", title = "Fast_Logist_Gamma_Old"))
-# 
-# (c = ggplot(f_fast_re_om %>% filter(Dat_Qual == "High", OM_Scenario == "Fast_Logist_Gamma_Young"),
-#             aes(x = year, y = median, color=time_comp)) +
-#     geom_ribbon(aes(ymin = lwr_95, ymax = upr_95, fill=time_comp),
-#                 alpha = 0.35, color = NA) +
-#     geom_line(show.legend = F, size = 2, alpha = 1) +
-#     facet_wrap(~EM_Scenario, nrow = 2) +
-#     scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 40)]) +
-#     scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 40)]) +
-#     coord_cartesian(ylim = c(-0.5, 0.5)) +
-#     geom_hline(aes(yintercept = 0), col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
-#     theme_matt() +
-#     labs(x = "Year", y = "", fill = "Time", color = "Time", title = "Fast_Logist_Gamma_Young"))
 
-# ggpubr::ggarrange(a,b,c, common.legend = TRUE, ncol = 1, labels = c("A", "B", "C"), widths = c(0.975,1,1),
-#                  label.x = 0.02, label.y = 1.01,font.label = list(size = 34, color = "black"))
-
-pdf(here("figs", "Manuscript_Figures_v2", "FigS4_F.pdf"), width = 17, height = 19)
-ggplot(f_fast_re_om %>% filter(time_comp %in% c("Fleet Trans End", "Terminal"), Dat_Qual == "High"),
-       aes(x = year, y = median, color = func, group = interaction(func, time_comp), alpha = time_comp)) +
-  geom_ribbon(aes(ymin = lwr_95, ymax = upr_95, fill = func, alpha = time_comp), color = NA) +
-  geom_line(aes(color = func, linetype = time_comp, size = time_comp), alpha = 1) +
+pdf(here("figs", "Manuscript_Figures_v2", "FigS4_F.pdf"), width = 19, height = 21)
+ggplot() + 
+  geom_hline(yintercept = 0, col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
+  geom_ribbon(f_fast_re_om %>% filter(time_comp == "Terminal"),
+              mapping = aes(x = year, y = median, ymin = lwr_95, ymax = upr_95, fill = func), 
+              color = NA, alpha = 0.3) +
+  geom_line(f_fast_re_om, mapping = aes(x = year, y = median, size = time_comp,
+                                          color = func, linetype = time_comp), alpha = 1) +
   facet_grid(abbrev ~ OM_Scenario) +
-  coord_cartesian(ylim = c(-1, 1)) +
-  geom_hline(aes(yintercept = 0), col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
-  scale_linetype_manual(values = c("Fleet Trans End" = 2, "Terminal" = 1)) +
-  scale_alpha_manual(values = c("Fleet Trans End" = 0.25, "Terminal" = 0.35)) +
-  scale_size_manual(values = c("Fleet Trans End" = 1.25, "Terminal" = 1.5)) +
+  coord_cartesian(ylim = c(-0.5, 0.5)) +
+  scale_linetype_manual(values = c("Fleet Intersect" = 3, "Fleet Trans End" = 2, "Terminal" = 1)) +
+  scale_size_manual(values = c("Fleet Intersect" = 2.8, "Fleet Trans End" = 1.35, "Terminal" = 1.5)) +
   scale_color_manual(values = c("#E69F00", "#0072B2")) +
   scale_fill_manual(values = c("#E69F00", "#0072B2")) +
   theme_matt() +
-  theme(legend.key.width = unit(1,"cm")) +
+  theme(legend.key.width = unit(1.3,"cm")) +
   theme(legend.position = "top") +
   labs(x = "Year", y = "Relative Error in Total Fishing Mortality", fill = "Functional Form",
-       color = "Functional Form", lty = "Time Component", alpha = "Time Component",
-       size = "Time Component")
+       color = "Functional Form", lty = "Assessment Period", alpha = "Assessment Period",
+       size = "Assessment Period")
 dev.off()
 
 
@@ -890,69 +863,30 @@ f_slow_re_om = ts_re_om %>%
           ),
           abbrev = factor(abbrev, levels = c("2Fleet", "1Fleet TimeInvar",
                                              "1Fleet Block", "1Fleet RandWlkPar",
-                                             "1Fleet SemiPar"))) # functional form
+                                             "1Fleet SemiPar"))) %>% 
+  filter(Dat_Qual == "High")
 
-# (a = ggplot(f_slow_re_om %>% filter(Dat_Qual == "High", OM_Scenario == "Slow_Logist_Logist"),
-#             aes(x = year, y = median, color=time_comp)) +
-#     geom_ribbon(aes(ymin = lwr_95, ymax = upr_95, fill=time_comp),
-#                 alpha = 0.35, color = NA) +
-#     geom_line(show.legend = F, size = 2, alpha = 1) +
-#     facet_wrap(~EM_Scenario, nrow = 2) +
-#     scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 40)]) +
-#     scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 40)]) +
-#     coord_cartesian(ylim = c(-0.5, 0.5)) +
-#     geom_hline(aes(yintercept = 0), col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
-#     theme_matt() +
-#     labs(x = "Year", y = "", fill = "Time", color = "Time", title = "Slow_Logist_Logist"))
-# 
-# (b = ggplot(f_slow_re_om %>% filter(Dat_Qual == "High", OM_Scenario == "Slow_Logist_Gamma_Old"),
-#             aes(x = year, y = median, color=time_comp)) +
-#     geom_ribbon(aes(ymin = lwr_95, ymax = upr_95, fill=time_comp),
-#                 alpha = 0.35, color = NA) +
-#     geom_line(show.legend = F, size = 2, alpha = 1) +
-#     facet_wrap(~EM_Scenario, nrow = 2) +
-#     scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 40)]) +
-#     scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 40)]) +
-#     coord_cartesian(ylim = c(-0.5, 0.5)) +
-#     geom_hline(aes(yintercept = 0), col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
-#     theme_matt() +
-#     labs(x = "Year", y = "", fill = "Time", color = "Time", title = "Slow_Logist_Gamma_Old"))
-# 
-# (c = ggplot(f_slow_re_om %>% filter(Dat_Qual == "High", OM_Scenario == "Slow_Logist_Gamma_Young"),
-#             aes(x = year, y = median, color=time_comp)) +
-#     geom_ribbon(aes(ymin = lwr_95, ymax = upr_95, fill=time_comp),
-#                 alpha = 0.35, color = NA) +
-#     geom_line(show.legend = F, size = 2, alpha = 1) +
-#     facet_wrap(~EM_Scenario, nrow = 2) +
-#     scale_color_manual(values = viridis::viridis(n = 50)[c(1, 20, 40)]) +
-#     scale_fill_manual(values = viridis::viridis(n = 50)[c(1, 20, 40)]) +
-#     coord_cartesian(ylim = c(-0.5, 0.5)) +
-#     geom_hline(aes(yintercept = 0), col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
-#     theme_matt() +
-#     labs(x = "Year", y = "", fill = "Time", color = "Time", title = "Slow_Logist_Gamma_Young"))
-# 
-# ggpubr::ggarrange(a,b,c, common.legend = TRUE, ncol = 1, labels = c("A", "B", "C"), widths = c(0.975,1,1),
-#                   label.x = 0.02, label.y = 1.01,font.label = list(size = 34, color = "black"))
 
-pdf(here("figs", "Manuscript_Figures_v2", "FigS5_F.pdf"), width = 17, height = 19)
-ggplot(f_slow_re_om %>% filter(time_comp %in% c("Fleet Trans End", "Terminal"), Dat_Qual == "High"),
-       aes(x = year, y = median, color = func, group = interaction(func, time_comp), alpha = time_comp)) +
-  geom_ribbon(aes(ymin = lwr_95, ymax = upr_95, fill = func, alpha = time_comp), color = NA) +
-  geom_line(aes(color = func, linetype = time_comp, size = time_comp), alpha = 1) +
+pdf(here("figs", "Manuscript_Figures_v2", "FigS5_F.pdf"), width = 19, height = 21)
+ggplot() + 
+  geom_hline(yintercept = 0, col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
+  geom_ribbon(f_slow_re_om %>% filter(time_comp == "Terminal"),
+              mapping = aes(x = year, y = median, ymin = lwr_95, ymax = upr_95, fill = func), 
+              color = NA, alpha = 0.3) +
+  geom_line(f_slow_re_om, mapping = aes(x = year, y = median, size = time_comp,
+                                        color = func, linetype = time_comp), alpha = 1) +
   facet_grid(abbrev ~ OM_Scenario) +
-  coord_cartesian(ylim = c(-1, 1)) +
-  geom_hline(aes(yintercept = 0), col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
-  scale_linetype_manual(values = c("Fleet Trans End" = 2, "Terminal" = 1)) +
-  scale_alpha_manual(values = c("Fleet Trans End" = 0.25, "Terminal" = 0.35)) +
-  scale_size_manual(values = c("Fleet Trans End" = 1.25, "Terminal" = 1.5)) +
+  coord_cartesian(ylim = c(-0.5, 0.5)) +
+  scale_linetype_manual(values = c("Fleet Intersect" = 3, "Fleet Trans End" = 2, "Terminal" = 1)) +
+  scale_size_manual(values = c("Fleet Intersect" = 2.8, "Fleet Trans End" = 1.35, "Terminal" = 1.5)) +
   scale_color_manual(values = c("#E69F00", "#0072B2")) +
   scale_fill_manual(values = c("#E69F00", "#0072B2")) +
   theme_matt() +
-  theme(legend.key.width = unit(1,"cm")) +
+  theme(legend.key.width = unit(1.3,"cm")) +
   theme(legend.position = "top") +
   labs(x = "Year", y = "Relative Error in Total Fishing Mortality", fill = "Functional Form",
-       color = "Functional Form", lty = "Time Component", alpha = "Time Component",
-       size = "Time Component")
+       color = "Functional Form", lty = "Assessment Period", alpha = "Assessment Period",
+       size = "Assessment Period")
 dev.off()
 
 # Figure S6 (Time Block AIC) ----------------------------------------------

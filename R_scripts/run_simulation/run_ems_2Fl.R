@@ -26,8 +26,9 @@ compile_tmb(wd = here("src"), cpp = "EM.cpp")
 
 # Read in OM and EM Scenarios
 om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "OM") %>% 
-  filter(str_detect(OM_Scenarios, "Rev"))
-em_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "EM_2Fl")
+  filter(str_detect(OM_Scenarios, "High"))
+em_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "EM_2Fl") %>% 
+  filter(str_detect(EM_Scenario, "GamGam|GamL"))
 
 # Read in spreadsheet for life history parameters
 lh_path <- here("input", "Sablefish_Inputs.xlsx")
