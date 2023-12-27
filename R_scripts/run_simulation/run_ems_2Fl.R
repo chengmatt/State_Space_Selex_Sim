@@ -26,9 +26,9 @@ compile_tmb(wd = here("src"), cpp = "EM.cpp")
 
 # Read in OM and EM Scenarios
 om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "OM") %>% 
-  filter(str_detect(OM_Scenarios, "High"))
+  filter(str_detect(OM_Scenarios, "Ext"))
 em_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "EM_2Fl") %>% 
-  filter(str_detect(EM_Scenario, "GamGam|GamL"))
+  filter(str_detect(EM_Scenario, "Term"))
 
 # Read in spreadsheet for life history parameters
 lh_path <- here("input", "Sablefish_Inputs.xlsx")
@@ -49,11 +49,12 @@ for(n_om in 1:n_OM_scen) {
   for(n_em in 1:n_EM_scen) {
     
 # Pre-process EM ----------------------------------------------------------
-
+    
     # Pre-processing to specify EM here
     n_fleets <- em_scenarios$n_fleets[n_em] # Number of fleets to model
     
     # Specify year options - differs if it is Fast vs Slow OM Scenario
+    if(str_detect(om_scenarios$OM_Scenarios[n_om], "Ext"))  em_scenarios$n_years = "99,99" # change to 150 if this is an extended case. 
     years_opt <- as.numeric(unlist(strsplit(em_scenarios$n_years[n_em], ",")) )
     if(str_detect(om_scenarios$OM_Scenarios[n_om], "Fast")) years <- 1:years_opt[1]
     if(str_detect(om_scenarios$OM_Scenarios[n_om], "Slow")) years <- 1:years_opt[2]

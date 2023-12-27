@@ -440,15 +440,15 @@ dev.off()
 ssb_plot_df <- ssb_df %>% 
   drop_na() %>% 
   filter(str_detect(OM_Scenario, "High")) %>% 
-  mutate(OM_Scenario = str_remove(OM_Scenario, "_High"),
-         Speed = ifelse(str_detect(OM_Scenario, "Fast"), "Fast", "Slow"),
-         Sel_Type = ifelse(str_detect(OM_Scenario, "LG_O"), "Logist-Gamma-Old", 
-                           ifelse(str_detect(OM_Scenario, "LG_Y"),
-                                  'Logist-Gamma-Young', "Logist-Logist")),
-         Sel_Type = factor(Sel_Type, levels = c("Logist-Logist", 
-                                                "Logist-Gamma-Old",
-                                                "Logist-Gamma-Young"))) %>% 
-  group_by(OM_Scenario, Year, Sel_Type, Speed) %>% 
+  # mutate(OM_Scenario = str_remove(OM_Scenario, "_High"),
+  #        Speed = ifelse(str_detect(OM_Scenario, "Fast"), "Fast", "Slow"),
+  #        Sel_Type = ifelse(str_detect(OM_Scenario, "LG_O"), "Logist-Gamma-Old", 
+  #                          ifelse(str_detect(OM_Scenario, "LG_Y"),
+  #                                 'Logist-Gamma-Young', "Logist-Logist")),
+  #        Sel_Type = factor(Sel_Type, levels = c("Logist-Logist", 
+  #                                               "Logist-Gamma-Old",
+  #                                               "Logist-Gamma-Young"))) %>% 
+  group_by(OM_Scenario, Year) %>% 
   summarize(median = median(Value),
          Lwr_95 = quantile(Value, 0.025),
          Upr_95 = quantile(Value, 0.975))
@@ -459,7 +459,7 @@ pdf(here("figs", "OM_Scenarios", "SBB_Trajectory.pdf"), width = 18, height = 10)
   geom_line(lwd = 1.5) +
   geom_ribbon(alpha = 0.35) +
   theme_bw() +
-  facet_grid(Sel_Type~Speed, scales = "free_x") +
+  facet_wrap(~OM_Scenario, scales = "free_x") +
   labs(x = 'Year', y = "Spawning Stock Biomass",
      color = "OM Scenario") +
   theme(legend.position = "top",
@@ -486,29 +486,14 @@ med_naa_df <- naa_df %>%
 
 pdf(here("figs", "OM_Scenarios", "NAA_plot.pdf"), width = 15, height = 10)
 
-(naa_plot = ggplot(med_naa_df %>% filter(Age %in% c(seq(2,30, 3), 30),
-                                         # str_detect(OM_Scenario, "LL"),
+(naa_plot = ggplot(med_naa_df %>% filter(str_detect(OM_Scenario, "Fast"),
                                          Sex == "Female") %>% 
-                     mutate(OM_Scenario = factor(OM_Scenario,
-                                                 levels = c(
-                                                   "Fast_LL",
-                                                   "Fast_LL_Rev",
-                                                   "Fast_LG_O",
-                                                   "Fast_GL_O_Rev",
-                                                   "Fast_LG_Y",
-                                                   "Fast_GL_Y_Rev",
-                                                   "Slow_LL",
-                                                   "Slow_LL_Rev",
-                                                   "Slow_LG_O",
-                                                   "Slow_GL_O_Rev",
-                                                   "Slow_LG_Y",
-                                                   "Slow_GL_Y_Rev"
-                                                 ))), 
-       aes(x = Year, y = median, fill = factor(Age))) +
-  geom_col(color = "black", alpha = 0.85) +
+                     mutate(Old_Int = ifelse(Age %in% c(15:30), "Old_Int (A15-30)", "Young (1-14)")),
+       aes(x = Year, y = median, fill = factor(Old_Int))) +
+  geom_col(color = "black", alpha = 0.55) +
   facet_wrap(~OM_Scenario, scales = "free") +
   labs(x = "Year", y = "Median Numbers-at-age", fill = "Age") +
-  scale_fill_viridis_d() +
+  ggthemes::scale_fill_colorblind() +
   theme_bw() +
   theme(legend.position = "top",
         axis.title = element_text(size = 25),
@@ -516,6 +501,21 @@ pdf(here("figs", "OM_Scenarios", "NAA_plot.pdf"), width = 15, height = 10)
         legend.title = element_text(size = 25),
         legend.text = element_text(size = 23),
         strip.text = element_text(size = 18)) )
+
+(naa_plot = ggplot(med_naa_df %>% filter(str_detect(OM_Scenario, "Fast"),
+                                         Sex == "Female",
+                                         Age %in% c(seq(2,30,2))),
+                   aes(x = Year, y = median, fill = factor(Age))) +
+    geom_col(color = "black", alpha = 0.55) +
+    facet_wrap(~OM_Scenario, scales = "free") +
+    labs(x = "Year", y = "Median Numbers-at-age", fill = "Age") +
+    theme_bw() +
+    theme(legend.position = "top",
+          axis.title = element_text(size = 25),
+          axis.text = element_text(size = 18, color = "black"),
+          legend.title = element_text(size = 25),
+          legend.text = element_text(size = 23),
+          strip.text = element_text(size = 18)) )
 
 dev.off()
 

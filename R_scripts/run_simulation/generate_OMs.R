@@ -18,7 +18,7 @@
   
   # Read in OM scenarios
   om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "OM") %>% 
-    filter(str_detect(OM_Scenarios, "Rev"))
+    filter(str_detect(OM_Scenarios, "Ext"))
   
   # Read in spreadsheet for life history parameters
   lh_path <- here("input", "Sablefish_Inputs.xlsx")
