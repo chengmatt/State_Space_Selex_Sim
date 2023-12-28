@@ -20,11 +20,11 @@ for(i in 1:length(files)) source(here(fxn_path, files[i]))
 compile_tmb(wd = here("src"), cpp = "EM.cpp")
 
 # Read in OM and EM Scenarios
-om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "OM") %>% 
-  filter(str_detect(OM_Scenarios, "Ext"))
-em_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "EM_1Fl_RW") %>% 
-  filter(str_detect(EM_Scenario, "SP_0.75|L_RW_1.25|Gam_RW_2.0"),
-         str_detect(EM_Scenario, "Term")) # only do terminal year runs
+om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "OM") 
+  # filter(str_detect(OM_Scenarios, "Ext"))
+em_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "EM_1Fl_RW")
+  # filter(str_detect(EM_Scenario, "SP_0.75|L_RW_1.25|Gam_RW_2.0"),
+  #        str_detect(EM_Scenario, "TrxE")) # only do terminal year runs
 
 # Read in spreadsheet for life history parameters
 lh_path <- here("input", "Sablefish_Inputs.xlsx")
@@ -33,7 +33,7 @@ lh_path <- here("input", "Sablefish_Inputs.xlsx")
 n_OM_scen <- length(om_scenarios$OM_Scenarios)
 n_EM_scen <- length(em_scenarios$EM_Scenario)
 
-for(n_om in 2:n_OM_scen) {
+for(n_om in 1:n_OM_scen) {
   
 # Load OM -----------------------------------------------------------------
   
@@ -57,7 +57,8 @@ for(n_om in 2:n_OM_scen) {
     n_fleets <- em_scenarios$n_fleets[n_em] # Number of fleets to model
     
     # Specify year options - differs if it is Fast vs Slow OM Scenario
-    if(str_detect(om_scenarios$OM_Scenarios[n_om], "Ext"))  em_scenarios$n_years = "100,100" # change to 150 if this is an extended case. 
+    if(str_detect(om_scenarios$OM_Scenarios[n_om], "Ext") &
+       str_detect(om_scenarios$OM_Scenarios[n_om], "Term"))  em_scenarios$n_years = "99,99" # change to 99 if this is an extended case.    years_opt <- as.numeric(unlist(strsplit(em_scenarios$n_years[n_em], ",")) )
     years_opt <- as.numeric(unlist(strsplit(em_scenarios$n_years[n_em], ",")) )
     if(str_detect(om_scenarios$OM_Scenarios[n_om], "Fast")) years <- 1:years_opt[1]
     if(str_detect(om_scenarios$OM_Scenarios[n_om], "Slow")) years <- 1:years_opt[2]

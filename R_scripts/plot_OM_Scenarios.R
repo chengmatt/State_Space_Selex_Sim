@@ -132,7 +132,7 @@ catch_df <- data.frame() # Catch dataframe
 fmort_df <- data.frame() # Fishing mortality dataframe
 ssb_df <- data.frame() # spawning stock biomass
 naa_df <- data.frame() # spawning stock biomass
-
+biom_df <- data.frame() # biomass at age
 for(i in 1:length(OMs)) {
   
   # Load in OMs
@@ -179,12 +179,24 @@ for(i in 1:length(OMs)) {
            Sex = parse_number(as.character(Sex)),
            Sim = parse_number(as.character(Sim)))
   
+  # Get Biomass at age
+  biom_om <- reshape2::melt(oms$Biom_at_age)
+  colnames(biom_om) <- c("Year", "Age", "Sex", "Sim", "Value")
+  
+  # parse out numbers
+  biom_om <- biom_om %>% 
+    mutate(Year = parse_number(as.character(Year)),
+           Age = parse_number(as.character(Age)),
+           Sex = parse_number(as.character(Sex)),
+           Sim = parse_number(as.character(Sim)))
+  
   hr_df$OM_Scenario <- OMs[i]
   nf_df$OM_Scenario <- OMs[i]
   cat_df$OM_Scenario <- OMs[i]
   fmort_om$OM_Scenario <- OMs[i]
   ssb_om$OM_Scenario <- OMs[i]
   naa_om$OM_Scenario <- OMs[i]
+  biom_om$OM_Scenario <- OMs[i]
   
   # Bind together
   harv_rates_df <- rbind(harv_rates_df, hr_df)
@@ -193,6 +205,8 @@ for(i in 1:length(OMs)) {
   fmort_df <- rbind(fmort_om, fmort_df)
   ssb_df <- rbind(ssb_df, ssb_om)
   naa_df <- rbind(naa_df, naa_om)
+  biom_df <- rbind(biom_df, biom_om)
+  
 }
 
 
@@ -439,7 +453,7 @@ dev.off()
 # Munging for plot dataframe
 ssb_plot_df <- ssb_df %>% 
   drop_na() %>% 
-  filter(str_detect(OM_Scenario, "High")) %>% 
+  filter(str_detect(OM_Scenario, "Ext")) %>% 
   # mutate(OM_Scenario = str_remove(OM_Scenario, "_High"),
   #        Speed = ifelse(str_detect(OM_Scenario, "Fast"), "Fast", "Slow"),
   #        Sel_Type = ifelse(str_detect(OM_Scenario, "LG_O"), "Logist-Gamma-Old", 
@@ -473,7 +487,8 @@ dev.off()
 # Numbers at Age ----------------------------------------------------------
 
 med_naa_df <- naa_df %>% 
-  filter(str_detect(OM_Scenario, "High")) %>% 
+  filter(str_detect(OM_Scenario, "High"),
+         Year != 100) %>% 
   mutate(Sex = ifelse(Sex == 1, "Female", "Male"),
          OM_Scenario = str_remove(OM_Scenario, "_High")
          # OM_Scenario = factor(OM_Scenario,
@@ -488,7 +503,7 @@ pdf(here("figs", "OM_Scenarios", "NAA_plot.pdf"), width = 15, height = 10)
 
 (naa_plot = ggplot(med_naa_df %>% filter(str_detect(OM_Scenario, "Fast"),
                                          Sex == "Female") %>% 
-                     mutate(Old_Int = ifelse(Age %in% c(15:30), "Old_Int (A15-30)", "Young (1-14)")),
+                     mutate(Old_Int = ifelse(Age %in% c(15:30), "Old_Int (15-30)", "Young (1-14)")),
        aes(x = Year, y = median, fill = factor(Old_Int))) +
   geom_col(color = "black", alpha = 0.55) +
   facet_wrap(~OM_Scenario, scales = "free") +
@@ -501,6 +516,23 @@ pdf(here("figs", "OM_Scenarios", "NAA_plot.pdf"), width = 15, height = 10)
         legend.title = element_text(size = 25),
         legend.text = element_text(size = 23),
         strip.text = element_text(size = 18)) )
+
+med_naa_df %>% filter(str_detect(OM_Scenario, "Fast"),
+                      Sex == "Female") %>% 
+  mutate(Old_Int = ifelse(Age %in% c(15:30), "Old_Int (15-30)", "Young (1-14)")) %>% 
+  group_by(OM_Scenario, Old_Int, Year) %>% 
+  summarize(sum = sum(median)) %>% 
+  ggplot(aes(x = Year, y = sum, color = Old_Int)) +
+  geom_line(size = 2) +
+  facet_wrap(~OM_Scenario) +
+  theme_bw() +
+  labs(y = "Sum Median NAA") +
+  theme(legend.position = "top",
+        axis.title = element_text(size = 25),
+        axis.text = element_text(size = 18, color = "black"),
+        legend.title = element_text(size = 25),
+        legend.text = element_text(size = 23),
+        strip.text = element_text(size = 18)) 
 
 (naa_plot = ggplot(med_naa_df %>% filter(str_detect(OM_Scenario, "Fast"),
                                          Sex == "Female",
@@ -520,6 +552,72 @@ pdf(here("figs", "OM_Scenarios", "NAA_plot.pdf"), width = 15, height = 10)
 dev.off()
 
 
+# Biomass at age ----------------------------------------------------------
+
+med_biom_df <- biom_df %>% 
+  filter(str_detect(OM_Scenario, "High"),
+         Year != 100) %>% 
+  mutate(Sex = ifelse(Sex == 1, "Female", "Male"),
+         OM_Scenario = str_remove(OM_Scenario, "_High")
+         # OM_Scenario = factor(OM_Scenario,
+         #                      levels = c("Fast_LG_O", "Fast_LG_Y",
+         #                                 "Slow_LG_O", "Slow_LG_Y",
+         #                                 "Fast_LL", "Slow_LL"))
+  ) %>% 
+  group_by(Age, Year, Sex, OM_Scenario) %>% 
+  summarize(median = median(Value))
+
+pdf(here("figs", "OM_Scenarios", "Biom_plot.pdf"), width = 15, height = 10)
+
+(biom_plot = ggplot(med_biom_df %>% filter(str_detect(OM_Scenario, "Fast"),
+                                         Sex == "Female") %>% 
+                     mutate(Old_Int = ifelse(Age %in% c(15:30), "Old_Int (15-30)", "Young (1-14)")),
+                   aes(x = Year, y = median, fill = factor(Old_Int))) +
+    geom_col(color = "black", alpha = 0.55) +
+    facet_wrap(~OM_Scenario, scales = "free") +
+    labs(x = "Year", y = "Median Biomass-at-age", fill = "Age") +
+    ggthemes::scale_fill_colorblind() +
+    theme_bw() +
+    theme(legend.position = "top",
+          axis.title = element_text(size = 25),
+          axis.text = element_text(size = 18, color = "black"),
+          legend.title = element_text(size = 25),
+          legend.text = element_text(size = 23),
+          strip.text = element_text(size = 18)) )
+
+med_biom_df %>% filter(str_detect(OM_Scenario, "Fast"),
+                      Sex == "Female") %>% 
+  mutate(Old_Int = ifelse(Age %in% c(15:30), "Old_Int (15-30)", "Young (1-14)")) %>% 
+  group_by(OM_Scenario, Old_Int, Year) %>% 
+  summarize(sum = sum(median)) %>% 
+  ggplot(aes(x = Year, y = sum, color = Old_Int)) +
+  geom_line(size = 2) +
+  facet_wrap(~OM_Scenario) +
+  theme_bw() +
+  labs(y = "Sum Median Biomass") +
+  theme(legend.position = "top",
+        axis.title = element_text(size = 25),
+        axis.text = element_text(size = 18, color = "black"),
+        legend.title = element_text(size = 25),
+        legend.text = element_text(size = 23),
+        strip.text = element_text(size = 18)) 
+
+(biom_plot = ggplot(med_biom_df %>% filter(str_detect(OM_Scenario, "Fast"),
+                                         Sex == "Female",
+                                         Age %in% c(seq(2,30,2))),
+                   aes(x = Year, y = median, fill = factor(Age))) +
+    geom_col(color = "black", alpha = 0.55) +
+    facet_wrap(~OM_Scenario, scales = "free") +
+    labs(x = "Year", y = "Median Biomass-at-age", fill = "Age") +
+    theme_bw() +
+    theme(legend.position = "top",
+          axis.title = element_text(size = 25),
+          axis.text = element_text(size = 18, color = "black"),
+          legend.title = element_text(size = 25),
+          legend.text = element_text(size = 23),
+          strip.text = element_text(size = 18)) )
+
+dev.off()
 
 # Effective Sample Size ---------------------------------------------------
 

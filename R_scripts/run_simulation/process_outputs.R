@@ -289,8 +289,18 @@ twofleet_pop_sel_ems <- data.frame()
 for(i in 1:length(unique_oms)) {
   
   # Assessment years to filter to
-  if(str_detect(unique_oms[i], "Fast")) yr <- c(27, 30, 50)
-  if(str_detect(unique_oms[i], "Slow")) yr <- c(36, 50, 70)
+  if(str_detect(unique_oms[i], "Fast") & str_detect(unique_oms[i], "Ext")) {
+    yr <- c(30, 99)
+    time_comp <- c("Fleet Trans End", "Terminal")
+  }
+  if(str_detect(unique_oms[i], "Fast") & !str_detect(unique_oms[i], "Ext")) {
+    yr <- c(27, 30, 50)
+    time_comp <- c("Fleet Intersect", "Fleet Trans End", "Terminal")
+  }
+  if(str_detect(unique_oms[i], "Slow")) {
+    yr <- c(36, 50, 70)
+    time_comp <- c("Fleet Intersect", "Fleet Trans End", "Terminal")
+  }
   
   # Read in EM Fishery Selex
   EM_fish_Slx = data.table::fread(here('output', "OM_Scenarios", unique_oms[i], "EM_Fish_Selex.csv"))
@@ -336,25 +346,26 @@ for(i in 1:length(unique_oms)) {
       
       # Loop through simulation runs to get population selex (fratio * selexAA for both males and females)
       for(m in 1:length(model_list)) {
-        
-        # Get Fratio - munge into matrix format
-        fratio <- matrix(exp(model_list[[m]]$sd_rep$par.fixed[names(model_list[[m]]$sd_rep$par.fixed) == "ln_Fy"]),
-                         ncol = 2, nrow = length(1:yr[j]))
-        fratio <- fratio[length(1:yr[j]),] / sum(fratio[length(1:yr[j]),])
-        
-        # Female Selectivity
-        Female <- colSums(fratio * t(colMeans(model_list[[m]]$model_fxn$rep$F_Slx[(yr[j] - 4):yr[j],,,1])))
-        # Male Selectivity
-        Male <- colSums(fratio * t(colMeans(model_list[[m]]$model_fxn$rep$F_Slx[(yr[j] - 4):yr[j],,,2])))
-        
-        # Put this into a dataframe
-        twofleet_pop_sel_df <- data.frame(cbind(Female, Male), Age = 1:30, 
-                                          OM_Scenario = unique_oms[i],
-                                          EM_Scenario = unique_models[k],
-                                          time_comp = time_comp[j],
-                                          sim = m)
-        
-        twofleet_pop_sel_ems <- rbind(twofleet_pop_sel_df, twofleet_pop_sel_ems)
+        if(length(model_list[[m]]) > 0) { # only go thorugh this if the list isn't null
+          # Get Fratio - munge into matrix format
+          fratio <- matrix(exp(model_list[[m]]$sd_rep$par.fixed[names(model_list[[m]]$sd_rep$par.fixed) == "ln_Fy"]),
+                           ncol = 2, nrow = length(1:yr[j]))
+          fratio <- fratio[length(1:yr[j]),] / sum(fratio[length(1:yr[j]),])
+          
+          # Female Selectivity
+          Female <- colSums(fratio * t(colMeans(model_list[[m]]$model_fxn$rep$F_Slx[(yr[j] - 4):yr[j],,,1])))
+          # Male Selectivity
+          Male <- colSums(fratio * t(colMeans(model_list[[m]]$model_fxn$rep$F_Slx[(yr[j] - 4):yr[j],,,2])))
+          
+          # Put this into a dataframe
+          twofleet_pop_sel_df <- data.frame(cbind(Female, Male), Age = 1:30, 
+                                            OM_Scenario = unique_oms[i],
+                                            EM_Scenario = unique_models[k],
+                                            time_comp = time_comp[j],
+                                            sim = m)
+          
+          twofleet_pop_sel_ems <- rbind(twofleet_pop_sel_df, twofleet_pop_sel_ems)
+        } # end if statement
       } # end m loop
     } # end k loop
     

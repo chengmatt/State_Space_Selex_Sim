@@ -24,27 +24,27 @@ for(i in 1:length(files)) source(here(fxn_path, files[i]))
 # read in csvs
 # Parameter and Time Series Summaries
 AIC_df <- data.table::fread(here("output", "AIC_Convergence_Summary.csv")) %>%   # time series total error (converged runs only)
-  filter(!str_detect(OM_Scenario, "Rev"))
+  filter(!str_detect(OM_Scenario, "Rev|Ext"))
   # time series total error (converged runs only)
 param_df <- read.csv(here("output", "Parameter_Summary.csv")) %>% # parameters
-  filter(str_detect(OM_Scenario, "Rev"))
+  filter(!str_detect(OM_Scenario, "Rev|Ext"))
 ts_all_df <- data.table::fread(here("output", "TimeSeries_Summary.csv")) %>%  # all time series data
-  filter(!str_detect(OM_Scenario, "Rev"))
+  filter(!str_detect(OM_Scenario, "Rev|Ext"))
 ts_re_df <- read.csv(here("output", "TimeSeries_RE.csv")) %>% # time series relative error (converged runs only)
-  filter(!str_detect(OM_Scenario, "Rev"))
+  filter(!str_detect(OM_Scenario, "Rev|Ext"))
 ts_te_df <- read.csv(here("output", "TimeSeries_TE.csv")) %>%  # time series total error (converged runs only)
-  filter(!str_detect(OM_Scenario, "Rev"))
+  filter(!str_detect(OM_Scenario, "Rev|Ext"))
 ts_are_df <- read.csv(here("output", "TimeSeries_ARE.csv")) %>%  # time series abs relative error (converged runs only)
-  filter(!str_detect(OM_Scenario, "Rev"))
+  filter(!str_detect(OM_Scenario, "Rev|Ext"))
 
 
 # Selectivity and Comps
 om_slx_df <- data.table::fread(here("output", "OM_Fish_Selex.csv")) %>% # OM Selectivity Values
-  filter(!str_detect(OM_Scenario, "Rev"))
+  filter(!str_detect(OM_Scenario, "Rev|Ext"))
 pop_sel_om <- data.table::fread(here("output", "Pop_Selex_OM.csv")) %>%  # OM Pop'n Selectivity Values
-  filter(!str_detect(OM_Scenario, "Rev"))
+  filter(!str_detect(OM_Scenario, "Rev|Ext"))
 pop_sel_em <- data.table::fread(here("output", "Pop_Selex_EM.csv")) %>%  # EM Pop'n Selectivity Values\
-  filter(!str_detect(OM_Scenario, "Rev"))
+  filter(!str_detect(OM_Scenario, "Rev|Ext"))
 
 
 # Unique oms and other components
@@ -722,7 +722,7 @@ print(
 dev.off()
 
 # Figure S1 (Convergence) -------------------------------------------------
-pdf(here("figs", "Manuscript_Figures_v2", "FigS1_Convergence.pdf"), width = 25, height = 13)
+pdf(here("figs", "Manuscript_Figures_v2", "FigS1_Convergence.pdf"), width = 25, height = 15)
 ggplot(conv_stat %>% 
          mutate(OM_Scenario = factor(OM_Scenario, levels = c(fast_om_plot_order, slow_om_plot_order)),
                 EM_Scenario = forcats::fct_rev(abbrev)) %>% 
@@ -766,7 +766,7 @@ ggplot(twofleet_aic %>% filter(Dat_Qual == "High") %>%
         legend.key.width = unit(1, "cm"))
 dev.off()
 
-pdf(here("figs", "Manuscript_Figures_v2", "FigS3_AIC_1Fl.pdf"), width = 20, height = 8)
+pdf(here("figs", "Manuscript_Figures_v2", "FigS3_AIC_1Fl.pdf"), width = 20, height = 13)
 ggplot(onefleet_aic %>% filter(Dat_Qual == "High") %>% 
          mutate(OM_Scenario = factor(OM_Scenario, levels = c(fast_om_plot_order, slow_om_plot_order))), 
        aes(x = abbrev, y = round(n_minAIC, 2), fill = func)) +
@@ -969,7 +969,7 @@ dev.off()
 
 # Figure S9 (Selectivity Fast Females) --------------------------------------------
 
-pdf(here("figs", "Manuscript_Figures_v2", "FigS9_FastSelex_F.pdf"), width = 15, height = 13)
+pdf(here("figs", "Manuscript_Figures_v2", "FigS9_FastSelex_F.pdf"), width = 12, height = 15)
 ggplot() +
     geom_line(plot_df %>% filter(Dat_Qual == "High", Sex == "Female", time_comp == "Terminal",
                                  str_detect(OM_Scenario, "Fast")),
@@ -981,7 +981,7 @@ ggplot() +
                                         str_detect(OM_Scenario, "Fast")),
               mapping = aes(x = Age, y = Selex), color = "black",
               position = position_jitter(width = 0.3), lwd = 1, alpha = 1, lty = 2) +
-    facet_grid(OM_Scenario ~ abbrev) +
+    facet_grid(abbrev ~ OM_Scenario) +
     scale_color_manual(values = c("#E69F00", "#0072B2")) +
     scale_fill_manual(values = c("#E69F00", "#0072B2")) +
     labs(x = "Age", y = "Selectivity (Females)", fill = "Functional Form", color = "Functional Form") +
@@ -992,7 +992,7 @@ dev.off()
 
 # Figure S10 (Selectivity Fast Males) --------------------------------------------
 
-pdf(here("figs", "Manuscript_Figures_v2", "FigS10_FastSelex_M.pdf"), width = 15, height = 13)
+pdf(here("figs", "Manuscript_Figures_v2", "FigS10_FastSelex_M.pdf"), width = 12, height = 15)
 ggplot() +
   geom_line(plot_df %>% filter(Dat_Qual == "High", Sex == "Male", time_comp == "Terminal",
                                str_detect(OM_Scenario, "Fast")),
@@ -1004,7 +1004,7 @@ ggplot() +
                                       str_detect(OM_Scenario, "Fast")),
             mapping = aes(x = Age, y = Selex), color = "black",
             position = position_jitter(width = 0.3), lwd = 1, alpha = 1, lty = 2) +
-  facet_grid(OM_Scenario ~ abbrev) +
+  facet_grid(abbrev ~ OM_Scenario) +
   scale_color_manual(values = c("#E69F00", "#0072B2")) +
   scale_fill_manual(values = c("#E69F00", "#0072B2")) +
   labs(x = "Age", y = "Selectivity (Males)", fill = "Functional Form", color = "Functional Form") +
@@ -1017,7 +1017,7 @@ dev.off()
 # Figure S11 (Selectivity Slow Females) --------------------------------------------
 
 
-pdf(here("figs", "Manuscript_Figures_v2", "FigS11_SlowSelex_F.pdf"), width = 15, height = 13)
+pdf(here("figs", "Manuscript_Figures_v2", "FigS11_SlowSelex_F.pdf"), width = 12, height = 15)
 ggplot() +
   geom_line(plot_df %>% filter(Dat_Qual == "High", Sex == "Female", time_comp == "Terminal",
                                str_detect(OM_Scenario, "Slow")),
@@ -1029,7 +1029,7 @@ ggplot() +
                                       str_detect(OM_Scenario, "Slow")),
             mapping = aes(x = Age, y = Selex), color = "black",
             position = position_jitter(width = 0.3), lwd = 1, alpha = 1, lty = 2) +
-  facet_grid(OM_Scenario ~ abbrev) +
+  facet_grid(abbrev ~ OM_Scenario) +
   scale_color_manual(values = c("#E69F00", "#0072B2")) +
   scale_fill_manual(values = c("#E69F00", "#0072B2")) +
   labs(x = "Age", y = "Selectivity (Females)", fill = "Functional Form", color = "Functional Form") +
@@ -1040,7 +1040,7 @@ dev.off()
 
 # Figure S10 (Selectivity Slow Males) --------------------------------------------
 
-pdf(here("figs", "Manuscript_Figures_v2", "FigS12_SlowSelex_M.pdf"), width = 15, height = 13)
+pdf(here("figs", "Manuscript_Figures_v2", "FigS12_SlowSelex_M.pdf"), width = 12, height = 15)
 ggplot() +
   geom_line(plot_df %>% filter(Dat_Qual == "High", Sex == "Male", time_comp == "Terminal",
                                str_detect(OM_Scenario, "Slow")),
@@ -1052,7 +1052,7 @@ ggplot() +
                                       str_detect(OM_Scenario, "Slow")),
             mapping = aes(x = Age, y = Selex), color = "black",
             position = position_jitter(width = 0.3), lwd = 1, alpha = 1, lty = 2) +
-  facet_grid(OM_Scenario ~ abbrev) +
+  facet_grid(abbrev ~ OM_Scenario) +
   scale_color_manual(values = c("#E69F00", "#0072B2")) +
   scale_fill_manual(values = c("#E69F00", "#0072B2")) +
   labs(x = "Age", y = "Selectivity (Males)", fill = "Functional Form", color = "Functional Form") +

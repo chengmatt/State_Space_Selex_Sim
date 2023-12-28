@@ -26,10 +26,10 @@ for(i in 1:length(files)) source(here(fxn_path, files[i]))
 compile_tmb(wd = here("src"), cpp = "EM.cpp")
 
 # Read in OM and EM Scenarios
-om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "OM") %>% 
-  filter(str_detect(OM_Scenarios, "Ext"))
-em_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "EM_1Fl_TI_Blk") %>% 
-  filter(str_detect(EM_Scenario, "Term"))
+om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "OM")
+  # filter(str_detect(OM_Scenarios, "Ext"))
+em_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "EM_1Fl_TI_Blk")
+  # filter(str_detect(EM_Scenario, "TrxE"))
 
 # Read in spreadsheet for life history parameters
 lh_path <- here("input", "Sablefish_Inputs.xlsx")
@@ -55,7 +55,8 @@ for(n_om in 1:n_OM_scen) {
     n_fleets <- em_scenarios$n_fleets[n_em] # Number of fleets to model
     
     # Specify year options - differs if it is Fast vs Slow OM Scenario
-    if(str_detect(om_scenarios$OM_Scenarios[n_om], "Ext"))  em_scenarios$n_years = "100,100" # change to 150 if this is an extended case. 
+    if(str_detect(om_scenarios$OM_Scenarios[n_om], "Ext") &
+       str_detect(om_scenarios$OM_Scenarios[n_om], "Term"))  em_scenarios$n_years = "99,99" # change to 99 if this is an extended case.   
     years_opt <- as.numeric(unlist(strsplit(em_scenarios$n_years[n_em], ",")) )
     if(str_detect(om_scenarios$OM_Scenarios[n_om], "Fast")) years <- 1:years_opt[1]
     if(str_detect(om_scenarios$OM_Scenarios[n_om], "Slow")) years <- 1:years_opt[2]
@@ -119,6 +120,7 @@ for(n_om in 1:n_OM_scen) {
                                               "ln_h", "ln_M"), sim = sim)
       
       # Run EM model here and get sdrep
+      model = list()
       tryCatch(expr = model <- run_EM(data = input$data, parameters = input$parameters, 
                       map = input$map, n.newton = 3,
                       silent = TRUE, getsdrep = TRUE), error = function(e){e}) 
@@ -130,6 +132,7 @@ for(n_om in 1:n_OM_scen) {
                                                     min_grad = 0.001), error = function(e){e}) 
       
       # Get quantities
+      quants_df=list()
       tryCatch(expr = quants_df <- get_quants(sd_rep = model$sd_rep,
                               model_fxn = model$model_fxn, 
                               sim = sim,  
@@ -180,13 +183,15 @@ for(n_om in 1:n_OM_scen) {
     Convergence = params %>% group_by(sim) %>% summarize(conv = unique(conv))
     
     for(s in 1:n_sims) {
-      # Get AIC here
-      AIC_df_tmp <- data.frame(
-        AIC = TMB_AIC(model_list[[s]]$mle_optim),
-        OM_Scenario = om_scenarios$OM_Scenarios[n_om],
-        EM_Scenario = em_scenarios$EM_Scenario[n_em],
-        sim = s, conv = Convergence$conv[s]
-      )
+      if(length(model_list[[s]]) != 0){
+        # Get AIC here
+        AIC_df_tmp <- data.frame(
+          AIC = TMB_AIC(model_list[[s]]$mle_optim),
+          OM_Scenario = om_scenarios$OM_Scenarios[n_om],
+          EM_Scenario = em_scenarios$EM_Scenario[n_em],
+          sim = s, conv = Convergence$conv[s]
+        )
+      }
       AIC_df <- rbind(AIC_df, AIC_df_tmp)
     } # end s sim AIC loop
     
