@@ -396,22 +396,6 @@ agg_catch = catch_df %>%
     Lwr_95_HR = quantile(Sum_Catch, 0.025),
     Upr_95_HR = quantile(Sum_Catch, 0.975))
 
-(ggplot(agg_catch, aes(x = Year, y = Median_HR,  
-                                        ymin = Lwr_95_HR, ymax = Upr_95_HR,
-                                        fill = Speed, color = Speed)) +
-    geom_ribbon(alpha = 0.35, color = NA) +
-    geom_line(size = 1.5) +
-    facet_grid(Selex~., scales = "free_x") +
-    labs(x = "Year", y = "Catch", fill = "Fleet",
-         color = "Fleet", linetype = "Fleet") +
-    theme_bw() +
-    theme(legend.position = "top",
-          axis.title = element_text(size = 17),
-          axis.text = element_text(size = 15, color = "black"),
-          legend.title = element_text(size = 17),
-          legend.text = element_text(size = 15),
-          strip.text = element_text(size = 11)) )
-
 # Catch Ratio
 ratio_df <- catch_df %>% 
   drop_na() %>% 
@@ -630,11 +614,11 @@ dev.off()
 # Combine Plots -----------------------------------------------------------
 
 
-pdf(here("figs", "OM_Scenarios", "Fig1_OM_Scenarios.pdf"), width = 23, height = 18)
+pdf(here("figs", "OM_Scenarios", "Fig1_OM_Scenarios.pdf"), width = 15, height = 13)
 # Combine plots
 comb_plots = ggpubr::ggarrange(selex_plot, catch_plot,
-                  ssb_plot, naa_plot, ncol = 4, 
-                  labels = c("B", "C", "D", "E"),
+                  ssb_plot, ncol = 3, 
+                  labels = c("B", "C", "D"),
                   common.legend = FALSE,  label.x = -0.005,
                   font.label=list(color="black",size = 25))
 # Now get all plots

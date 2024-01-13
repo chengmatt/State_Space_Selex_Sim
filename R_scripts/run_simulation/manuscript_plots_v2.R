@@ -142,6 +142,13 @@ for(o in 1:length(plot_order)) {
 # relevel factors
 conv_stat$EM_Scenario <- factor(conv_stat$EM_Scenario, levels = c(unique(conv_stat$EM_Scenario)[order]))
 
+# Do some summart stats
+conv_stat %>% 
+  filter(Dat_Qual == "High") %>% 
+  group_by(EM_Scenario) %>% 
+  summarize(mean = mean(converged))
+  
+  
 ### AIC Stuff ---------------------------------------------------------------
 AIC_df <- AIC_df %>% 
   filter(conv == "Converged") %>% 
