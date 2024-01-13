@@ -69,8 +69,8 @@ plot_order <- c("2Fleet_Logist_Logist",
                 "1Fleet_Gamma_SemiPar")
 
 # Fast and slow plot order
-fast_om_plot_order <- c("Fast_Logist_Logist", "Fast_Logist_Gamma_Old", "Fast_Logist_Gamma_Young")
-slow_om_plot_order <- c("Slow_Logist_Logist", "Slow_Logist_Gamma_Old", "Slow_Logist_Gamma_Young")
+fast_om_plot_order <- c("Fast-Logistic", "Fast-Gamma-Old", "Fast-Gamma-Young")
+slow_om_plot_order <- c("Slow-Logistic", "Slow-Gamma-Old", "Slow-Gamma-Young")
 
 # Sensitivity block models order
 blk_sens_order <- c("1Fl_LL_Blk_-5", "1Fl_LL_Blk_-4", "1Fl_LL_Blk_-3", "1Fl_LL_Blk_-2", "1Fl_LL_Blk_-1", "1Fl_LL_Blk", 
@@ -109,12 +109,8 @@ conv_stat <- AIC_df %>%
   summarize(converged = sum(conv == "Converged")/200) %>% # divide by 200 = number of sims run
   ungroup() %>% 
   mutate(OM_Scenario = factor(OM_Scenario, 
-                                labels = c("Fast_Logist_Gamma_Old",
-                                           "Fast_Logist_Gamma_Young",
-                                           "Fast_Logist_Logist",
-                                           "Slow_Logist_Gamma_Old",
-                                           "Slow_Logist_Gamma_Young",
-                                           "Slow_Logist_Logist")),
+                                labels = c(fast_om_plot_order,
+                                           slow_om_plot_order)),
            EM_Scenario = factor(EM_Scenario,
                                 labels = c("1Fleet_Gamma_RandomWalk",
                                            "1Fleet_Gamma_SemiPar",
@@ -129,14 +125,14 @@ conv_stat <- AIC_df %>%
   mutate(func = ifelse(str_detect(EM_Scenario, "Gamma"), "Gamma", "Logistic"),
          abbrev = case_when(
            str_detect(EM_Scenario, "2Fleet") ~ "2Fleet",
-           str_detect(EM_Scenario, "TimeInvar") ~ "1Fleet TimeInvar",
-           str_detect(EM_Scenario, "Blk") ~ "1Fleet Block",
-           str_detect(EM_Scenario, "Random") ~ "1Fleet RandWlkPar",
-           str_detect(EM_Scenario, "Semi") ~ "1Fleet SemiPar"
+           str_detect(EM_Scenario, "TimeInvar") ~ "1Fleet-TimeInvar",
+           str_detect(EM_Scenario, "Blk") ~ "1Fleet-Block",
+           str_detect(EM_Scenario, "Random") ~ "1Fleet-RandWlkPar",
+           str_detect(EM_Scenario, "Semi") ~ "1Fleet-SemiPar"
          ),
-         abbrev = factor(abbrev, levels = rev(c("2Fleet", "1Fleet TimeInvar",
-                                                "1Fleet Block", "1Fleet RandWlkPar",
-                                                "1Fleet SemiPar"))))
+         abbrev = factor(abbrev, levels = rev(c("2Fleet", "1Fleet-TimeInvar",
+                                                "1Fleet-Block", "1Fleet-RandWlkPar",
+                                                "1Fleet-SemiPar"))))
 # Set order for plot
 order <- vector()
 for(o in 1:length(plot_order)) {
@@ -154,12 +150,12 @@ AIC_df <- AIC_df %>%
     str_detect(OM_Scenario, "Low") ~ 'Low'
   ),  OM_Scenario = str_remove(OM_Scenario, "_High|_Low"),
   OM_Scenario = case_when(
-    OM_Scenario == "Fast_LL" ~ "Fast_Logist_Logist",
-    OM_Scenario == "Fast_LG_Y" ~ "Fast_Logist_Gamma_Young",
-    OM_Scenario == "Fast_LG_O" ~ "Fast_Logist_Gamma_Old",
-    OM_Scenario == "Slow_LL" ~ "Slow_Logist_Logist",
-    OM_Scenario == "Slow_LG_Y" ~ "Slow_Logist_Gamma_Young",
-    OM_Scenario == "Slow_LG_O" ~ "Slow_Logist_Gamma_Old"
+    OM_Scenario == "Fast_LL" ~ "Fast-Logistic",
+    OM_Scenario == "Fast_LG_Y" ~ "Fast-Gamma-Young",
+    OM_Scenario == "Fast_LG_O" ~ "Fast-Gamma-Old",
+    OM_Scenario == "Slow_LL" ~ "Slow-Logistic",
+    OM_Scenario == "Slow_LG_Y" ~ "Slow-Gamma-Young",
+    OM_Scenario == "Slow_LG_O" ~ "Slow-Gamma-Old"
   ),
   OM_Scenario = factor(OM_Scenario,  levels = c(fast_om_plot_order, slow_om_plot_order))) 
 
@@ -180,14 +176,14 @@ twofleet_aic <- AIC_df %>%
   mutate(func = ifelse(str_detect(EM_Scenario, "Gamma"), "Gamma", "Logistic"),
          abbrev = case_when(
            str_detect(EM_Scenario, "2Fleet") ~ "2Fleet",
-           str_detect(EM_Scenario, "TimeInvar") ~ "1Fleet TimeInvar",
-           str_detect(EM_Scenario, "Blk") ~ "1Fleet Block",
-           str_detect(EM_Scenario, "Random") ~ "1Fleet RandWlkPar",
-           str_detect(EM_Scenario, "Semi") ~ "1Fleet SemiPar"
+           str_detect(EM_Scenario, "TimeInvar") ~ "1Fleet-TimeInvar",
+           str_detect(EM_Scenario, "Blk") ~ "1Fleet-Block",
+           str_detect(EM_Scenario, "Random") ~ "1Fleet-RandWlkPar",
+           str_detect(EM_Scenario, "Semi") ~ "1Fleet-SemiPar"
          ),
-         abbrev = factor(abbrev, levels = c("2Fleet", "1Fleet TimeInvar",
-                                            "1Fleet Block", "1Fleet RandWlkPar",
-                                            "1Fleet SemiPar")))
+         abbrev = factor(abbrev, levels = c("2Fleet", "1Fleet-TimeInvar",
+                                            "1Fleet-Block", "1Fleet-RandWlkPar",
+                                            "1Fleet-SemiPar")))
 
 # Get mean values here
 twofleet_aic_vals = AIC_df %>% 
@@ -229,14 +225,14 @@ onefleet_aic <- AIC_df %>%
   mutate(func = ifelse(str_detect(EM_Scenario, "Gamma"), "Gamma", "Logistic"),
          abbrev = case_when(
            str_detect(EM_Scenario, "2Fleet") ~ "2Fleet",
-           str_detect(EM_Scenario, "TimeInvar") ~ "1Fleet TimeInvar",
-           str_detect(EM_Scenario, "Blk") ~ "1Fleet Block",
-           str_detect(EM_Scenario, "Random") ~ "1Fleet RandWlkPar",
-           str_detect(EM_Scenario, "Semi") ~ "1Fleet SemiPar"
+           str_detect(EM_Scenario, "TimeInvar") ~ "1Fleet-TimeInvar",
+           str_detect(EM_Scenario, "Blk") ~ "1Fleet-Block",
+           str_detect(EM_Scenario, "Random") ~ "1Fleet-RandWlkPar",
+           str_detect(EM_Scenario, "Semi") ~ "1Fleet-SemiPar"
          ),
-         abbrev = factor(abbrev, levels = rev(c("2Fleet", "1Fleet TimeInvar",
-                                                "1Fleet Block", "1Fleet RandWlkPar",
-                                                "1Fleet SemiPar"))))
+         abbrev = factor(abbrev, levels = rev(c("2Fleet", "1Fleet-TimeInvar",
+                                                "1Fleet-Block", "1Fleet-RandWlkPar",
+                                                "1Fleet-SemiPar"))))
 
 
 ### Time Block AIC Stuff ----------------------------------------------------
@@ -284,9 +280,7 @@ best_fleetblk_models = best_fleetblk_models_df %>%
   mutate(OM_Scenario = factor(OM_Scenario, levels = c("Fast_Logist_Logist", 
                                                       "Fast_Logist_Gamma_Old", 
                                                       "Fast_Logist_Gamma_Young"),
-                              labels = c("Fast_Logist_Logist",
-                                         "Fast_Logist_Gamma_Old",
-                                         "Fast_Logist_Gamma_Young")))
+                              labels = c(fast_om_plot_order)))
 
 ### ABC Parameters ----------------------------------------------------------
 
@@ -297,12 +291,12 @@ om_scenario_params <- param_df %>% filter(str_detect(EM_Scenario, all_models),
     str_detect(OM_Scenario, "High") ~ 'High',
     str_detect(OM_Scenario, "Low") ~ 'Low'
   ), OM_Scenario = str_remove(OM_Scenario, "_High|_Low"),
-  OM_Scenario = factor(OM_Scenario, labels = c("Fast_Logist_Gamma_Old",
-                                         "Fast_Logist_Gamma_Young",
-                                         "Fast_Logist_Logist",
-                                         "Slow_Logist_Gamma_Old",
-                                         "Slow_Logist_Gamma_Young",
-                                         "Slow_Logist_Logist")),
+  OM_Scenario = factor(OM_Scenario, labels = c("Fast-Gamma-Old",
+                                               "Fast-Gamma-Young",
+                                               "Fast-Logistic",
+                                               "Slow-Gamma-Old",
+                                               "Slow-Gamma-Young",
+                                               "Slow-Logistic")),
          EM_Scenario = factor(EM_Scenario,
                               labels = c("1Fleet_Gamma_RandomWalk",
                                          "1Fleet_Gamma_SemiPar",
@@ -334,14 +328,14 @@ pt_rg_re <- pt_rg_re %>%
   mutate(func = ifelse(str_detect(EM_Scenario, "Gamma"), "Gamma", "Logistic"),
          abbrev = case_when(
            str_detect(EM_Scenario, "2Fleet") ~ "2Fleet",
-           str_detect(EM_Scenario, "TimeInvar") ~ "1Fleet TimeInvar",
-           str_detect(EM_Scenario, "Blk") ~ "1Fleet Block",
-           str_detect(EM_Scenario, "Random") ~ "1Fleet RandWlkPar",
-           str_detect(EM_Scenario, "Semi") ~ "1Fleet SemiPar"
+           str_detect(EM_Scenario, "TimeInvar") ~ "1Fleet-TimeInvar",
+           str_detect(EM_Scenario, "Blk") ~ "1Fleet-Block",
+           str_detect(EM_Scenario, "Random") ~ "1Fleet-RandWlkPar",
+           str_detect(EM_Scenario, "Semi") ~ "1Fleet-SemiPar"
          ),
-         abbrev = factor(abbrev, levels = c("2Fleet", "1Fleet TimeInvar",
-                                                "1Fleet Block", "1Fleet RandWlkPar",
-                                                "1Fleet SemiPar")))
+         abbrev = factor(abbrev, levels = c("2Fleet", "1Fleet-TimeInvar",
+                                                "1Fleet-Block", "1Fleet-RandWlkPar",
+                                                "1Fleet-SemiPar")))
 
 
 # Selectivity Stuff -------------------------------------------------------
@@ -355,12 +349,12 @@ plot_df = pop_sel_em %>%
   OM_Scenario = str_remove(OM_Scenario, "_High|_Low"),
   EM_Scenario = str_remove(EM_Scenario, "_1.25|_2.0|_0.75"),
   EM_Scenario = str_replace(EM_Scenario, "Gam", "G"),
-  OM_Scenario = factor(OM_Scenario, labels = c("Fast_Logist_Gamma_Old",
-                                               "Fast_Logist_Gamma_Young",
-                                               "Fast_Logist_Logist",
-                                               "Slow_Logist_Gamma_Old",
-                                               "Slow_Logist_Gamma_Young",
-                                               "Slow_Logist_Logist")),
+  OM_Scenario = factor(OM_Scenario, labels = c("Fast-Gamma-Old",
+                                               "Fast-Gamma-Young",
+                                               "Fast-Logistic",
+                                               "Slow-Gamma-Old",
+                                               "Slow-Gamma-Young",
+                                               "Slow-Logistic")),
   EM_Scenario = factor(EM_Scenario,
                        labels = c("1Fleet_Gamma_RandomWalk",
                                   "1Fleet_Gamma_SemiPar",
@@ -377,14 +371,14 @@ plot_df = pop_sel_em %>%
   mutate(func = ifelse(str_detect(EM_Scenario, "Gamma"), "Gamma", "Logistic"),
          abbrev = case_when(
            str_detect(EM_Scenario, "2Fleet") ~ "2Fleet",
-           str_detect(EM_Scenario, "TimeInvar") ~ "1Fleet TimeInvar",
-           str_detect(EM_Scenario, "Blk") ~ "1Fleet Block",
-           str_detect(EM_Scenario, "Random") ~ "1Fleet RandWlkPar",
-           str_detect(EM_Scenario, "Semi") ~ "1Fleet SemiPar"
+           str_detect(EM_Scenario, "TimeInvar") ~ "1Fleet-TimeInvar",
+           str_detect(EM_Scenario, "Blk") ~ "1Fleet-Block",
+           str_detect(EM_Scenario, "Random") ~ "1Fleet-RandWlkPar",
+           str_detect(EM_Scenario, "Semi") ~ "1Fleet-SemiPar"
          ),
-         abbrev = factor(abbrev, levels = c("2Fleet", "1Fleet TimeInvar",
-                                                "1Fleet Block", "1Fleet RandWlkPar",
-                                                "1Fleet SemiPar")))
+         abbrev = factor(abbrev, levels = c("2Fleet", "1Fleet-TimeInvar",
+                                                "1Fleet-Block", "1Fleet-RandWlkPar",
+                                                "1Fleet-SemiPar")))
 
 plot_sel_om_df = pop_sel_om %>% 
   mutate(Dat_Qual = case_when(
@@ -392,12 +386,12 @@ plot_sel_om_df = pop_sel_om %>%
     str_detect(OM_Scenario, "Low") ~ 'Low'
   ), 
   OM_Scenario = str_remove(OM_Scenario, "_High|_Low"),
-  OM_Scenario = factor(OM_Scenario, labels = c("Fast_Logist_Gamma_Old",
-                                               "Fast_Logist_Gamma_Young",
-                                               "Fast_Logist_Logist",
-                                               "Slow_Logist_Gamma_Old",
-                                               "Slow_Logist_Gamma_Young",
-                                               "Slow_Logist_Logist")),
+  OM_Scenario = factor(OM_Scenario, labels = c("Fast-Gamma-Old",
+                                               "Fast-Gamma-Young",
+                                               "Fast-Logistic",
+                                               "Slow-Gamma-Old",
+                                               "Slow-Gamma-Young",
+                                               "Slow-Logistic")),
   OM_Scenario = factor(OM_Scenario, levels = c(fast_om_plot_order, slow_om_plot_order)))
 
 ### Time Series Stuff -------------------------------------------------------
@@ -410,12 +404,12 @@ ts_re_om <- ts_re_df %>% filter(str_detect(EM_Scenario, all_models)) %>%
   ),  OM_Scenario = str_remove(OM_Scenario, "_High|_Low"),
   EM_Scenario = str_replace(EM_Scenario, "Gam", "G"),
   OM_Scenario = factor(OM_Scenario,
-                       labels = c("Fast_Logist_Gamma_Old",
-                                  "Fast_Logist_Gamma_Young",
-                                  "Fast_Logist_Logist",
-                                  "Slow_Logist_Gamma_Old",
-                                  "Slow_Logist_Gamma_Young",
-                                  "Slow_Logist_Logist")),
+                       labels = c("Fast-Gamma-Old",
+                                  "Fast-Gamma-Young",
+                                  "Fast-Logistic",
+                                  "Slow-Gamma-Old",
+                                  "Slow-Gamma-Young",
+                                  "Slow-Logistic")),
   EM_Scenario = factor(EM_Scenario,
                        labels = c("1Fleet_Gamma_RandomWalk",
                                   "1Fleet_Gamma_SemiPar",
@@ -453,8 +447,8 @@ tb_ts_re_om <- ts_re_df %>% filter(time_comp %in% c("Terminal", "Fleet Trans End
     str_detect(OM_Scenario, "Low") ~ 'Low'
   ),  OM_Scenario = str_remove(OM_Scenario, "_High|_Low"),
   OM_Scenario = factor(OM_Scenario, levels = c("Fast_LL", "Fast_LG_O", "Fast_LG_Y"),
-                       labels = c("Fast_Logist_Logist", "Fast_Logist_Gamma_Old",
-                                  "Fast_Logist_Gamma_Young")),
+                       labels = c("Fast-Logistic", "Fast-Gamma-Old",
+                                  "Fast-Gamma-Young")),
   EM_Scenario = factor(EM_Scenario, levels = blk_sens_order,
                        labels = blk_sens_labels),
   BreakPoint = 
@@ -588,14 +582,14 @@ ssb_fast_re_om = ts_re_om %>%
           func = ifelse(str_detect(EM_Scenario, "Gamma"), "Gamma", "Logistic"),
           abbrev = case_when(
                 str_detect(model_type, "2Fleet") ~ "2Fleet",
-                str_detect(model_type, "TimeInvar") ~ "1Fleet TimeInvar",
-                str_detect(model_type, "Block") ~ "1Fleet Block",
-                str_detect(model_type, "Random") ~ "1Fleet RandWlkPar",
-                str_detect(model_type, "Semi") ~ "1Fleet SemiPar"
+                str_detect(model_type, "TimeInvar") ~ "1Fleet-TimeInvar",
+                str_detect(model_type, "Block") ~ "1Fleet-Block",
+                str_detect(model_type, "Random") ~ "1Fleet-RandWlkPar",
+                str_detect(model_type, "Semi") ~ "1Fleet-SemiPar"
               ),
-          abbrev = factor(abbrev, levels = c("2Fleet", "1Fleet TimeInvar",
-                                             "1Fleet Block", "1Fleet RandWlkPar",
-                                             "1Fleet SemiPar"))) %>%  # functional form
+          abbrev = factor(abbrev, levels = c("2Fleet", "1Fleet-TimeInvar",
+                                             "1Fleet-Block", "1Fleet-RandWlkPar",
+                                             "1Fleet-SemiPar"))) %>%  # functional form
   filter(Dat_Qual == "High")
 
 
@@ -626,7 +620,7 @@ dev.off()
 
 pdf(here("figs", "Manuscript_Figures_v2", "Fig3_ABC.pdf"), width = 15, height = 15)
 print(
-  ggplot(pt_rg_re %>% filter(Dat_Qual == "High", str_detect(OM_Scenario, "Fast_"), type == "ABC"),
+  ggplot(pt_rg_re %>% filter(Dat_Qual == "High", str_detect(OM_Scenario, "Fast"), type == "ABC"),
          aes(x = factor(abbrev), y = median, color = func, fill = func,
              ymin = lwr_95, ymax = upr_95)) +
     geom_pointrange(position = position_dodge2(width = 0.65), size = 1, linewidth = 1) +
@@ -664,14 +658,14 @@ ssb_slow_re_om = ts_re_om %>%
           func = ifelse(str_detect(EM_Scenario, "Gamma"), "Gamma", "Logistic"),
           abbrev = case_when(
             str_detect(model_type, "2Fleet") ~ "2Fleet",
-            str_detect(model_type, "TimeInvar") ~ "1Fleet TimeInvar",
-            str_detect(model_type, "Block") ~ "1Fleet Block",
-            str_detect(model_type, "Random") ~ "1Fleet RandWlkPar",
-            str_detect(model_type, "Semi") ~ "1Fleet SemiPar"
+            str_detect(model_type, "TimeInvar") ~ "1Fleet-TimeInvar",
+            str_detect(model_type, "Block") ~ "1Fleet-Block",
+            str_detect(model_type, "Random") ~ "1Fleet-RandWlkPar",
+            str_detect(model_type, "Semi") ~ "1Fleet-SemiPar"
           ),
-          abbrev = factor(abbrev, levels = c("2Fleet", "1Fleet TimeInvar",
-                                             "1Fleet Block", "1Fleet RandWlkPar",
-                                             "1Fleet SemiPar"))) %>%  # functional form
+          abbrev = factor(abbrev, levels = c("2Fleet", "1Fleet-TimeInvar",
+                                             "1Fleet-Block", "1Fleet-RandWlkPar",
+                                             "1Fleet-SemiPar"))) %>%  # functional form
   filter(Dat_Qual == "High")
 
 pdf(here("figs", "Manuscript_Figures_v2", "Fig4_SSB.pdf"), width = 19, height = 21)
@@ -699,7 +693,7 @@ dev.off()
 # Figure 5 (RE ABC Slow) --------------------------------------------------
 pdf(here("figs", "Manuscript_Figures_v2", "Fig5_ABC.pdf"), width = 15, height = 15)
 print(
-  ggplot(pt_rg_re %>% filter(Dat_Qual == "High", str_detect(OM_Scenario, "Slow_"), type == "ABC"),
+  ggplot(pt_rg_re %>% filter(Dat_Qual == "High", str_detect(OM_Scenario, "Slow"), type == "ABC"),
          aes(x = factor(abbrev), y = median, color = func, fill = func,
              ymin = lwr_95, ymax = upr_95)) +
     geom_pointrange(position = position_dodge2(width = 0.65), size = 1, linewidth = 1) +
@@ -744,13 +738,13 @@ dev.off()
 
 # Figure S2 and S3 (AIC) --------------------------------------------------
 
-pdf(here("figs", "Manuscript_Figures_v2", "FigS2_AIC_2Fl.pdf"), width = 12, height = 5)
+pdf(here("figs", "Manuscript_Figures_v2", "FigS2_AIC_2Fl.pdf"), width = 17, height = 10)
 ggplot(twofleet_aic %>% filter(Dat_Qual == "High") %>% 
-         mutate(OM_Scenario = factor(OM_Scenario, levels = rev(c(fast_om_plot_order, slow_om_plot_order)))), 
-       aes(x = OM_Scenario, y = round(n_minAIC, 2), fill = func)) +
+         mutate(OM_Scenario = factor(OM_Scenario, levels = c(fast_om_plot_order, slow_om_plot_order))), 
+       aes(x = abbrev, y = round(n_minAIC, 2), fill = func)) +
   geom_col(position = position_dodge2(width = 0.1), 
            alpha = 0.7, color = "black") +  
-  facet_wrap(~time_comp) +
+  facet_grid(time_comp~OM_Scenario) +
   geom_hline(aes(yintercept = 0.9), col = "black", lty = 2, size = 0.7, alpha = 1) +
   geom_hline(aes(yintercept = 0.5), col = "black", lty = 2, size = 0.7, alpha = 1) +
   coord_flip() +
@@ -776,7 +770,7 @@ ggplot(onefleet_aic %>% filter(Dat_Qual == "High") %>%
   coord_flip() +
   geom_hline(aes(yintercept = 0.9), col = "black", lty = 2, size = 0.7, alpha = 1) +
   geom_hline(aes(yintercept = 0.5), col = "black", lty = 2, size = 0.7, alpha = 1) +
-  labs(x = "Operating Models", y = "Proportion of models with lowest AIC", fill = "Functional Form of 1Fleet Models") +
+  labs(x = "Estimation Models", y = "Proportion of models with lowest AIC", fill = "Functional Form of 1Fleet Models") +
   theme_test() +
   scale_fill_manual(values = c("#E69F00", "#0072B2")) +
   theme(legend.position = "top",
@@ -805,14 +799,14 @@ f_fast_re_om = ts_re_om %>%
           func = ifelse(str_detect(EM_Scenario, "Gamma"), "Gamma", "Logistic"),
           abbrev = case_when(
             str_detect(model_type, "2Fleet") ~ "2Fleet",
-            str_detect(model_type, "TimeInvar") ~ "1Fleet TimeInvar",
-            str_detect(model_type, "Block") ~ "1Fleet Block",
-            str_detect(model_type, "Random") ~ "1Fleet RandWlkPar",
-            str_detect(model_type, "Semi") ~ "1Fleet SemiPar"
+            str_detect(model_type, "TimeInvar") ~ "1Fleet-TimeInvar",
+            str_detect(model_type, "Block") ~ "1Fleet-Block",
+            str_detect(model_type, "Random") ~ "1Fleet-RandWlkPar",
+            str_detect(model_type, "Semi") ~ "1Fleet-SemiPar"
           ),
-          abbrev = factor(abbrev, levels = c("2Fleet", "1Fleet TimeInvar",
-                                             "1Fleet Block", "1Fleet RandWlkPar",
-                                             "1Fleet SemiPar"))) %>%  # functional form
+          abbrev = factor(abbrev, levels = c("2Fleet", "1Fleet-TimeInvar",
+                                             "1Fleet-Block", "1Fleet-RandWlkPar",
+                                             "1Fleet-SemiPar"))) %>%  # functional form
   filter(Dat_Qual == "High")
 
 
@@ -856,14 +850,14 @@ f_slow_re_om = ts_re_om %>%
           func = ifelse(str_detect(EM_Scenario, "Gamma"), "Gamma", "Logistic"),
           abbrev = case_when(
             str_detect(model_type, "2Fleet") ~ "2Fleet",
-            str_detect(model_type, "TimeInvar") ~ "1Fleet TimeInvar",
-            str_detect(model_type, "Block") ~ "1Fleet Block",
-            str_detect(model_type, "Random") ~ "1Fleet RandWlkPar",
-            str_detect(model_type, "Semi") ~ "1Fleet SemiPar"
+            str_detect(model_type, "TimeInvar") ~ "1Fleet-TimeInvar",
+            str_detect(model_type, "Block") ~ "1Fleet-Block",
+            str_detect(model_type, "Random") ~ "1Fleet-RandWlkPar",
+            str_detect(model_type, "Semi") ~ "1Fleet-SemiPar"
           ),
-          abbrev = factor(abbrev, levels = c("2Fleet", "1Fleet TimeInvar",
-                                             "1Fleet Block", "1Fleet RandWlkPar",
-                                             "1Fleet SemiPar"))) %>% 
+          abbrev = factor(abbrev, levels = c("2Fleet", "1Fleet-TimeInvar",
+                                             "1Fleet-Block", "1Fleet-RandWlkPar",
+                                             "1Fleet-SemiPar"))) %>%  # functional form
   filter(Dat_Qual == "High")
 
 

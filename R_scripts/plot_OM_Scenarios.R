@@ -36,7 +36,7 @@ selexf1 <- cbind(1 / (1 + exp(-1 * ((bins - a50f1)/deltaf1) )) , "Females", "Fle
 selexf2 <- cbind(1 / (1 + exp(-1 * ((bins - a50f2)/deltaf2) )) , "Females", "Fleet 2", age = bins)
 
 # Bind these together
-selex_logist <- data.frame(rbind(selexm1, selexm2, selexf1, selexf2), Type = "Logist_Logist")
+selex_logist <- data.frame(rbind(selexm1, selexm2, selexf1, selexf2), Type = "Logistic")
 colnames(selex_logist) <- c("Selex", "Sex", "Fleet", "Age", "Type")
 
 ### Logistic-Gamma (Old) ----------------------------------------------------------
@@ -54,7 +54,7 @@ pf2 <- (0.5 * (sqrt(amaxf2^2 + 4*deltaf2^2) - amaxf2))
 selex_f2 <- cbind((bins/amaxf2) ^ (amaxf2/pf2) * exp((amaxf2 - bins) / pf2), "Females", "Fleet 2", age = bins)
 
 # Bind these together
-selex_gamma_old <- data.frame(rbind(selexm1, selex_m2, selexf1, selex_f2), Type = "Logist-Gamma-Old")
+selex_gamma_old <- data.frame(rbind(selexm1, selex_m2, selexf1, selex_f2), Type = "Gamma-Old")
 colnames(selex_gamma_old) <- c("Selex", "Sex", "Fleet", "Age", "Type")
 
 
@@ -72,7 +72,7 @@ pf2 <- (0.5 * (sqrt(amaxf2^2 + 4*deltaf2^2) - amaxf2))
 selex_f2 <- cbind((bins/amaxf2) ^ (amaxf2/pf2) * exp((amaxf2 - bins) / pf2), "Females", "Fleet 2", age = bins)
 
 # Bind these together
-selex_gamma_young <- data.frame(rbind(selexm1, selex_m2, selexf1, selex_f2), Type = "Logist-Gamma-Young")
+selex_gamma_young <- data.frame(rbind(selexm1, selex_m2, selexf1, selex_f2), Type = "Gamma-Young")
 colnames(selex_gamma_young) <- c("Selex", "Sex", "Fleet", "Age", "Type")
 
 
@@ -84,9 +84,9 @@ selex_all <- rbind(selex_logist, selex_gamma_old, selex_gamma_young)
 pdf(here("figs", "OM_Scenarios", "selex_scenario.pdf"), width = 15, height = 10)
 (selex_plot <- ggplot(selex_all %>% 
                         mutate(Type = factor(Type,
-                                             levels = c("Logist_Logist",
-                                                        "Logist-Gamma-Old",
-                                                        "Logist-Gamma-Young"))), aes(x = as.numeric(Age), 
+                                             levels = c("Logistic",
+                                                        "Gamma-Old",
+                                                        "Gamma-Young"))), aes(x = as.numeric(Age), 
                                      y = as.numeric(paste(Selex)), 
                                      lty = factor(Fleet))) +
   geom_line(size = 1.5, alpha = 1) + 
@@ -238,7 +238,8 @@ mutate(
 
 pdf(here("figs", "OM_Scenarios", "F_Scenario.pdf"), width = 20, height = 10)
 
-(fmort_plot <- ggplot(fmort_plot_df, aes(x = Year, y = Value,  lty = factor(Fleet))) +
+(fmort_plot <- ggplot(fmort_plot_df %>% filter(OM_Scenario %in% c("Fast", "Slow")), 
+                      aes(x = Year, y = Value,  lty = factor(Fleet))) +
   geom_line(size = 0.9) +
   coord_cartesian(ylim = c(0, 0.13)) + 
   geom_segment(aes(x = BreakPoint, xend = BreakPoint,
@@ -343,23 +344,27 @@ catch_df_sum <- catch_df %>%
          Fleet = parse_number(as.character(Fleet)),
          OM_Scenario = str_remove(OM_Scenario, "_High"),
          Speed = ifelse(str_detect(OM_Scenario, "Fast"), "Fast", "Slow"),
-         Selex = ifelse(str_detect(OM_Scenario, "LG_O"), "Logist-Gamma-Old",
-                 ifelse(str_detect(OM_Scenario, "LG_Y"), 'Logist-Gamma-Young', "Logist-Logist")),
-         Selex = factor(Selex, levels = c("Logist-Logist",
-                                          "Logist-Gamma-Old",
-                                          "Logist-Gamma-Young"))
-         ) %>% 
-  group_by(Year, OM_Scenario, Fleet, Speed) %>% 
+         Selex = ifelse(str_detect(OM_Scenario, "LG_O"), "Gamma-Old",
+                 ifelse(str_detect(OM_Scenario, "LG_Y"), 'Gamma-Young', "Logistic")),
+         Selex = factor(Selex, levels = c("Logistic",
+                                          "Gamma-Old",
+                                          "Gamma-Young"))
+         ) %>%
+  group_by(Year, OM_Scenario, Fleet, Speed, Selex) %>% 
   summarize(Median_HR = median(Value),
             Lwr_95_HR = quantile(Value, 0.025),
             Upr_95_HR = quantile(Value, 0.975)) 
 
 pdf(here("figs", "OM_Scenarios", "Catch_Scenarios.pdf"), width = 28, height = 10)
-(catch_plot <- ggplot(catch_df_sum, aes(x = Year, y = Median_HR,  lty = factor(Fleet),
+(catch_plot <- ggplot(catch_df_sum %>% 
+                        filter(!str_detect(OM_Scenario, "Ext"),
+                               !str_detect(OM_Scenario, "Rev"),
+                               !str_detect(OM_Scenario, "Low")),
+                      aes(x = Year, y = Median_HR,  lty = factor(Fleet),
                       ymin = Lwr_95_HR, ymax = Upr_95_HR)) +
     geom_ribbon(alpha = 0.35, color = NA) +
     geom_line(size = 1.5) +
-    facet_grid(OM_Scenario~Speed, scales = "free_x") +
+    facet_grid(Selex~Speed, scales = "free_x") +
     labs(x = "Year", y = "Catch", fill = "Fleet",
          color = "Fleet", linetype = "Fleet") +
     theme_bw() +
@@ -453,27 +458,29 @@ dev.off()
 # Munging for plot dataframe
 ssb_plot_df <- ssb_df %>% 
   drop_na() %>% 
-  filter(str_detect(OM_Scenario, "Ext")) %>% 
-  # mutate(OM_Scenario = str_remove(OM_Scenario, "_High"),
-  #        Speed = ifelse(str_detect(OM_Scenario, "Fast"), "Fast", "Slow"),
-  #        Sel_Type = ifelse(str_detect(OM_Scenario, "LG_O"), "Logist-Gamma-Old", 
-  #                          ifelse(str_detect(OM_Scenario, "LG_Y"),
-  #                                 'Logist-Gamma-Young', "Logist-Logist")),
-  #        Sel_Type = factor(Sel_Type, levels = c("Logist-Logist", 
-  #                                               "Logist-Gamma-Old",
-  #                                               "Logist-Gamma-Young"))) %>% 
-  group_by(OM_Scenario, Year) %>% 
-  summarize(median = median(Value),
+  # filter(str_detect(OM_Scenario, "Ext")) %>% 
+  mutate(OM_Scenario = str_remove(OM_Scenario, "_High"),
+         Speed = ifelse(str_detect(OM_Scenario, "Fast"), "Fast", "Slow"),
+         Sel_Type = ifelse(str_detect(OM_Scenario, "LG_O"), "Gamma-Old",
+                           ifelse(str_detect(OM_Scenario, "LG_Y"),
+                                  'Gamma-Young', "Logistic")),
+         Sel_Type = factor(Sel_Type, levels = c("Logistic",
+                                                "Gamma-Old",
+                                                "Gamma-Young"))) %>%
+  group_by(OM_Scenario, Year,Sel_Type,Speed) %>%  summarize(median = median(Value),
          Lwr_95 = quantile(Value, 0.025),
          Upr_95 = quantile(Value, 0.975))
 
 pdf(here("figs", "OM_Scenarios", "SBB_Trajectory.pdf"), width = 18, height = 10)
 (ssb_plot <- ssb_plot_df %>% 
+    filter(!str_detect(OM_Scenario, "Ext"),
+           !str_detect(OM_Scenario, "Rev"),
+           !str_detect(OM_Scenario, "Low")) %>% 
   ggplot(aes(x = Year, y = median, ymin = Lwr_95, ymax = Upr_95)) +
   geom_line(lwd = 1.5) +
   geom_ribbon(alpha = 0.35) +
   theme_bw() +
-  facet_wrap(~OM_Scenario, scales = "free_x") +
+  facet_grid(Sel_Type~Speed, scales = "free_x") +
   labs(x = 'Year', y = "Spawning Stock Biomass",
      color = "OM Scenario") +
   theme(legend.position = "top",
@@ -487,67 +494,50 @@ dev.off()
 # Numbers at Age ----------------------------------------------------------
 
 med_naa_df <- naa_df %>% 
-  filter(str_detect(OM_Scenario, "High"),
-         Year != 100) %>% 
-  mutate(Sex = ifelse(Sex == 1, "Female", "Male"),
-         OM_Scenario = str_remove(OM_Scenario, "_High")
-         # OM_Scenario = factor(OM_Scenario,
-         #                      levels = c("Fast_LG_O", "Fast_LG_Y",
-         #                                 "Slow_LG_O", "Slow_LG_Y",
-         #                                 "Fast_LL", "Slow_LL"))
-         ) %>% 
-  group_by(Age, Year, Sex, OM_Scenario) %>% 
+  drop_na() %>% 
+  mutate(OM_Scenario = str_remove(OM_Scenario, "_High"),
+         Speed = ifelse(str_detect(OM_Scenario, "Fast"), "Fast", "Slow"),
+         Sel_Type = ifelse(str_detect(OM_Scenario, "LG_O"), "Gamma-Old",
+                           ifelse(str_detect(OM_Scenario, "LG_Y"),
+                                  'Gamma-Young', "Logistic")),
+         Sel_Type = factor(Sel_Type, levels = c("Logistic",
+                                                "Gamma-Old",
+                                                "Gamma-Young"))) %>%
+  group_by(Age, Year, Sex, OM_Scenario, Speed, Sel_Type) %>% 
   summarize(median = median(Value))
 
 pdf(here("figs", "OM_Scenarios", "NAA_plot.pdf"), width = 15, height = 10)
 
-(naa_plot = ggplot(med_naa_df %>% filter(str_detect(OM_Scenario, "Fast"),
-                                         Sex == "Female") %>% 
-                     mutate(Old_Int = ifelse(Age %in% c(15:30), "Old_Int (15-30)", "Young (1-14)")),
-       aes(x = Year, y = median, fill = factor(Old_Int))) +
-  geom_col(color = "black", alpha = 0.55) +
-  facet_wrap(~OM_Scenario, scales = "free") +
-  labs(x = "Year", y = "Median Numbers-at-age", fill = "Age") +
+(naa_plot = ggplot(med_naa_df %>% filter(Sex == 1,
+                                         !str_detect(OM_Scenario, "Ext"),
+                                         !str_detect(OM_Scenario, "Rev"),
+                                         !str_detect(OM_Scenario, "Low")) %>% 
+                     group_by(Speed) %>% 
+                     filter(Year != max(Year)) %>% 
+                     mutate(Age_Groups = case_when(
+                       Age %in% c(1:10) ~ "1-10",
+                       # Age %in% c(6:10) ~ "6-10",
+                       # Age %in% c(11:15) ~ "11-15",
+                       # Age %in% c(16:20) ~ "16-20",
+                       Age %in% c(11:20) ~ "11-20",
+                       Age %in% c(21:30) ~ "21-30"
+                     ),
+                     Age_Groups = factor(Age_Groups, levels = c("1-10", "11-20", "21-30"))),
+       aes(x = Year, y = median, fill = factor(Age_Groups))) +
+  geom_col() +
+  facet_grid(Sel_Type~Speed, scales = "free_x") +
+  labs(x = "Year", y = "Median Numbers-at-age", fill = "Ages") +
   ggthemes::scale_fill_colorblind() +
+  guides(fill=guide_legend(nrow=3,byrow=TRUE)) +
   theme_bw() +
-  theme(legend.position = "top",
-        axis.title = element_text(size = 25),
-        axis.text = element_text(size = 18, color = "black"),
-        legend.title = element_text(size = 25),
-        legend.text = element_text(size = 23),
-        strip.text = element_text(size = 18)) )
-
-med_naa_df %>% filter(str_detect(OM_Scenario, "Fast"),
-                      Sex == "Female") %>% 
-  mutate(Old_Int = ifelse(Age %in% c(15:30), "Old_Int (15-30)", "Young (1-14)")) %>% 
-  group_by(OM_Scenario, Old_Int, Year) %>% 
-  summarize(sum = sum(median)) %>% 
-  ggplot(aes(x = Year, y = sum, color = Old_Int)) +
-  geom_line(size = 2) +
-  facet_wrap(~OM_Scenario) +
-  theme_bw() +
-  labs(y = "Sum Median NAA") +
-  theme(legend.position = "top",
-        axis.title = element_text(size = 25),
-        axis.text = element_text(size = 18, color = "black"),
-        legend.title = element_text(size = 25),
-        legend.text = element_text(size = 23),
-        strip.text = element_text(size = 18)) 
-
-(naa_plot = ggplot(med_naa_df %>% filter(str_detect(OM_Scenario, "Fast"),
-                                         Sex == "Female",
-                                         Age %in% c(seq(2,30,2))),
-                   aes(x = Year, y = median, fill = factor(Age))) +
-    geom_col(color = "black", alpha = 0.55) +
-    facet_wrap(~OM_Scenario, scales = "free") +
-    labs(x = "Year", y = "Median Numbers-at-age", fill = "Age") +
-    theme_bw() +
-    theme(legend.position = "top",
-          axis.title = element_text(size = 25),
-          axis.text = element_text(size = 18, color = "black"),
-          legend.title = element_text(size = 25),
-          legend.text = element_text(size = 23),
-          strip.text = element_text(size = 18)) )
+  ylim(0, 85) +
+  theme(legend.position = c(0.85, 0.915),
+              axis.title = element_text(size = 17),
+              axis.text = element_text(size = 15, color = "black"),
+              legend.title = element_text(size = 17),
+              strip.text = element_text(size = 15),
+              legend.text = element_text(size = 15),
+              legend.spacing.y = unit(0.05, "cm"))) 
 
 dev.off()
 
@@ -559,10 +549,6 @@ med_biom_df <- biom_df %>%
          Year != 100) %>% 
   mutate(Sex = ifelse(Sex == 1, "Female", "Male"),
          OM_Scenario = str_remove(OM_Scenario, "_High")
-         # OM_Scenario = factor(OM_Scenario,
-         #                      levels = c("Fast_LG_O", "Fast_LG_Y",
-         #                                 "Slow_LG_O", "Slow_LG_Y",
-         #                                 "Fast_LL", "Slow_LL"))
   ) %>% 
   group_by(Age, Year, Sex, OM_Scenario) %>% 
   summarize(median = median(Value))
@@ -644,11 +630,11 @@ dev.off()
 # Combine Plots -----------------------------------------------------------
 
 
-pdf(here("figs", "OM_Scenarios", "Fig1_OM_Scenarios.pdf"), width = 17, height = 15)
+pdf(here("figs", "OM_Scenarios", "Fig1_OM_Scenarios.pdf"), width = 23, height = 18)
 # Combine plots
 comb_plots = ggpubr::ggarrange(selex_plot, catch_plot,
-                  ssb_plot, ncol = 3, 
-                  labels = c("B", "C", "D"),
+                  ssb_plot, naa_plot, ncol = 4, 
+                  labels = c("B", "C", "D", "E"),
                   common.legend = FALSE,  label.x = -0.005,
                   font.label=list(color="black",size = 25))
 # Now get all plots
