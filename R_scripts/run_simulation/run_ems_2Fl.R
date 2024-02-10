@@ -25,10 +25,10 @@ for(i in 1:length(files)) source(here(fxn_path, files[i]))
 compile_tmb(wd = here("src"), cpp = "EM.cpp")
 
 # Read in OM and EM Scenarios
-om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "OM")
-  # filter(str_detect(OM_Scenarios, "Ext"))
-em_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "EM_2Fl")
-  # filter(str_detect(EM_Scenario, "TrxE"))
+om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "OM") %>% 
+filter(str_detect(OM_Scenarios, "High"), !str_detect(OM_Scenarios, "Ext|Rev"))
+em_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "EM_2Fl") %>% 
+  filter(str_detect(EM_Scenario, "_LL|_LGam"))
 
 # Read in spreadsheet for life history parameters
 lh_path <- here("input", "Sablefish_Inputs.xlsx")
@@ -184,6 +184,8 @@ for(n_om in 1:n_OM_scen) {
     write.csv(params, here(em_path_res, "Param_Results.csv"))
     write.csv(time_series, here(em_path_res, "TimeSeries_Results.csv"))
 
+    plot_ts_sum(time_series = time_series, em_path_res)
+    
     # Progress
     cat(crayon::green("OM", n_om, "out of", n_OM_scen))
     cat(crayon::yellow("EM", n_em, "out of", n_EM_scen))

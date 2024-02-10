@@ -265,9 +265,16 @@ simulate_data <- function(fxn_path,
                Harvest_Rate[y, f, sim] <- Catch_agg[y, f, sim] / # Catch / Exploitable Biomass
                                           sum(N_at_age[y,,s,sim] * Fish_selex_at_age[y,,f,s,sim] * wt_at_age[y,,,sim])
               } # if we are done w/ looping through sexes
+            } # end 1st sex loop
               
-              ### Sample Fishery Index and Comps ------------------------------------------
-              
+            ### Sample Fishery Index and Comps ------------------------------------------
+            
+            # Generate comps based on catch at age
+            p_af <- sum(Catch_at_age[y,,f,1,sim]) / sum(Catch_at_age[y,,f,,sim]) # Get sex-ratios (age-comps)
+            pa <- rbinom(Input_N_Fish[y,f] * n_sex, 1, p_af) # get binomial draws
+            Input_Nfish_Sex <- c(sum(pa), (Input_N_Fish[y,f] * n_sex) - sum(pa)) # get ISS by sex
+            
+            for(s in 1:n_sex) { 
               # Only start sampling if y > Fish start year. 
               if(y >= Fish_Start_yr[f]) { # Observation Model for Fishery
                 
@@ -277,15 +284,13 @@ simulate_data <- function(fxn_path,
                 
                 # Probability for fishery age comps, using CAA as probability
                 Prob_Fish_Comps <- Catch_at_age[y,,f,s,sim]
-
-                # Generate comps based on catch at age
                 Fish_Age_Comps[y,,f,s,sim] <- sample_comps(error = fish_likelihood,
-                                                           Input_N = Input_N_Fish[y,f], 
+                                                           Input_N = Input_Nfish_Sex[s], 
                                                            DM_Param = DM_Fish_Param[f], 
                                                            prob = Prob_Fish_Comps / sum(Prob_Fish_Comps))
                 
               }  # Only start sampling if we are the start of the fish start year
-            } # end sex index
+            } # end 2nd sex index
             
             # Summarize this fishery index aggregated by sex and applying some error
             Fishery_Index_Agg[y,f,sim] <- sum(melt(Fishery_Index[y,f,,sim]), na.rm = TRUE) # Aggregate
@@ -301,6 +306,11 @@ simulate_data <- function(fxn_path,
           
           for(sf in 1:n_srv_fleets) { # Loop for survey fleets
             
+            # Generate comps based on survey catch at age
+            p_af <- sum(N_at_age[y,,1,sim] * Surv_selex_at_age[y,,sf,1,sim]) / sum(N_at_age[y,,,sim] * Surv_selex_at_age[y,,sf,,sim]) # Get sex-ratios (age-comps)
+            pa <- rbinom(Input_N_Srv[y,sf] * n_sex, 1, p_af) # get binomial draws
+            Input_Nsrv_Sex <- c(sum(pa), (Input_N_Srv[y,sf] * n_sex) - sum(pa)) # get ISS by sex
+            
             for(s in 1:n_sex) {
               
               # Only start sampling if y > Survey Start Year.
@@ -312,10 +322,10 @@ simulate_data <- function(fxn_path,
                 
                 # Get probability of sampling a given age class for use in multinomial
                 Prob_Surv_at_age <- N_at_age[y,,s,sim] * Surv_selex_at_age[y,,sf,s,sim]
-                
+
                 # Generate comps based on the expected CPUE at age
                 Survey_Age_Comps[y,,sf,s,sim] <- sample_comps(error = srv_likelihood,
-                                                              Input_N = Input_N_Srv[y,sf], 
+                                                              Input_N = Input_Nsrv_Sex[s], 
                                                               DM_Param = DM_Srv_Param[sf], 
                                                               prob = Prob_Surv_at_age / sum(Prob_Surv_at_age))
                 

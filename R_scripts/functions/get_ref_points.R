@@ -87,7 +87,7 @@ get_Fx_refpt <- function(ages,
                          N_Init = N_Init, 
                          SSB_Unfished = SSB_Unfished,
                          F_x = F_x), 
-             start = list(Trial_F = 0.01), 
+             start = list(Trial_F = 0.05), 
              optimizer = "nlminb",
              method="Nelder-Mead",
              control = list(maxit = 1e3))

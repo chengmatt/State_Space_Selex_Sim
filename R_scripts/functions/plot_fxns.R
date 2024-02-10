@@ -68,3 +68,36 @@ plot_RE_ts_base <- function(data, par_name, ylim) {
   
 }
 
+
+#' Title  Quick summary for EMs for sanity
+#'
+#' @param time_series df of time series
+#'
+#' @return
+#' @export
+#'
+#' @examples
+plot_ts_sum <- function(time_series, path) {
+  
+  require(tidyverse)
+  require(here)
+  
+  # get quick summary
+  time_series <- time_series %>% 
+    mutate(re = (mle_val - t) / t) %>% 
+    group_by(year, type) %>% 
+    summarize(median = median(re),
+              lwr_95 = quantile(re, 0.025),
+              upr_95 = quantile(re, 0.975))
+  
+  # plot!
+  pdf(here(path, "TS_RE.pdf"))
+  print(
+    ggplot(time_series, aes(x = year, y = median, ymin = lwr_95, ymax = upr_95)) +
+      geom_line() +
+      geom_ribbon(alpha = 0.35) +
+      facet_wrap(~type) +
+      coord_cartesian(ylim = c(-0.75, 0.75))
+  )
+  dev.off()
+}
