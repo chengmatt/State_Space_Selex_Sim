@@ -29,7 +29,7 @@ compile_tmb(wd = here("src"), cpp = "EM.cpp")
 om_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "OM") %>% 
 filter(str_detect(OM_Scenarios, "High"), !str_detect(OM_Scenarios, "Ext|Rev"))
 em_scenarios <- readxl::read_excel(here('input', "OM_EM_Scenarios_v3.xlsx"), sheet = "EM_1Fl_TI_Blk") %>% 
-  filter(str_detect(EM_Scenario, "_LL|_LGam"))
+  filter(str_detect(EM_Scenario, "_LL|_LGam|TI"))
 
 # Read in spreadsheet for life history parameters
 lh_path <- here("input", "Sablefish_Inputs.xlsx")

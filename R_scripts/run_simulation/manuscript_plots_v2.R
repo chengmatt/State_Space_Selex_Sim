@@ -1092,6 +1092,17 @@ terminal_minmax_df = minmax_df %>%
   select(OM_Scenario, EM_Scenario, MARE) %>% 
   pivot_wider(names_from = "OM_Scenario", values_from = "MARE")
 
+# rearrange stuff
+minmax_df <- minmax_df %>% 
+  mutate(OM_Scenario = factor(OM_Scenario, 
+                              levels = c("Fast_Logist_Logist",
+                                         "Fast_Logist_Gamma_Old",
+                                         "Fast_Logist_Gamma_Young",
+                                         "Slow_Logist_Logist",
+                                         "Slow_Logist_Gamma_Old",
+                                         "Slow_Logist_Gamma_Young"),
+                              labels = c(fast_om_plot_order, slow_om_plot_order)))
+
 # fleet transition end
 fleettrans_minmax_df = minmax_df %>% 
   mutate(MARE = round(MARE, 4)) %>% 
@@ -1103,6 +1114,13 @@ fleettrans_minmax_df = minmax_df %>%
 fleetint_minmax_df = minmax_df %>% 
   mutate(MARE = round(MARE, 4)) %>% 
   filter(Dat_Qual == "High", time_comp == "Fleet Intersect") %>% 
+  select(OM_Scenario, EM_Scenario, MARE) %>% 
+  pivot_wider(names_from = "OM_Scenario", values_from = "MARE")
+
+# terminal
+terminal_minmax_df = minmax_df %>% 
+  mutate(MARE = round(MARE, 4)) %>% 
+  filter(Dat_Qual == "High", time_comp == "Terminal") %>% 
   select(OM_Scenario, EM_Scenario, MARE) %>% 
   pivot_wider(names_from = "OM_Scenario", values_from = "MARE")
 
