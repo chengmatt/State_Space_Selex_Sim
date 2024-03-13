@@ -36,14 +36,15 @@ ts_te_df <- read.csv(here("output", "TimeSeries_TE.csv")) %>%  # time series tot
   filter(!str_detect(OM_Scenario, "Rev|Ext"))
 ts_are_df <- read.csv(here("output", "TimeSeries_ARE.csv")) %>%  # time series abs relative error (converged runs only)
   filter(!str_detect(OM_Scenario, "Rev|Ext"))
-
+naa_df <- read.csv(here("output", "NAA_Summary.csv")) %>%  # numbers at age 
+  filter(!str_detect(OM_Scenario, "Rev|Ext"))
 
 # Selectivity and Comps
 om_slx_df <- data.table::fread(here("output", "OM_Fish_Selex.csv")) %>% # OM Selectivity Values
   filter(!str_detect(OM_Scenario, "Rev|Ext"))
 pop_sel_om <- data.table::fread(here("output", "Pop_Selex_OM.csv")) %>%  # OM Pop'n Selectivity Values
   filter(!str_detect(OM_Scenario, "Rev|Ext"))
-pop_sel_em <- data.table::fread(here("output", "Pop_Selex_EM.csv")) %>%  # EM Pop'n Selectivity Values\
+pop_sel_em <- data.table::fread(here("output", "Pop_Selex_EM.csv")) %>%  # EM Pop'n Selectivity Values
   filter(!str_detect(OM_Scenario, "Rev|Ext"))
 
 
@@ -571,7 +572,45 @@ minmax_df = minmax_df %>%
   left_join(time_minmax_medians, by = c("time_comp", "Dat_Qual")) %>% 
   left_join(global_minmax_medians, by = c("Dat_Qual"))
 
-  
+# NAA Summary -------------------------------------------------------------
+# Relative error of NAA series
+naa_df <- naa_df %>% filter(str_detect(EM_Scenario, all_models)) %>% 
+  mutate(Dat_Qual = case_when(
+    str_detect(OM_Scenario, "High") ~ 'High',
+    str_detect(OM_Scenario, "Low") ~ 'Low'
+  ),  OM_Scenario = str_remove(OM_Scenario, "_High|_Low"),
+  EM_Scenario = str_replace(EM_Scenario, "Gam", "G"),
+  OM_Scenario = factor(OM_Scenario,
+                       labels = c("Fast-Gamma-Old",
+                                  "Fast-Gamma-Young",
+                                  "Fast-Logistic",
+                                  "Slow-Gamma-Old",
+                                  "Slow-Gamma-Young",
+                                  "Slow-Logistic")),
+  EM_Scenario = factor(EM_Scenario,
+                       labels = c("1Fleet_Gamma_RandomWalk",
+                                  "1Fleet_Gamma_SemiPar",
+                                  "1Fleet_Gamma_TimeInvar",
+                                  "1Fleet_Logist_RandomWalk",
+                                  "1Fleet_Logist_SemiPar",
+                                  "1Fleet_Logist_TimeInvar",
+                                  "1Fleet_Logist_Gamma_TimeBlk",
+                                  "1Fleet_Logist_Logist_TimeBlk",
+                                  "2Fleet_Logist_Gamma",
+                                  "2Fleet_Logist_Logist")))
+
+# Set order for plot
+order <- vector()
+for(o in 1:length(plot_order)) {
+  order[o] <- which(grepl(plot_order[o], x = unique(naa_df$EM_Scenario)))
+} # end o loop
+
+# Now relevel factor for organizing plot
+naa_df <- naa_df %>% 
+  mutate(EM_Scenario = factor(EM_Scenario, levels = unique(EM_Scenario)[order]),
+         time_comp = factor(time_comp, levels = c("Fleet Intersect", "Fleet Trans End", "Terminal")))
+
+
 # Plots -------------------------------------------------------------------
 # Figure 2 (RE SSB Fast) --------------------------------------------------
 
@@ -622,34 +661,7 @@ ggplot() +
        size = "Assessment Period")
 dev.off()
 
-
-# Figure 3 (RE ABC Fast) --------------------------------------------------
-
-pdf(here("figs", "Manuscript_Figures_v2", "Fig3_ABC.pdf"), width = 15, height = 15)
-print(
-  ggplot(pt_rg_re %>% filter(Dat_Qual == "High", str_detect(OM_Scenario, "Fast"), type == "ABC"),
-         aes(x = factor(abbrev), y = median, color = func, fill = func,
-             ymin = lwr_95, ymax = upr_95)) +
-    geom_pointrange(position = position_dodge2(width = 0.65), size = 1, linewidth = 1) +
-    geom_hline(aes(yintercept = 0), col = "black", lty = 2, size = 0.5, alpha = 1) +
-    facet_grid(time_comp~OM_Scenario, scales = "free_x") +
-    scale_color_manual(values = c("#E69F00", "#0072B2")) +
-    scale_fill_manual(values = c("#E69F00", "#0072B2")) +
-    scale_x_discrete(guide = guide_axis(angle = 45)) +
-    labs(x = "Estimation Models", y = "Relative Error in ABC", 
-         fill = "Functional Form", color = "Functional Form") +
-    theme_matt() +
-    theme(legend.position = "top", 
-          title = element_text(size = 20),
-          axis.title = element_text(size = 20),
-          axis.text= element_text(size = 18),
-          strip.text = element_text(size = 17),
-          legend.text = element_text(size = 18),
-          legend.title = element_text(size = 20)) +
-    coord_cartesian(ylim = c(-0.5, 0.5)))
-dev.off()
-
-# Figure 4 (RE SSB Slow) --------------------------------------------------
+# Figure 3 (RE SSB Slow) --------------------------------------------------
 
 # Filter to fast scenario, and differentiate models
 ssb_slow_re_om = ts_re_om %>% 
@@ -675,7 +687,7 @@ ssb_slow_re_om = ts_re_om %>%
                                              "1Fleet-SemiPar"))) %>%  # functional form
   filter(Dat_Qual == "High")
 
-pdf(here("figs", "Manuscript_Figures_v2", "Fig4_SSB.pdf"), width = 19, height = 21)
+pdf(here("figs", "Manuscript_Figures_v2", "Fig3_SSB.pdf"), width = 19, height = 21)
 ggplot() + 
   geom_hline(yintercept = 0, col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
   geom_ribbon(ssb_slow_re_om %>% filter(time_comp == "Terminal"),
@@ -695,6 +707,33 @@ ggplot() +
   labs(x = "Year", y = "Relative Error in Spawning Stock Biomass", fill = "Functional Form",
        color = "Functional Form", lty = "Assessment Period", alpha = "Assessment Period",
        size = "Assessment Period")
+dev.off()
+
+
+# Figure 4 (RE ABC Fast) --------------------------------------------------
+
+pdf(here("figs", "Manuscript_Figures_v2", "Fig4_ABC.pdf"), width = 15, height = 15)
+print(
+  ggplot(pt_rg_re %>% filter(Dat_Qual == "High", str_detect(OM_Scenario, "Fast"), type == "ABC"),
+         aes(x = factor(abbrev), y = median, color = func, fill = func,
+             ymin = lwr_95, ymax = upr_95)) +
+    geom_pointrange(position = position_dodge2(width = 0.65), size = 1, linewidth = 1) +
+    geom_hline(aes(yintercept = 0), col = "black", lty = 2, size = 0.5, alpha = 1) +
+    facet_grid(time_comp~OM_Scenario, scales = "free_x") +
+    scale_color_manual(values = c("#E69F00", "#0072B2")) +
+    scale_fill_manual(values = c("#E69F00", "#0072B2")) +
+    scale_x_discrete(guide = guide_axis(angle = 45)) +
+    labs(x = "Estimation Models", y = "Relative Error in ABC", 
+         fill = "Functional Form", color = "Functional Form") +
+    theme_matt() +
+    theme(legend.position = "top", 
+          title = element_text(size = 20),
+          axis.title = element_text(size = 20),
+          axis.text= element_text(size = 18),
+          strip.text = element_text(size = 17),
+          legend.text = element_text(size = 18),
+          legend.title = element_text(size = 20)) +
+    coord_cartesian(ylim = c(-0.5, 0.5)))
 dev.off()
 
 # Figure 5 (RE ABC Slow) --------------------------------------------------
@@ -721,6 +760,264 @@ print(
           legend.title = element_text(size = 20)) +
     coord_cartesian(ylim = c(-0.5, 0.5)))
 dev.off()
+
+
+# Figure 6 (Quadratic Bias) -----------------------------------------------
+
+# Get terminal NAA
+sub_naa_df <- naa_df %>% filter(OM_Scenario == "Fast-Logistic",
+                  str_detect(EM_Scenario, "TimeInvar"),
+                  time_comp == "Terminal",
+                  Sex == "Female") %>% 
+  mutate(EM_Scenario = factor(EM_Scenario, labels = c("1Fleet-TimeInvar-Gamma",
+                                                      "1Fleet-TimeInvar-Logist")))
+
+# Filter to fast scenario, and differentiate models
+f_fast_re_om = ts_re_om %>% 
+  filter(par_name == "Total Fishing Mortality", str_detect(OM_Scenario, "Fast")) %>% 
+  mutate( OM_Scenario = factor(OM_Scenario, levels = fast_om_plot_order),
+          model_type = case_when( # differenitate model types
+            str_detect(EM_Scenario, 'Random') ~ "1Fleet Random Walk",
+            str_detect(EM_Scenario, 'Semi') ~ "1Fleet Semi-Parametric",
+            str_detect(EM_Scenario, 'TimeInvar') ~ "1Fleet TimeInvar",
+            str_detect(EM_Scenario, 'TimeBlk') ~ "1Fleet TimeBlock",
+            str_detect(EM_Scenario, '2Fl') ~ "2Fleet TimeInvar"
+          ),
+          func = ifelse(str_detect(EM_Scenario, "Gamma"), "Gamma", "Logistic"),
+          func = ifelse(str_detect(EM_Scenario, "Gamma"), "Gamma", "Logistic"),
+          abbrev = case_when(
+            str_detect(model_type, "2Fleet") ~ "2Fleet",
+            str_detect(model_type, "TimeInvar") ~ "1Fleet-TimeInvar",
+            str_detect(model_type, "Block") ~ "1Fleet-Block",
+            str_detect(model_type, "Random") ~ "1Fleet-RandWlkPar",
+            str_detect(model_type, "Semi") ~ "1Fleet-SemiPar"
+          ),
+          abbrev = factor(abbrev, levels = c("2Fleet", "1Fleet-TimeInvar",
+                                             "1Fleet-Block", "1Fleet-RandWlkPar",
+                                             "1Fleet-SemiPar"))) %>%  # functional form
+  filter(Dat_Qual == "High")
+
+# Get OM Age Structure
+load(here(om_scenario_path, "Fast_LL_High", paste("Fast_LL_High", ".RData", sep = "")))
+
+# Get Numbers at age
+naa_om <- reshape2::melt(oms$N_at_age)
+colnames(naa_om) <- c("Year", "Age", "Sex", "Sim", "Value")
+
+# parse out numbers
+naa_om <- naa_om %>% 
+  mutate(Year = parse_number(as.character(Year)),
+         Age = parse_number(as.character(Age)),
+         Sex = parse_number(as.character(Sex)),
+         Sim = parse_number(as.character(Sim)))
+
+# get median here
+med_naa_df <- naa_om %>% 
+  group_by(Age, Year, Sex) %>% 
+  summarize(median = median(Value))
+
+### Numbers at age Females (Fast-Logistic) ------------------------------------------
+
+naa_plot1 <- ggplot(sub_naa_df %>% filter(Age %in% c(6,26)) %>% 
+                      mutate(Age = factor(Age, labels = c("Age 6 (Young)",
+                                                          "Age 26 (Old)"))),
+       aes(x = Year, y = Median_RE, fill = EM_Scenario)) +
+  geom_rect(xmin = -Inf, xmax = 25, ymin = -Inf, ymax = Inf, fill = "grey", alpha = 0.05) +
+  geom_rect(xmin = 25, xmax = Inf, ymin = -Inf, ymax = Inf, fill = "green3", alpha = 0.002) +
+  geom_line(linewidth = 2, alpha = 1, aes(color = EM_Scenario)) +
+  geom_ribbon(aes(ymin = Lwr_95, ymax = Upr_95), alpha = 0.5) +
+  geom_hline(aes(yintercept = 0), col = "black",
+             lty = 2, linewidth = 0.5, alpha = 1) +
+  facet_wrap(~Age, scales = "free_y", nrow = 2) +
+  labs(x = "Year", y = "Relative Error in NAA (Females)", 
+       fill = "Estimation Models", color = "Estimation Models") +
+  scale_color_manual(values = c("#E69F00", "#0072B2")) +
+  scale_fill_manual(values = c("#E69F00", "#0072B2")) +
+  theme_matt() +
+  theme(legend.position = "none", 
+        title = element_text(size = 25),
+        axis.title = element_text(size = 20),
+        axis.text= element_text(size = 20),
+        strip.text = element_text(size = 20),
+        legend.text = element_text(size = 20),
+        legend.title = element_text(size = 23), 
+        panel.grid = element_blank(),
+        axis.title.x = element_text(vjust = 5))
+
+png(here("figs", "Manuscript_Figures_v2", "NAA1_EM.png"), width = 800, height = 400)
+naa_plot1
+dev.off()
+
+selex_plot1 <- ggplot() +
+  geom_line(plot_df %>% filter(Dat_Qual == "High", Sex == "Female", time_comp == "Terminal",
+                               str_detect(OM_Scenario, "Fast-Logistic"),
+                               str_detect(EM_Scenario, "TimeInvar")) %>% 
+              mutate(EM_Scenario = factor(EM_Scenario, labels = c("1Fleet-TimeInvar-Logist",
+                                                    "1Fleet-TimeInvar-Gamma"))),
+            mapping = aes(x = Age, y = Median_Selex, color = EM_Scenario), lwd = 2, alpha = 1) +
+  geom_ribbon(plot_df %>% filter(Dat_Qual == "High", Sex == "Female", time_comp == "Terminal",
+                                 str_detect(OM_Scenario, "Fast-Logistic"),
+                                 str_detect(EM_Scenario, "TimeInvar")) %>% 
+                mutate(EM_Scenario = factor(EM_Scenario, labels = c("1Fleet-TimeInvar-Logist",
+                                                      "1Fleet-TimeInvar-Gamma"))),
+              mapping = aes(x = Age, y = Median_Selex, ymin = Lwr_95, ymax = Upr_95, fill = EM_Scenario),
+              alpha = 0.25) +
+  geom_line(plot_sel_om_df %>% filter(Dat_Qual == "High", Sex == "Female", 
+                                      time_comp %in% c( "First Year"),
+                                      str_detect(OM_Scenario, "Fast-Logistic")),
+            mapping = aes(x = Age, y = Selex), color = "black", 
+            lwd = 1.5, alpha = 1, lty = 1) +
+  scale_color_manual(values = c("#0072B2", "#E69F00")) +
+  scale_fill_manual(values = c( "#0072B2", "#E69F00")) +
+  labs(x = "Age", y = "Selectivity (Females)", lty = "Year", title = "Pre-Transition",
+       color = "Estimation Model", fill = "Estimation Model") +
+  theme_matt() +
+  theme(legend.position = "top", 
+        plot.title=element_text(hjust= 0.5),
+        axis.text = element_text(size = 20),
+        axis.title.x = element_text(vjust = 5)) 
+
+
+selex_plot2 <- ggplot() +
+  geom_line(plot_df %>% filter(Dat_Qual == "High", Sex == "Female", time_comp == "Terminal",
+                               str_detect(OM_Scenario, "Fast-Logistic"),
+                               str_detect(EM_Scenario, "TimeInvar")),
+            mapping = aes(x = Age, y = Median_Selex, color = func), lwd = 2, alpha = 1) +
+  geom_ribbon(plot_df %>% filter(Dat_Qual == "High", Sex == "Female", time_comp == "Terminal",
+                                 str_detect(OM_Scenario, "Fast-Logistic"),
+                                 str_detect(EM_Scenario, "TimeInvar")),
+              mapping = aes(x = Age, y = Median_Selex, ymin = Lwr_95, ymax = Upr_95, fill = func),
+              alpha = 0.25) +
+  geom_line(plot_sel_om_df %>% filter(Dat_Qual == "High", Sex == "Female", 
+                                      time_comp %in% c( "Terminal"),
+                                      str_detect(OM_Scenario, "Fast-Logistic")),
+            mapping = aes(x = Age, y = Selex), color = "black", 
+            lwd = 1.5, alpha = 1, lty = 2) +
+  scale_color_manual(values = c("#E69F00", "#0072B2"), guide = "none") +
+  scale_fill_manual(values = c("#E69F00", "#0072B2"), guide = "none") +
+  labs(x = "Age", y = "Selectivity (Females)", lty = "Year", title = "Post-Transition") +
+  theme_matt() +
+  theme(legend.position = c(0.7, 0.15), 
+        plot.title=element_text(hjust= 0.5),
+        axis.text = element_text(size = 20),
+        axis.title.x = element_text(vjust = 5)) 
+
+png(here("figs", "Manuscript_Figures_v2", "Selex_PrePost.png"), width = 850)
+ggpubr::ggarrange(selex_plot1, selex_plot2, common.legend = TRUE)
+dev.off()
+
+# get f plot
+# f_plot <- ggplot(f_fast_re_om %>% filter(time_comp == "Terminal",
+#                                          str_detect(OM_Scenario, "Fast-Logistic"),
+#                                          str_detect(EM_Scenario, "TimeInvar")),
+#                  mapping = aes(x = year, y = median, ymin = lwr_95, ymax = upr_95, fill = func, color = func)) + 
+#   geom_rect(xmin = -Inf, xmax = 25, ymin = -Inf, ymax = Inf, fill = "grey", alpha = 0.05, color = NA) +
+#   geom_rect(xmin = 25, xmax = Inf, ymin = -Inf, ymax = Inf, fill = "green3", alpha = 0.002, color = NA) +
+#   geom_hline(yintercept = 0, col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
+#   geom_ribbon(color = NA, alpha = 0.3) +
+#   geom_line(alpha = 1, lwd = 2) +
+#   coord_cartesian(ylim = c(-0.5, 0.5)) +
+#   scale_color_manual(values = c("#E69F00", "#0072B2"), guide = "none") +
+#   scale_fill_manual(values = c("#E69F00", "#0072B2"), guide = "none") +
+#   theme_matt() +
+#   theme(legend.key.width = unit(1.3,"cm")) +
+#   theme(legend.position = "top",
+#         axis.text = element_text(size = 20), panel.grid = element_blank(),
+#         axis.title.x = element_text(vjust = 5),
+#         axis.title = element_text(size = 20)) +
+#   labs(x = "Year", y = "Relative Error in Total Fishing Mortality")
+# 
+# png(here("figs", "Manuscript_Figures_v2", "F_Quad.png"))
+# f_plot
+# dev.off()
+
+# naa_om_plot <- ggplot(med_naa_df %>% filter(Sex == 1,
+#                              Age %in% c(3, 6, 9, 12, 21, 24, 27, 30)), 
+#        aes(x = Year, y = median, fill = factor(Age))) +
+#   geom_col(color = "black", alpha = 0.75) +
+#   theme_matt() +
+#   ggthemes::scale_fill_colorblind() +
+#   theme(legend.key.width = unit(1.3,"cm"),
+#         axis.text.y = element_text(angle = 90)) +
+#   guides(fill=guide_legend(nrow=3,byrow=TRUE)) +
+#   theme(legend.position = c(0.65, 0.8),
+#         axis.text = element_text(size = 23)) +
+#   labs(x = "Year", y = "True Median NAA (Females)", fill = "Age", title = "E)")
+
+# png(here("figs", "Manuscript_Figures_v2", "NAA_OM.png"))
+# naa_om_plot
+# dev.off()
+
+# ssb plot
+# ssb_plot <- ggplot() +
+#   geom_hline(yintercept = 0, col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
+#   geom_ribbon(ssb_fast_re_om %>% filter(time_comp == "Terminal",
+#                                         str_detect(EM_Scenario, "TimeInvar"),
+#                                         str_detect(OM_Scenario, "Fast-Logistic")),
+#               mapping = aes(x = year, y = median, ymin = lwr_95, ymax = upr_95, fill = EM_Scenario),
+#               color = NA, alpha = 0.3) +
+#   geom_line(ssb_fast_re_om %>% filter(time_comp == "Terminal",
+#                                       str_detect(EM_Scenario, "TimeInvar"),
+#                                       str_detect(OM_Scenario, "Fast-Logistic")),
+#             mapping = aes(x = year, y = median, color = EM_Scenario), alpha = 1, size = 2) +
+#   coord_cartesian(ylim = c(-0.5, 0.5)) +
+#   scale_color_manual(values = c("#E69F00", "#0072B2")) +
+#   scale_fill_manual(values = c("#E69F00", "#0072B2")) +
+#   theme_matt() +
+#   theme(legend.key.width = unit(1.3,"cm"),
+#         axis.text.y = element_text(angle = 90),
+#         axis.text = element_text(size = 23)) +
+#   theme(legend.position = "none") +
+#   labs(x = "Year", y = "Relative Error in Spawning Stock Biomass")
+# 
+# png(here("figs", "Manuscript_Figures_v2", "SSB_Quad.png"))
+# ssb_plot
+# dev.off()
+
+# Combined SSB and F plot
+f_sub <- f_fast_re_om %>% filter(time_comp == "Terminal",
+                                 str_detect(OM_Scenario, "Fast-Logistic"),
+                                 str_detect(EM_Scenario, "TimeInvar")) %>% 
+  mutate(Type = "F")
+
+ssb_sub <- ssb_fast_re_om %>% filter(time_comp == "Terminal",
+                                        str_detect(EM_Scenario, "TimeInvar"),
+                                        str_detect(OM_Scenario, "Fast-Logistic")) %>% 
+  mutate(Type = "SSB")
+
+f_ssb_sub <- rbind(f_sub, ssb_sub)
+
+f_ssb_plot <- ggplot(f_ssb_sub, mapping = aes(x = year, y = median, ymin = lwr_95, 
+                                ymax = upr_95, color = EM_Scenario,
+                                fill = EM_Scenario, lty = Type)) +
+  geom_rect(xmin = -Inf, xmax = 25, ymin = -Inf, ymax = Inf, fill = "grey", alpha = 0.05, color = NA) +
+  geom_rect(xmin = 25, xmax = Inf, ymin = -Inf, ymax = Inf, fill = "green3", alpha = 0.002, color = NA) +
+  geom_hline(yintercept = 0, col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
+  geom_ribbon(color = NA, alpha = 0.3) +
+  geom_line(alpha = 1, lwd = 2) +
+  scale_color_manual(values = c("#E69F00", "#0072B2"), guide = "none") +
+  scale_fill_manual(values = c("#E69F00", "#0072B2"), guide = "none") +
+  theme_matt() +
+  theme(legend.position = c(0.875, 0.925),
+        axis.text = element_text(size = 20), panel.grid = element_blank(),
+        axis.title.x = element_text(vjust = 5),
+        axis.title = element_text(size = 20),
+        legend.key.width = unit(1.3,"cm"),
+        legend.background = element_blank()) +
+  labs(x = "Year", y = "Relative Error", lty = "")
+
+png(here("figs", "Manuscript_Figures_v2", "F_SSB.png"), width = 800, height = 400)
+f_ssb_plot
+dev.off()
+
+
+# f_ssb_plot <- ggpubr::ggarrange(ssb_plot, f_plot, nrow = 1)
+# sel_naa_plot <- ggpubr::ggarrange(selex_plot, naa_om_plot)
+# comb_f_ssb_sel_naa_plot <- ggpubr::ggarrange(f_ssb_plot, sel_naa_plot, nrow = 2)
+# pdf(here("figs", "Manuscript_Figures_v2", "Fig6_Quad.pdf"), width = 17, height = 25)
+# ggpubr::ggarrange(naa_plot, comb_f_ssb_sel_naa_plot, 
+#                   ncol= 1, widths = c(0.5, 0.25, 0.25), common.legend = TRUE)
+# dev.off()
 
 # Figure S1 (Convergence) -------------------------------------------------
 pdf(here("figs", "Manuscript_Figures_v2", "FigS1_Convergence.pdf"), width = 25, height = 15)
@@ -978,14 +1275,17 @@ ggplot() +
     geom_ribbon(plot_df %>% filter(Dat_Qual == "High", Sex == "Female", time_comp == "Terminal",
                                    str_detect(OM_Scenario, "Fast")),
                 mapping = aes(x = Age, y = Median_Selex, ymin = Lwr_95, ymax = Upr_95, fill = func), alpha = 0.25) +
-    geom_line(plot_sel_om_df %>% filter(Dat_Qual == "High", Sex == "Female", time_comp == "Terminal",
-                                        str_detect(OM_Scenario, "Fast")),
-              mapping = aes(x = Age, y = Selex), color = "black",
-              position = position_jitter(width = 0.3), lwd = 1, alpha = 1, lty = 2) +
+  geom_line(plot_sel_om_df %>% filter(Dat_Qual == "High", Sex == "Female", 
+                                      time_comp %in% c("Terminal", "First Year"),
+                                      str_detect(OM_Scenario, "Fast")),
+            mapping = aes(x = Age, y = Selex,lty = time_comp), color = "black", 
+            lwd = 1, alpha = 1) +
     facet_grid(abbrev ~ OM_Scenario) +
     scale_color_manual(values = c("#E69F00", "#0072B2")) +
     scale_fill_manual(values = c("#E69F00", "#0072B2")) +
-    labs(x = "Age", y = "Selectivity (Females)", fill = "Functional Form", color = "Functional Form") +
+    labs(x = "Age", y = "Selectivity (Females)", 
+         fill = "Functional Form", color = "Functional Form",
+         lty = "Year") +
     theme_matt() +
     coord_cartesian(ylim = c(0, 2.5))
 dev.off()
@@ -1001,14 +1301,17 @@ ggplot() +
   geom_ribbon(plot_df %>% filter(Dat_Qual == "High", Sex == "Male", time_comp == "Terminal",
                                  str_detect(OM_Scenario, "Fast")),
               mapping = aes(x = Age, y = Median_Selex, ymin = Lwr_95, ymax = Upr_95, fill = func), alpha = 0.25) +
-  geom_line(plot_sel_om_df %>% filter(Dat_Qual == "High", Sex == "Male", time_comp == "Terminal",
+  geom_line(plot_sel_om_df %>% filter(Dat_Qual == "High", Sex == "Male", 
+                                      time_comp %in% c("Terminal", "First Year"),
                                       str_detect(OM_Scenario, "Fast")),
-            mapping = aes(x = Age, y = Selex), color = "black",
-            position = position_jitter(width = 0.3), lwd = 1, alpha = 1, lty = 2) +
+            mapping = aes(x = Age, y = Selex,lty = time_comp), color = "black", 
+            lwd = 1, alpha = 1) +
   facet_grid(abbrev ~ OM_Scenario) +
   scale_color_manual(values = c("#E69F00", "#0072B2")) +
   scale_fill_manual(values = c("#E69F00", "#0072B2")) +
-  labs(x = "Age", y = "Selectivity (Males)", fill = "Functional Form", color = "Functional Form") +
+  labs(x = "Age", y = "Selectivity (Females)", 
+       fill = "Functional Form", color = "Functional Form",
+       lty = "Year") +
   theme_matt() +
   coord_cartesian(ylim = c(0, 2.5))
 dev.off()
@@ -1026,14 +1329,17 @@ ggplot() +
   geom_ribbon(plot_df %>% filter(Dat_Qual == "High", Sex == "Female", time_comp == "Terminal",
                                  str_detect(OM_Scenario, "Slow")),
               mapping = aes(x = Age, y = Median_Selex, ymin = Lwr_95, ymax = Upr_95, fill = func), alpha = 0.25) +
-  geom_line(plot_sel_om_df %>% filter(Dat_Qual == "High", Sex == "Female", time_comp == "Terminal",
+  geom_line(plot_sel_om_df %>% filter(Dat_Qual == "High", Sex == "Female", 
+                                      time_comp %in% c("Terminal", "First Year"),
                                       str_detect(OM_Scenario, "Slow")),
-            mapping = aes(x = Age, y = Selex), color = "black",
-            position = position_jitter(width = 0.3), lwd = 1, alpha = 1, lty = 2) +
+            mapping = aes(x = Age, y = Selex,lty = time_comp), color = "black", 
+            lwd = 1, alpha = 1) +
   facet_grid(abbrev ~ OM_Scenario) +
   scale_color_manual(values = c("#E69F00", "#0072B2")) +
   scale_fill_manual(values = c("#E69F00", "#0072B2")) +
-  labs(x = "Age", y = "Selectivity (Females)", fill = "Functional Form", color = "Functional Form") +
+  labs(x = "Age", y = "Selectivity (Females)", 
+       fill = "Functional Form", color = "Functional Form",
+       lty = "Year") +
   theme_matt() +
   coord_cartesian(ylim = c(0, 2.5))
 dev.off()
@@ -1049,14 +1355,17 @@ ggplot() +
   geom_ribbon(plot_df %>% filter(Dat_Qual == "High", Sex == "Male", time_comp == "Terminal",
                                  str_detect(OM_Scenario, "Slow")),
               mapping = aes(x = Age, y = Median_Selex, ymin = Lwr_95, ymax = Upr_95, fill = func), alpha = 0.25) +
-  geom_line(plot_sel_om_df %>% filter(Dat_Qual == "High", Sex == "Male", time_comp == "Terminal",
+  geom_line(plot_sel_om_df %>% filter(Dat_Qual == "High", Sex == "Male", 
+                                      time_comp %in% c("Terminal", "First Year"),
                                       str_detect(OM_Scenario, "Slow")),
-            mapping = aes(x = Age, y = Selex), color = "black",
-            position = position_jitter(width = 0.3), lwd = 1, alpha = 1, lty = 2) +
+            mapping = aes(x = Age, y = Selex,lty = time_comp), color = "black", 
+            lwd = 1, alpha = 1) +
   facet_grid(abbrev ~ OM_Scenario) +
   scale_color_manual(values = c("#E69F00", "#0072B2")) +
   scale_fill_manual(values = c("#E69F00", "#0072B2")) +
-  labs(x = "Age", y = "Selectivity (Males)", fill = "Functional Form", color = "Functional Form") +
+  labs(x = "Age", y = "Selectivity (Females)", 
+       fill = "Functional Form", color = "Functional Form",
+       lty = "Year") +
   theme_matt() +
   coord_cartesian(ylim = c(0, 2.5))
 dev.off()

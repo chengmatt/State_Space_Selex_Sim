@@ -245,7 +245,7 @@ for(i in 1:length(unique_oms)) {
 data.table::fwrite(data.table::rbindlist(om_list), here("output", "OM_Fish_Selex.csv"), row.names = FALSE)
 
 # Get Population Selex ----------------------------------------------------
-time_comp <- c("Fleet Intersect", "Fleet Trans End", "Terminal")
+time_comp <- c("First Year", "Fleet Intersect", "Fleet Trans End", "Terminal")
 
 ### OM ----------------------------------------------------------------------
 pop_sel_om <- data.frame()
@@ -254,8 +254,8 @@ for(i in 1:length(unique_oms)) {
   # Load in a given OM
   load(here(om_scenario_path, unique_oms[i], paste(unique_oms[i], ".RData", sep = "")))
   # Assessment years to filter to
-  if(str_detect(unique_oms[i], "Fast")) yr <- c(27, 30, 50)
-  if(str_detect(unique_oms[i], "Slow")) yr <- c(36, 50, 70)
+  if(str_detect(unique_oms[i], "Fast")) yr <- c(1, 27, 30, 50)
+  if(str_detect(unique_oms[i], "Slow")) yr <- c(1, 36, 50, 70)
   
   for(j in 1:length(time_comp)) {
     
@@ -623,6 +623,32 @@ for(i in 1:length(unique_oms)) {
 
   print(i)
 } # end i
+
+
+### Summarize NAA -----------------------------------------------------------
+all_naa_sum <- data.frame()
+for(i in 1:length(unique_oms)) {
+# read in data
+NAA_df_re = data.table::fread(here("output", "OM_Scenarios", unique_oms[i], "OM_EM_NAA.csv"))
+
+# Do some residual munging
+NAA_df_re_plot <- NAA_df_re %>%
+  filter(conv == "Converged") %>% 
+  mutate(RE = (Est_Numbers - True_Numbers) / True_Numbers) %>%
+  group_by(OM_Scenario, EM_Scenario, Year, Age, Sex, time_comp) %>%
+  summarize(Median_RE = median(RE, na.rm = TRUE),
+            Lwr_95 = quantile(RE, 0.025, na.rm = TRUE),
+            Upr_95 = quantile(RE, 0.975, na.rm = TRUE))
+
+# Now relevel factor for organizing plot
+NAA_df_re_plot <- NAA_df_re_plot %>%
+  mutate(time_comp = factor(time_comp,
+                            levels = c("Fleet Intersect", "Fleet Trans End", "Terminal")))
+all_naa_sum <- rbind(all_naa_sum, NAA_df_re_plot) # bind
+print(i)
+}
+
+write.csv(all_naa_sum, here("output", "NAA_Summary.csv")) # write out csv
 
 # # Get composition fits ----------------------------------------------------
 # all_em_fish_comps_list <- list() # em pred composition list

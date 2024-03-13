@@ -528,6 +528,17 @@ dev.off()
 
 # Biomass at age ----------------------------------------------------------
 
+biom_summary <- biom_df %>% 
+  filter(str_detect(OM_Scenario, "High"),
+         Year != 100) %>% 
+  mutate(Sex = ifelse(Sex == 1, "Female", "Male"),
+         OM_Scenario = str_remove(OM_Scenario, "_High")
+  ) %>% 
+  group_by(Sim, Year,OM_Scenario) %>% 
+  summarize(sum = sum(Value)) %>% 
+  group_by(Year, OM_Scenario) %>% 
+  summarize(median = median(sum))
+
 med_biom_df <- biom_df %>% 
   filter(str_detect(OM_Scenario, "High"),
          Year != 100) %>% 
@@ -586,7 +597,6 @@ med_biom_df %>% filter(str_detect(OM_Scenario, "Fast"),
           legend.title = element_text(size = 25),
           legend.text = element_text(size = 23),
           strip.text = element_text(size = 18)) )
-
 dev.off()
 
 # Effective Sample Size ---------------------------------------------------
