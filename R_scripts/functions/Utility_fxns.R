@@ -846,7 +846,8 @@ theme_matt <- function() {
           axis.text= element_text(size = 18, color = "black"),
           legend.text = element_text(size = 23),
           legend.title = element_text(size = 25),
-          title = element_text(size = 25)) 
+          title = element_text(size = 25),
+          plot.title = element_text(hjust = 0.5)) 
 }
 
 # Get AIC values here

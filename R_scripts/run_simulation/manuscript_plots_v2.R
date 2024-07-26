@@ -658,7 +658,7 @@ ggplot() +
   theme(legend.position = "top") +
   labs(x = "Year", y = "Relative Error in Spawning Stock Biomass", fill = "Functional Form",
        color = "Functional Form", lty = "Assessment Period", alpha = "Assessment Period",
-       size = "Assessment Period")
+       size = "Assessment Period", title = "Fast Transition")
 dev.off()
 
 # Figure 3 (RE SSB Slow) --------------------------------------------------
@@ -706,7 +706,7 @@ ggplot() +
   theme(legend.position = "top") +
   labs(x = "Year", y = "Relative Error in Spawning Stock Biomass", fill = "Functional Form",
        color = "Functional Form", lty = "Assessment Period", alpha = "Assessment Period",
-       size = "Assessment Period")
+       size = "Assessment Period", title = "Slow Transition")
 dev.off()
 
 
@@ -724,7 +724,7 @@ print(
     scale_fill_manual(values = c("#E69F00", "#0072B2")) +
     scale_x_discrete(guide = guide_axis(angle = 45)) +
     labs(x = "Estimation Models", y = "Relative Error in ABC", 
-         fill = "Functional Form", color = "Functional Form") +
+         fill = "Functional Form", color = "Functional Form", title = "Fast Transition") +
     theme_matt() +
     theme(legend.position = "top", 
           title = element_text(size = 20),
@@ -749,7 +749,7 @@ print(
     scale_fill_manual(values = c("#E69F00", "#0072B2")) +
     scale_x_discrete(guide = guide_axis(angle = 45)) +
     labs(x = "Estimation Models", y = "Relative Error in ABC", 
-         fill = "Functional Form", color = "Functional Form") +
+         fill = "Functional Form", color = "Functional Form", title = "Slow Transition") +
     theme_matt() +
     theme(legend.position = "top", 
           title = element_text(size = 20),
@@ -1087,105 +1087,105 @@ ggplot(onefleet_aic %>% filter(Dat_Qual == "High") %>%
 dev.off()
 
 # Figure S4 (RE Total F Fast) --------------------------------------------------
-
-# Filter to fast scenario, and differentiate models
-f_fast_re_om = ts_re_om %>% 
-  filter(par_name == "Total Fishing Mortality", str_detect(OM_Scenario, "Fast")) %>% 
-  mutate( OM_Scenario = factor(OM_Scenario, levels = fast_om_plot_order),
-          model_type = case_when( # differenitate model types
-            str_detect(EM_Scenario, 'Random') ~ "1Fleet Random Walk",
-            str_detect(EM_Scenario, 'Semi') ~ "1Fleet Semi-Parametric",
-            str_detect(EM_Scenario, 'TimeInvar') ~ "1Fleet TimeInvar",
-            str_detect(EM_Scenario, 'TimeBlk') ~ "1Fleet TimeBlock",
-            str_detect(EM_Scenario, '2Fl') ~ "2Fleet TimeInvar"
-          ),
-          func = ifelse(str_detect(EM_Scenario, "Gamma"), "Gamma", "Logistic"),
-          func = ifelse(str_detect(EM_Scenario, "Gamma"), "Gamma", "Logistic"),
-          abbrev = case_when(
-            str_detect(model_type, "2Fleet") ~ "2Fleet",
-            str_detect(model_type, "TimeInvar") ~ "1Fleet-TimeInvar",
-            str_detect(model_type, "Block") ~ "1Fleet-Block",
-            str_detect(model_type, "Random") ~ "1Fleet-RandWlkPar",
-            str_detect(model_type, "Semi") ~ "1Fleet-SemiPar"
-          ),
-          abbrev = factor(abbrev, levels = c("2Fleet", "1Fleet-TimeInvar",
-                                             "1Fleet-Block", "1Fleet-RandWlkPar",
-                                             "1Fleet-SemiPar"))) %>%  # functional form
-  filter(Dat_Qual == "High")
-
-
-pdf(here("figs", "Manuscript_Figures_v2", "FigS4_F.pdf"), width = 19, height = 21)
-ggplot() + 
-  geom_hline(yintercept = 0, col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
-  geom_ribbon(f_fast_re_om %>% filter(time_comp == "Terminal"),
-              mapping = aes(x = year, y = median, ymin = lwr_95, ymax = upr_95, fill = func), 
-              color = NA, alpha = 0.3) +
-  geom_line(f_fast_re_om, mapping = aes(x = year, y = median, size = time_comp,
-                                          color = func, linetype = time_comp), alpha = 1) +
-  facet_grid(abbrev ~ OM_Scenario) +
-  coord_cartesian(ylim = c(-0.5, 0.5)) +
-  scale_linetype_manual(values = c("Fleet Intersect" = 3, "Fleet Trans End" = 2, "Terminal" = 1)) +
-  scale_size_manual(values = c("Fleet Intersect" = 2.8, "Fleet Trans End" = 1.35, "Terminal" = 1.5)) +
-  scale_color_manual(values = c("#E69F00", "#0072B2")) +
-  scale_fill_manual(values = c("#E69F00", "#0072B2")) +
-  theme_matt() +
-  theme(legend.key.width = unit(1.3,"cm")) +
-  theme(legend.position = "top") +
-  labs(x = "Year", y = "Relative Error in Total Fishing Mortality", fill = "Functional Form",
-       color = "Functional Form", lty = "Assessment Period", alpha = "Assessment Period",
-       size = "Assessment Period")
-dev.off()
-
-
-# Figure S5 (RE Total F Slow) --------------------------------------------------
-
-# Filter to fast scenario, and differentiate models
-f_slow_re_om = ts_re_om %>% 
-  filter(par_name == "Total Fishing Mortality", str_detect(OM_Scenario, "Slow")) %>% 
-  mutate( OM_Scenario = factor(OM_Scenario, levels = slow_om_plot_order),
-          model_type = case_when( # differenitate model types
-            str_detect(EM_Scenario, 'Random') ~ "1Fleet Random Walk",
-            str_detect(EM_Scenario, 'Semi') ~ "1Fleet Semi-Parametric",
-            str_detect(EM_Scenario, 'TimeInvar') ~ "1Fleet TimeInvar",
-            str_detect(EM_Scenario, 'TimeBlk') ~ "1Fleet TimeBlock",
-            str_detect(EM_Scenario, '2Fl') ~ "2Fleet TimeInvar"
-          ),
-          func = ifelse(str_detect(EM_Scenario, "Gamma"), "Gamma", "Logistic"),
-          func = ifelse(str_detect(EM_Scenario, "Gamma"), "Gamma", "Logistic"),
-          abbrev = case_when(
-            str_detect(model_type, "2Fleet") ~ "2Fleet",
-            str_detect(model_type, "TimeInvar") ~ "1Fleet-TimeInvar",
-            str_detect(model_type, "Block") ~ "1Fleet-Block",
-            str_detect(model_type, "Random") ~ "1Fleet-RandWlkPar",
-            str_detect(model_type, "Semi") ~ "1Fleet-SemiPar"
-          ),
-          abbrev = factor(abbrev, levels = c("2Fleet", "1Fleet-TimeInvar",
-                                             "1Fleet-Block", "1Fleet-RandWlkPar",
-                                             "1Fleet-SemiPar"))) %>%  # functional form
-  filter(Dat_Qual == "High")
-
-
-pdf(here("figs", "Manuscript_Figures_v2", "FigS5_F.pdf"), width = 19, height = 21)
-ggplot() + 
-  geom_hline(yintercept = 0, col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
-  geom_ribbon(f_slow_re_om %>% filter(time_comp == "Terminal"),
-              mapping = aes(x = year, y = median, ymin = lwr_95, ymax = upr_95, fill = func), 
-              color = NA, alpha = 0.3) +
-  geom_line(f_slow_re_om, mapping = aes(x = year, y = median, size = time_comp,
-                                        color = func, linetype = time_comp), alpha = 1) +
-  facet_grid(abbrev ~ OM_Scenario) +
-  coord_cartesian(ylim = c(-0.5, 0.5)) +
-  scale_linetype_manual(values = c("Fleet Intersect" = 3, "Fleet Trans End" = 2, "Terminal" = 1)) +
-  scale_size_manual(values = c("Fleet Intersect" = 2.8, "Fleet Trans End" = 1.35, "Terminal" = 1.5)) +
-  scale_color_manual(values = c("#E69F00", "#0072B2")) +
-  scale_fill_manual(values = c("#E69F00", "#0072B2")) +
-  theme_matt() +
-  theme(legend.key.width = unit(1.3,"cm")) +
-  theme(legend.position = "top") +
-  labs(x = "Year", y = "Relative Error in Total Fishing Mortality", fill = "Functional Form",
-       color = "Functional Form", lty = "Assessment Period", alpha = "Assessment Period",
-       size = "Assessment Period")
-dev.off()
+# 
+# # Filter to fast scenario, and differentiate models
+# f_fast_re_om = ts_re_om %>% 
+#   filter(par_name == "Total Fishing Mortality", str_detect(OM_Scenario, "Fast")) %>% 
+#   mutate( OM_Scenario = factor(OM_Scenario, levels = fast_om_plot_order),
+#           model_type = case_when( # differenitate model types
+#             str_detect(EM_Scenario, 'Random') ~ "1Fleet Random Walk",
+#             str_detect(EM_Scenario, 'Semi') ~ "1Fleet Semi-Parametric",
+#             str_detect(EM_Scenario, 'TimeInvar') ~ "1Fleet TimeInvar",
+#             str_detect(EM_Scenario, 'TimeBlk') ~ "1Fleet TimeBlock",
+#             str_detect(EM_Scenario, '2Fl') ~ "2Fleet TimeInvar"
+#           ),
+#           func = ifelse(str_detect(EM_Scenario, "Gamma"), "Gamma", "Logistic"),
+#           func = ifelse(str_detect(EM_Scenario, "Gamma"), "Gamma", "Logistic"),
+#           abbrev = case_when(
+#             str_detect(model_type, "2Fleet") ~ "2Fleet",
+#             str_detect(model_type, "TimeInvar") ~ "1Fleet-TimeInvar",
+#             str_detect(model_type, "Block") ~ "1Fleet-Block",
+#             str_detect(model_type, "Random") ~ "1Fleet-RandWlkPar",
+#             str_detect(model_type, "Semi") ~ "1Fleet-SemiPar"
+#           ),
+#           abbrev = factor(abbrev, levels = c("2Fleet", "1Fleet-TimeInvar",
+#                                              "1Fleet-Block", "1Fleet-RandWlkPar",
+#                                              "1Fleet-SemiPar"))) %>%  # functional form
+#   filter(Dat_Qual == "High")
+# 
+# 
+# pdf(here("figs", "Manuscript_Figures_v2", "FigS4_F.pdf"), width = 19, height = 21)
+# ggplot() + 
+#   geom_hline(yintercept = 0, col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
+#   geom_ribbon(f_fast_re_om %>% filter(time_comp == "Terminal"),
+#               mapping = aes(x = year, y = median, ymin = lwr_95, ymax = upr_95, fill = func), 
+#               color = NA, alpha = 0.3) +
+#   geom_line(f_fast_re_om, mapping = aes(x = year, y = median, size = time_comp,
+#                                           color = func, linetype = time_comp), alpha = 1) +
+#   facet_grid(abbrev ~ OM_Scenario) +
+#   coord_cartesian(ylim = c(-0.5, 0.5)) +
+#   scale_linetype_manual(values = c("Fleet Intersect" = 3, "Fleet Trans End" = 2, "Terminal" = 1)) +
+#   scale_size_manual(values = c("Fleet Intersect" = 2.8, "Fleet Trans End" = 1.35, "Terminal" = 1.5)) +
+#   scale_color_manual(values = c("#E69F00", "#0072B2")) +
+#   scale_fill_manual(values = c("#E69F00", "#0072B2")) +
+#   theme_matt() +
+#   theme(legend.key.width = unit(1.3,"cm")) +
+#   theme(legend.position = "top") +
+#   labs(x = "Year", y = "Relative Error in Total Fishing Mortality", fill = "Functional Form",
+#        color = "Functional Form", lty = "Assessment Period", alpha = "Assessment Period",
+#        size = "Assessment Period", title = "Fast Transition")
+# dev.off()
+# 
+# 
+# # Figure S5 (RE Total F Slow) --------------------------------------------------
+# 
+# # Filter to fast scenario, and differentiate models
+# f_slow_re_om = ts_re_om %>% 
+#   filter(par_name == "Total Fishing Mortality", str_detect(OM_Scenario, "Slow")) %>% 
+#   mutate( OM_Scenario = factor(OM_Scenario, levels = slow_om_plot_order),
+#           model_type = case_when( # differenitate model types
+#             str_detect(EM_Scenario, 'Random') ~ "1Fleet Random Walk",
+#             str_detect(EM_Scenario, 'Semi') ~ "1Fleet Semi-Parametric",
+#             str_detect(EM_Scenario, 'TimeInvar') ~ "1Fleet TimeInvar",
+#             str_detect(EM_Scenario, 'TimeBlk') ~ "1Fleet TimeBlock",
+#             str_detect(EM_Scenario, '2Fl') ~ "2Fleet TimeInvar"
+#           ),
+#           func = ifelse(str_detect(EM_Scenario, "Gamma"), "Gamma", "Logistic"),
+#           func = ifelse(str_detect(EM_Scenario, "Gamma"), "Gamma", "Logistic"),
+#           abbrev = case_when(
+#             str_detect(model_type, "2Fleet") ~ "2Fleet",
+#             str_detect(model_type, "TimeInvar") ~ "1Fleet-TimeInvar",
+#             str_detect(model_type, "Block") ~ "1Fleet-Block",
+#             str_detect(model_type, "Random") ~ "1Fleet-RandWlkPar",
+#             str_detect(model_type, "Semi") ~ "1Fleet-SemiPar"
+#           ),
+#           abbrev = factor(abbrev, levels = c("2Fleet", "1Fleet-TimeInvar",
+#                                              "1Fleet-Block", "1Fleet-RandWlkPar",
+#                                              "1Fleet-SemiPar"))) %>%  # functional form
+#   filter(Dat_Qual == "High")
+# 
+# 
+# pdf(here("figs", "Manuscript_Figures_v2", "FigS5_F.pdf"), width = 19, height = 21)
+# ggplot() + 
+#   geom_hline(yintercept = 0, col = "black", lty = 2, linewidth = 0.5, alpha = 1) +
+#   geom_ribbon(f_slow_re_om %>% filter(time_comp == "Terminal"),
+#               mapping = aes(x = year, y = median, ymin = lwr_95, ymax = upr_95, fill = func), 
+#               color = NA, alpha = 0.3) +
+#   geom_line(f_slow_re_om, mapping = aes(x = year, y = median, size = time_comp,
+#                                         color = func, linetype = time_comp), alpha = 1) +
+#   facet_grid(abbrev ~ OM_Scenario) +
+#   coord_cartesian(ylim = c(-0.5, 0.5)) +
+#   scale_linetype_manual(values = c("Fleet Intersect" = 3, "Fleet Trans End" = 2, "Terminal" = 1)) +
+#   scale_size_manual(values = c("Fleet Intersect" = 2.8, "Fleet Trans End" = 1.35, "Terminal" = 1.5)) +
+#   scale_color_manual(values = c("#E69F00", "#0072B2")) +
+#   scale_fill_manual(values = c("#E69F00", "#0072B2")) +
+#   theme_matt() +
+#   theme(legend.key.width = unit(1.3,"cm")) +
+#   theme(legend.position = "top") +
+#   labs(x = "Year", y = "Relative Error in Total Fishing Mortality", fill = "Functional Form",
+#        color = "Functional Form", lty = "Assessment Period", alpha = "Assessment Period",
+#        size = "Assessment Period", title = "Slow Transition")
+# dev.off()
 
 # Figure S6 (Time Block AIC) ----------------------------------------------
 
@@ -1225,7 +1225,7 @@ dev.off()
   guides(linetype = "none") +
   facet_grid(time_comp~OM_Scenario) + 
   labs(x = "Year", y = "Relative Error in Spawning Biomass", 
-       color = "Years since fleet structure change (Time Block specification)") +
+       color = "Years since fleet structure change (Time Block specification)", title = "Fast Transition") +
   theme_matt() +
   theme(legend.position = "top", 
           title = element_text(size = 20),
@@ -1247,7 +1247,7 @@ dev.off()
     guides(linetype = "none") +
     facet_grid(time_comp~OM_Scenario) + 
     labs(x = "Year", y = "Relative Error in Spawning Biomass", 
-         color = "Years since fleet structure change (Time Block specification)") +
+         color = "Years since fleet structure change (Time Block specification)", title = "Fast Transition") +
     theme_matt() +
     theme(legend.position = "top", 
           title = element_text(size = 20),
@@ -1285,7 +1285,7 @@ ggplot() +
     scale_fill_manual(values = c("#E69F00", "#0072B2")) +
     labs(x = "Age", y = "Selectivity (Females)", 
          fill = "Functional Form", color = "Functional Form",
-         lty = "Year") +
+         lty = "Year", title = "Fast Transition") +
     theme_matt() +
     coord_cartesian(ylim = c(0, 2.5))
 dev.off()
@@ -1309,9 +1309,9 @@ ggplot() +
   facet_grid(abbrev ~ OM_Scenario) +
   scale_color_manual(values = c("#E69F00", "#0072B2")) +
   scale_fill_manual(values = c("#E69F00", "#0072B2")) +
-  labs(x = "Age", y = "Selectivity (Females)", 
+  labs(x = "Age", y = "Selectivity (Males)", 
        fill = "Functional Form", color = "Functional Form",
-       lty = "Year") +
+       lty = "Year", title = "Fast Transition") +
   theme_matt() +
   coord_cartesian(ylim = c(0, 2.5))
 dev.off()
@@ -1339,7 +1339,7 @@ ggplot() +
   scale_fill_manual(values = c("#E69F00", "#0072B2")) +
   labs(x = "Age", y = "Selectivity (Females)", 
        fill = "Functional Form", color = "Functional Form",
-       lty = "Year") +
+       lty = "Year", title = "Slow Transition") +
   theme_matt() +
   coord_cartesian(ylim = c(0, 2.5))
 dev.off()
@@ -1363,9 +1363,9 @@ ggplot() +
   facet_grid(abbrev ~ OM_Scenario) +
   scale_color_manual(values = c("#E69F00", "#0072B2")) +
   scale_fill_manual(values = c("#E69F00", "#0072B2")) +
-  labs(x = "Age", y = "Selectivity (Females)", 
+  labs(x = "Age", y = "Selectivity (Males)", 
        fill = "Functional Form", color = "Functional Form",
-       lty = "Year") +
+       lty = "Year", title = "Slow Transition") +
   theme_matt() +
   coord_cartesian(ylim = c(0, 2.5))
 dev.off()
